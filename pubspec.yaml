@@ -1,0 +1,70 @@
+name: flutter_user_app
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_native_splash: ^2.4.4
+  flutter_otp_text_field: ^1.5.1+1
+  flutter_svg: ^2.0.17
+  intl: ^0.20.2
+  country_picker: ^2.0.27
+  camera: ^0.10.5+9
+  image_picker: ^1.0.4
+  emoji_picker_flutter: ^3.1.0
+  google_nav_bar: ^5.0.7
+  flex_color_scheme: ^8.1.1
+  csc_picker_plus: ^0.0.3
+  provider: ^6.1.2
+  video_player: ^2.7.0
+  shared_preferences: ^2.5.2
+  table_calendar: ^3.2.0
+  permission_handler: ^11.0.1
+  readmore: ^3.0.0
+  smooth_page_indicator: ^1.2.1
+  dartz: ^0.10.1
+  equatable: ^2.0.7
+  like_button: ^2.0.5
+  lottie: ^3.3.1
+  timeago: ^3.2.2
+  popover: ^0.3.1
+  flutter_context_menu: ^0.2.2
+  http: ^1.2.0
+  url_launcher: ^6.2.5
+  flutter_dotenv: ^5.1.0
+  share_plus: ^12.0.1
+  path_provider: ^2.1.5
+  screenshot: ^3.0.0
+  gal: ^2.3.2
+  photo_manager: ^3.8.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+  - .env
+  - assets/splash/
+  - assets/illustrations/
+  - assets/icons/
+  - assets/icons_bottomnav/
+  - assets/contact_icons/
+  - assets/video/
+  - assets/lottie/
+
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/splash/namo_logo.png
+  android_12:
+    image: assets/splash/namo_logo_a12.png
+    color: "#ffffff"
+  web: true

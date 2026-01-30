@@ -19,6 +19,17 @@ class TempleModel {
   final String email;
   final String phoneNumber;
   final bool isVerified;
+  final String city;
+  final String state;
+  final String country;
+  final String zipCode;
+  final String website;
+  final String openTime;
+  final String closeTime;
+  final String bankName;
+  final String bankAccountNumber;
+  final String bankIfsc;
+  final String bankAccountHolder;
 
   TempleModel({
     required this.id,
@@ -38,6 +49,17 @@ class TempleModel {
     required this.email,
     required this.phoneNumber,
     required this.isVerified,
+    this.city = '',
+    this.state = '',
+    this.country = '',
+    this.zipCode = '',
+    this.website = '',
+    this.openTime = '',
+    this.closeTime = '',
+    this.bankName = '',
+    this.bankAccountNumber = '',
+    this.bankIfsc = '',
+    this.bankAccountHolder = '',
   });
 
   factory TempleModel.fromJson(Map<String, dynamic> json) {
@@ -58,6 +80,15 @@ class TempleModel {
     }
     if (loc.isEmpty) loc = 'India';
 
+    // 3. Parse Nested Objects
+    final timings = json['timings'] != null && json['timings'] is Map 
+        ? json['timings'] 
+        : <String, dynamic>{};
+    
+    final bank = json['bankDetails'] != null && json['bankDetails'] is Map 
+        ? json['bankDetails'] 
+        : <String, dynamic>{};
+
     return TempleModel(
       id: json['_id'] ?? '',
       name: json['templeName'] ?? 'Unknown Temple',
@@ -77,6 +108,17 @@ class TempleModel {
       email: json['email'] ?? '',
       phoneNumber: json['pocPhoneNumber'] ?? '',
       isVerified: json['isVerified'] ?? false,
+      city: json['city'] ?? '',
+      state: json['state'] ?? '',
+      country: json['country'] ?? '',
+      zipCode: json['zipCode'] ?? '',
+      website: json['website'] ?? '',
+      openTime: timings['openTime'] ?? '',
+      closeTime: timings['closeTime'] ?? '',
+      bankName: bank['bankName'] ?? '',
+      bankAccountNumber: bank['bankAccountNumber'] ?? '',
+      bankIfsc: bank['ifscCode'] ?? '',
+      bankAccountHolder: bank['accountHolderName'] ?? '',
     );
   }
 }

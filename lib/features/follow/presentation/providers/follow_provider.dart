@@ -68,12 +68,79 @@ class FollowProvider with ChangeNotifier {
     _setError(null);
     try {
       final res = await _apiService.getFollowing(_userId!);
-      final list = (res['following'] as List<dynamic>?) ?? const [];
-      _myFollowing = list
-          .whereType<Map<String, dynamic>>()
-          .map((e) => FollowingModel.fromJson(e))
-          .toList();
+      print('FOLLOW_PROVIDER: getFollowing response keys: ${res.keys.toList()}');
+
+      List<FollowingModel> parsedList = [];
+
+      // 1. Schema: { following: [FollowingModel...] }
+      if (res['following'] != null && res['following'] is List) {
+        final list = res['following'] as List;
+        print('FOLLOW_PROVIDER: Raw list length: ${list.length}');
+        
+        for (var item in list) {
+          try {
+             if (item is Map) {
+               final Map<String, dynamic> map = Map<String, dynamic>.from(item);
+               parsedList.add(FollowingModel.fromJson(map));
+             }
+          } catch (e) {
+             print('FOLLOW_PROVIDER: Failed to parse item: $e');
+          }
+        }
+      }
+      
+      // 2. Schema: { temples: [TempleModel...], creators: [CreatorModel...] }
+      // If the API returns populated nodes, we map them to FollowingModel synthetically
+      // so we can track isFollowing state by ID.
+      if (res['temples'] != null && res['temples'] is List) {
+         final list = res['temples'] as List;
+         parsedList.addAll(list.whereType<Map<String, dynamic>>().map((e) {
+           final id = e['_id'] ?? e['id'] ?? '';
+           return FollowingModel(
+             id: id, 
+             followingId: id, // Mapping Entity ID to followingId
+             followingType: 'temple',
+             followingName: e['templeName'] ?? e['name'] ?? '',
+             followingImage: e['templePics'] != null && (e['templePics'] as List).isNotEmpty ? e['templePics'][0] : '',
+             followingLocation: e['address'] ?? ''
+           );
+         }));
+      }
+
+      if (res['creators'] != null && res['creators'] is List) {
+         final list = res['creators'] as List;
+         parsedList.addAll(list.whereType<Map<String, dynamic>>().map((e) {
+           final id = e['_id'] ?? e['id'] ?? '';
+           return FollowingModel(
+             id: id, 
+             followingId: id, // Mapping Entity ID to followingId
+             followingType: 'creator',
+             followingName: e['creatorName'] ?? '',
+             followingImage: e['profilePic'] ?? '',
+             followingLocation: e['address'] ?? ''
+           );
+         }));
+      }
+
+      _myFollowing = parsedList;
+      print('FOLLOW_PROVIDER: Parsed ${_myFollowing.length} following items');
+      if (_myFollowing.isNotEmpty) {
+        print('FOLLOW_PROVIDER: First item followingId: ${_myFollowing.first.followingId}');
+        print('FOLLOW_PROVIDER: All following IDs: ${_myFollowing.map((f) => f.followingId).toList()}');
+      } else {
+        print('FOLLOW_PROVIDER: WARNING - Following list is EMPTY!');
+        if (res['following'] != null && res['following'] is List) {
+          final rawList = res['following'] as List;
+          if (rawList.isNotEmpty) {
+             print('FOLLOW_PROVIDER: Raw first item: ${rawList.first}');
+          } else {
+             print('FOLLOW_PROVIDER: API returned empty following list');
+          }
+        }
+      }
+
     } catch (e) {
+      print('FOLLOW_PROVIDER: Error loading following: $e');
       _setError(e.toString());
     } finally {
       _isLoading = false;
@@ -114,13 +181,22 @@ class FollowProvider with ChangeNotifier {
     _setError(null);
 
     try {
+      print('FOLLOW_PROVIDER: Calling followEntity - ID: $followingId, Type: $followingType');
+      
+      // Always use the unified follow endpoint: POST /follow
       await _apiService.followEntity(
         followingId: followingId,
-        followingType: followingType,
+        followingType: followingType.toLowerCase(), // Backend expects lowercase
       );
+      
+      print('FOLLOW_PROVIDER: Follow API success, reloading following list');
       await loadMyFollowing();
+      
+      print('FOLLOW_PROVIDER: Following list updated, length: ${_myFollowing.length}');
+      // Reload followers count from API to get accurate backend data
       return true;
     } catch (e) {
+      print('FOLLOW_PROVIDER: Follow error: $e');
       _setError(e.toString());
       return false;
     } finally {
@@ -129,7 +205,10 @@ class FollowProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> unfollow(String followingId) async {
+  Future<bool> unfollow({
+    required String followingId,
+    required String followingType,
+  }) async {
     if (!canFollow) {
       _setError('Only users can unfollow');
       return false;
@@ -139,10 +218,19 @@ class FollowProvider with ChangeNotifier {
     _setError(null);
 
     try {
+      print('FOLLOW_PROVIDER: Calling unfollowEntity - ID: $followingId');
+      
+      // Always use the unified unfollow endpoint: DELETE /follow/{id}
       await _apiService.unfollowEntity(followingId);
+      
+      print('FOLLOW_PROVIDER: Unfollow API success, reloading following list');
       await loadMyFollowing();
+      
+      print('FOLLOW_PROVIDER: Following list updated, length: ${_myFollowing.length}');
+      // Reload followers count from API to get accurate backend data
       return true;
     } catch (e) {
+      print('FOLLOW_PROVIDER: Unfollow error: $e');
       _setError(e.toString());
       return false;
     } finally {

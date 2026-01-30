@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_context_menu/flutter_context_menu.dart';
 import 'package:flutter_user_app/features/posts/domain/entities/post_comment_entity.dart';
-import 'package:flutter_user_app/features/posts/data/model/post_comment_model.dart';
+import 'package:flutter_user_app/features/posts/data/models/post_comment_model.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/comment_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_user_app/features/posts/presentation/widgets/comment_context_menu.dart';

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
+import 'package:crop_your_image/crop_your_image.dart';
 import 'post_composer_page.dart';
 
 /// Image filter definition with color matrix
@@ -112,11 +113,12 @@ class CropPage extends StatefulWidget {
 }
 
 class _CropPageState extends State<CropPage> {
-  double _rotationValue = 0.0;
+  final CropController _cropController = CropController();
+  Uint8List? _imageBytes;
   bool _isCropMode = true;
   ImageFilter _selectedFilter = ImageFilter.original;
-  final GlobalKey _imageKey = GlobalKey();
   bool _isSaving = false;
+  bool _isLoading = true;
 
   final List<ImageFilter> _filters = [
     ImageFilter.original,
@@ -129,74 +131,115 @@ class _CropPageState extends State<CropPage> {
     ImageFilter.vivid,
   ];
 
-  Future<String> _saveFilteredImage() async {
-    setState(() => _isSaving = true);
-    
+  @override
+  void initState() {
+    super.initState();
+    _loadImage();
+  }
+
+  Future<void> _loadImage() async {
     try {
-      // Read original image
-      final originalFile = File(widget.imagePath);
-      final originalBytes = await originalFile.readAsBytes();
-      final codec = await ui.instantiateImageCodec(originalBytes);
-      final frame = await codec.getNextFrame();
-      final originalImage = frame.image;
-
-      // Create a picture recorder to apply filter
-      final recorder = ui.PictureRecorder();
-      final canvas = Canvas(recorder);
-      final size = Size(originalImage.width.toDouble(), originalImage.height.toDouble());
-
-      // Apply color filter matrix
-      final paint = Paint();
-      if (_selectedFilter.name != 'Original') {
-        paint.colorFilter = ColorFilter.matrix(_selectedFilter.matrix);
+      final file = File(widget.imagePath);
+      final bytes = await file.readAsBytes();
+      if (mounted) {
+        setState(() {
+          _imageBytes = bytes;
+          _isLoading = false;
+        });
       }
-
-      // Draw the filtered image
-      canvas.drawImage(originalImage, Offset.zero, paint);
-
-      // Convert to image
-      final picture = recorder.endRecording();
-      final filteredImage = await picture.toImage(
-        originalImage.width,
-        originalImage.height,
-      );
-
-      // Convert to bytes
-      final byteData = await filteredImage.toByteData(format: ui.ImageByteFormat.png);
-      final bytes = byteData!.buffer.asUint8List();
-
-      // Save to temp file
-      final tempDir = await getTemporaryDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final filteredPath = '${tempDir.path}/filtered_$timestamp.png';
-      final filteredFile = File(filteredPath);
-      await filteredFile.writeAsBytes(bytes);
-
-      return filteredPath;
     } catch (e) {
-      debugPrint('Error saving filtered image: $e');
-      return widget.imagePath; // Return original if filter fails
-    } finally {
-      setState(() => _isSaving = false);
+      debugPrint('Error loading image: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  void _navigateToPostComposer() async {
-    final imagePath = await _saveFilteredImage();
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PostComposerPage(imagePath: imagePath),
-        ),
-      );
+  Future<void> _onCropped(CropResult result) async {
+    if (result is CropSuccess) {
+      final croppedData = result.croppedImage;
+      try {
+        // If a filter is selected, we need to apply it to the cropped image
+        // If no filter, we can just save the cropped data directly
+        
+        Uint8List finalBytes = croppedData;
+
+        if (_selectedFilter.name != 'Original') {
+          final codec = await ui.instantiateImageCodec(croppedData);
+          final frame = await codec.getNextFrame();
+          final image = frame.image;
+
+          final recorder = ui.PictureRecorder();
+          final canvas = Canvas(recorder);
+          
+          final paint = Paint();
+          paint.colorFilter = ColorFilter.matrix(_selectedFilter.matrix);
+          
+          canvas.drawImage(image, Offset.zero, paint);
+          
+          final picture = recorder.endRecording();
+          final filteredImage = await picture.toImage(
+            image.width,
+            image.height,
+          );
+          
+          final byteData = await filteredImage.toByteData(format: ui.ImageByteFormat.png);
+          if (byteData != null) {
+            finalBytes = byteData.buffer.asUint8List();
+          }
+        }
+
+        // Save to temp file
+        final tempDir = await getTemporaryDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final filteredPath = '${tempDir.path}/cropped_filtered_$timestamp.png';
+        final filteredFile = File(filteredPath);
+        await filteredFile.writeAsBytes(finalBytes);
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PostComposerPage(imagePath: filteredPath),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Error processing image: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error processing image')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isSaving = false);
+        }
+      }
+    } else if (result is CropFailure) {
+       final cause = result.cause;
+       debugPrint('Crop error: $cause');
+       if (mounted) {
+         setState(() => _isSaving = false);
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('Error cropping image: $cause')),
+         );
+       }
     }
+  }
+
+  void _processImage() {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    
+    // Trigger crop - the result will be handled in onCropped callback of Crop widget
+    _cropController.crop();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.black, // Dark background for better crop visibility
       body: SafeArea(
         child: Column(
           children: [
@@ -207,264 +250,198 @@ class _CropPageState extends State<CropPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Text(
-                        'Recents',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 18,
-                          color: Colors.black,
-                        ),
-                      ),
-                      Icon(Icons.keyboard_arrow_down, color: Colors.black),
-                    ],
+                  const Text(
+                    'Crop & Filter',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                      color: Colors.white,
+                    ),
                   ),
                   TextButton(
-                    onPressed: _isSaving ? null : _navigateToPostComposer,
-                    child: Text(
-                      'Next',
-                      style: TextStyle(
-                        color: _isSaving ? Colors.grey : Colors.cyan,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    onPressed: _isSaving || _isLoading ? null : _processImage,
+                    child: _isSaving 
+                      ? const SizedBox(
+                          width: 16, 
+                          height: 16, 
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                        )
+                      : const Text(
+                          'Next',
+                          style: TextStyle(
+                            color: Colors.cyan,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                   ),
                 ],
               ),
             ),
 
-            // Image preview with filter applied
+            // Main Content
             Expanded(
-              child: Container(
-                margin: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Blurred background
-                      ImageFiltered(
-                        imageFilter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                        child: ColorFiltered(
-                          colorFilter: ColorFilter.mode(
-                            Colors.black.withAlpha(77),
-                            BlendMode.darken,
-                          ),
-                          child: Image.file(
-                            File(widget.imagePath),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      // Main image with filter and crop grid
-                      Center(
-                        child: RepaintBoundary(
-                          key: _imageKey,
-                          child: Transform.rotate(
-                            angle: _rotationValue * 3.14159 / 180,
-                            child: ColorFiltered(
-                              colorFilter: ColorFilter.matrix(_selectedFilter.matrix),
-                              child: Stack(
-                                children: [
-                                  Image.file(
-                                    File(widget.imagePath),
-                                    fit: BoxFit.contain,
-                                  ),
-                                  // Crop grid overlay (only in crop mode)
-                                  if (_isCropMode)
-                                    Positioned.fill(
-                                      child: CustomPaint(
-                                        painter: GridPainter(),
-                                      ),
-                                    ),
-                                ],
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: Colors.cyan))
+                  : _imageBytes == null
+                      ? const Center(child: Text('Failed to load image', style: TextStyle(color: Colors.white)))
+                      : Container(
+                          color: Colors.black,
+                          child: Stack(
+                            children: [
+                              // Crop Widget with Filter Preview
+                              ColorFiltered(
+                                colorFilter: ColorFilter.matrix(_selectedFilter.matrix),
+                                child: Crop(
+                                  image: _imageBytes!,
+                                  controller: _cropController,
+                                  onCropped: _onCropped,
+                                  withCircleUi: false,
+                                  baseColor: Colors.black,
+                                  maskColor: Colors.black.withOpacity(0.5),
+
+                                  // Lock crop rect interaction when not in crop mode to prevent accidental moves
+                                  interactive: _isCropMode,
+                                  cornerDotBuilder: (size, edgeAlignment) => 
+                                    _isCropMode ? const DotControl(color: Colors.cyan) : const SizedBox(),
+                                ),
                               ),
-                            ),
+                              
+                              // Loading overlay
+                              if (_isSaving)
+                                Container(
+                                  color: Colors.black.withOpacity(0.5),
+                                  child: const Center(
+                                    child: CircularProgressIndicator(color: Colors.cyan),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                      ),
-                      // Loading overlay
-                      if (_isSaving)
-                        Container(
-                          color: Colors.black.withAlpha(128),
-                          child: const Center(
-                            child: CircularProgressIndicator(color: Colors.white),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
             ),
 
-            // Crop/Filter toggle buttons
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
+            // Controls
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isCropMode = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: _isCropMode ? Colors.cyan : Colors.transparent,
-                          border: Border.all(
-                            color: _isCropMode ? Colors.cyan : Colors.grey.shade300,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Crop',
-                            style: TextStyle(
-                              color: _isCropMode ? Colors.white : Colors.grey[600],
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isCropMode = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: !_isCropMode ? Colors.cyan : Colors.transparent,
-                          border: Border.all(
-                            color: !_isCropMode ? Colors.cyan : Colors.grey.shade300,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Filter',
-                            style: TextStyle(
-                              color: !_isCropMode ? Colors.white : Colors.grey[600],
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Crop controls or Filter selection
-            if (_isCropMode) ...[
-              // Rotation slider
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: _buildRotationSlider(),
-              ),
-            ] else ...[
-              // Filter thumbnails
-              SizedBox(
-                height: 100,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _filters.length,
-                  itemBuilder: (context, index) {
-                    final filter = _filters[index];
-                    final isSelected = _selectedFilter == filter;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedFilter = filter),
-                      child: Container(
-                        width: 80,
-                        margin: const EdgeInsets.only(right: 12),
-                        decoration: BoxDecoration(
-                          border: isSelected
-                              ? Border.all(color: Colors.cyan, width: 3)
-                              : null,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: ColorFiltered(
-                                  colorFilter: ColorFilter.matrix(filter.matrix),
-                                  child: Image.file(
-                                    File(widget.imagePath),
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
+                  // Tab Buttons
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _isCropMode = true),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _isCropMode ? Colors.cyan : Colors.transparent,
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Crop',
+                                  style: TextStyle(
+                                    color: _isCropMode ? Colors.white : Colors.black,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              filter.name,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isSelected ? Colors.cyan : Colors.grey[600],
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _isCropMode = false),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !_isCropMode ? Colors.cyan : Colors.transparent,
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Filter',
+                                  style: TextStyle(
+                                    color: !_isCropMode ? Colors.white : Colors.black,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 16),
-
-            // Continue button
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _navigateToPostComposer,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.cyan,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
+                      ],
                     ),
-                    elevation: 0,
                   ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Continue',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
-                ),
+
+                  // Aspect Ratio Options (Visible only in Crop Mode)
+                  if (_isCropMode)
+                    SizedBox(
+                      height: 80,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          _buildAspectRatioButton('Free', null),
+                          _buildAspectRatioButton('1:1', 1.0),
+                          _buildAspectRatioButton('4:5', 4/5),
+                          _buildAspectRatioButton('16:9', 16/9),
+                        ],
+                      ),
+                    )
+                  // Filter Options (Visible only in Filter Mode)
+                  else
+                    SizedBox(
+                      height: 100,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _filters.length,
+                        itemBuilder: (context, index) {
+                          final filter = _filters[index];
+                          final isSelected = _selectedFilter == filter;
+                          return GestureDetector(
+                            onTap: () => setState(() => _selectedFilter = filter),
+                            child: Container(
+                              width: 80,
+                              margin: const EdgeInsets.only(right: 12),
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: ColorFiltered(
+                                        colorFilter: ColorFilter.matrix(filter.matrix),
+                                        child: _imageBytes != null 
+                                          ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                                          : Container(color: Colors.grey),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    filter.name,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isSelected ? Colors.cyan : Colors.grey[600],
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
               ),
             ),
           ],
@@ -473,97 +450,23 @@ class _CropPageState extends State<CropPage> {
     );
   }
 
-  Widget _buildRotationSlider() {
-    return Column(
-      children: [
-        Row(
+  Widget _buildAspectRatioButton(String label, double? ratio) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: GestureDetector(
+        onTap: () {
+          _cropController.aspectRatio = ratio;
+          // crop_your_image updates UI automatically when ratio changes
+        },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 20,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: Colors.cyan,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(4),
-                  bottomLeft: Radius.circular(4),
-                ),
-              ),
-            ),
-            Expanded(
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: Colors.cyan,
-                  inactiveTrackColor: Colors.grey[300],
-                  thumbColor: Colors.cyan,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-                  trackHeight: 4,
-                ),
-                child: Slider(
-                  value: _rotationValue,
-                  min: -15,
-                  max: 15,
-                  divisions: 30,
-                  onChanged: (value) {
-                    setState(() => _rotationValue = value);
-                  },
-                ),
-              ),
-            ),
-            Container(
-              width: 20,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: Colors.cyan,
-                borderRadius: BorderRadius.only(
-                  topRight: Radius.circular(4),
-                  bottomRight: Radius.circular(4),
-                ),
-              ),
-            ),
+            Icon(Icons.crop_free, color: Colors.grey[800]),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 12)),
           ],
         ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('-15', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-            Text(
-              '${_rotationValue.toInt()}°',
-              style: const TextStyle(
-                color: Colors.cyan,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-            Text('15', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-          ],
-        ),
-      ],
+      ),
     );
   }
-}
-
-class GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withAlpha(179)
-      ..strokeWidth = 1;
-
-    // Draw vertical lines
-    for (int i = 1; i < 3; i++) {
-      double x = size.width * i / 3;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-
-    // Draw horizontal lines
-    for (int i = 1; i < 3; i++) {
-      double y = size.height * i / 3;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

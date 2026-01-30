@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/api/api_service.dart';
@@ -27,14 +28,14 @@ class _FollowingListView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Following'),
+        title: Text(AppLocalizations.of(context)!.following),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
       ),
       body: Consumer<FollowProvider>(
         builder: (context, provider, child) {
           if (provider.userType != null && provider.userType != 'User') {
-            return const Center(child: Text('Only users have a following list.'));
+            return Center(child: Text(AppLocalizations.of(context)!.onlyUsersHaveFollowingList));
           }
 
           if (provider.isLoading && provider.myFollowing.isEmpty) {
@@ -52,7 +53,7 @@ class _FollowingListView extends StatelessWidget {
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: () => provider.loadMyFollowing(),
-                      child: const Text('Retry'),
+                      child: Text(AppLocalizations.of(context)!.retry),
                     )
                   ],
                 ),
@@ -64,9 +65,9 @@ class _FollowingListView extends StatelessWidget {
             return RefreshIndicator(
               onRefresh: () => provider.loadMyFollowing(),
               child: ListView(
-                children: const [
+                children: [
                   SizedBox(height: 160),
-                  Center(child: Text('You are not following anyone yet.')),
+                  Center(child: Text(AppLocalizations.of(context)!.noFollowingYet)),
                 ],
               ),
             );
@@ -116,20 +117,24 @@ class _FollowingListView extends StatelessWidget {
                           )
                         : OutlinedButton(
                             onPressed: () async {
-                              final ok = await provider.unfollow(item.followingId);
+                              final ok = await provider.unfollow(
+                                followingId: item.followingId,
+                                followingType: item.followingType,
+                              );
+
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       ok
-                                          ? 'Unfollowed ${item.followingName}'
+                                          ? AppLocalizations.of(context)!.unfollowed(item.followingName)
                                           : (provider.error ?? 'Failed to unfollow'),
                                     ),
                                   ),
                                 );
                               }
                             },
-                            child: const Text('Unfollow'),
+                            child: Text(AppLocalizations.of(context)!.unfollow),
                           ),
                   ),
                 );

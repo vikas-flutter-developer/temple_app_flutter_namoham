@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/api/api_service.dart';
@@ -58,7 +59,7 @@ class _FollowersView extends StatelessWidget {
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: () => provider.loadFollowers(entityId),
-                      child: const Text('Retry'),
+                      child: Text(AppLocalizations.of(context)!.retry),
                     )
                   ],
                 ),
@@ -70,9 +71,9 @@ class _FollowersView extends StatelessWidget {
             return RefreshIndicator(
               onRefresh: () => provider.loadFollowers(entityId),
               child: ListView(
-                children: const [
+                children: [
                   SizedBox(height: 160),
-                  Center(child: Text('No followers yet.')),
+                  Center(child: Text(AppLocalizations.of(context)!.noFollowersYet)),
                 ],
               ),
             );

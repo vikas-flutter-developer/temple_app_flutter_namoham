@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:flutter_user_app/core/provider/theme_provider.dart';
+import 'package:flutter_user_app/core/providers/locale_provider.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
 import 'package:flutter_user_app/features/posts/presentation/providers/post_provider.dart';
@@ -11,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_main_layout.dart';
 import 'package:flutter_user_app/features/home/presentation/screens/home_page.dart';
 import 'core/config/app_config.dart';
+import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 
 void main() async {
   // Ensure Flutter is initialized and preserve splash screen
@@ -22,16 +26,38 @@ void main() async {
 
   // Initialize theme provider with saved preferences
   final themeProvider = await ThemeProvider.initialize();
+  
+  // Initialize locale provider
+  final localeProvider = LocaleProvider();
 
   // Run the app
   runApp(
     MultiProvider(
       providers: [
+        // ApiService - shared instance
+        Provider<ApiService>(
+          create: (_) => ApiService.create(),
+          dispose: (_, apiService) => apiService.client.close(),
+        ),
         ChangeNotifierProvider<ThemeProvider>.value(
           value: themeProvider,
         ),
-        ChangeNotifierProvider<PostProvider>(
-          create: (_) => PostProvider(ApiService.create()),
+        ChangeNotifierProvider<LocaleProvider>.value(
+          value: localeProvider,
+        ),
+        ChangeNotifierProxyProvider<ApiService, PostProvider>(
+          create: (context) => PostProvider(
+            Provider.of<ApiService>(context, listen: false),
+          ),
+          update: (context, apiService, previous) =>
+              previous ?? PostProvider(apiService),
+        ),
+        ChangeNotifierProxyProvider<ApiService, FollowProvider>(
+          create: (context) => FollowProvider(
+            Provider.of<ApiService>(context, listen: false),
+          ),
+          update: (context, apiService, previous) =>
+              previous ?? FollowProvider(apiService),
         ),
       ],
       child: const MainApp(),
@@ -103,17 +129,32 @@ class _MainAppState extends State<MainApp> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(builder: (context, themeProvider, _) {
-      // Update system UI whenever theme changes
-      _updateSystemUI(themeProvider.themeMode);
+    return Consumer2<ThemeProvider, LocaleProvider>(
+      builder: (context, themeProvider, localeProvider, _) {
+        // Update system UI whenever theme changes
+        _updateSystemUI(themeProvider.themeMode);
 
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: themeProvider.themeMode,
-        themeAnimationDuration: const Duration(milliseconds: 600),
-        themeAnimationCurve: Curves.easeInOutCirc,
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: themeProvider.themeMode,
+          themeAnimationDuration: const Duration(milliseconds: 600),
+          themeAnimationCurve: Curves.easeInOutCirc,
+          // Localization support
+          locale: localeProvider.locale,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en'), // English
+            Locale('mr'), // Marathi
+            Locale('hi'), // Hindi
+            Locale('gu'), // Gujarati
+          ],
         // Use FutureBuilder to transition from splash to app content
         home: FutureBuilder<Widget>(
           future: _initializationFuture,

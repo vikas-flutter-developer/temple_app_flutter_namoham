@@ -21,8 +21,40 @@ class EventsScreen extends StatelessWidget {
   }
 }
 
-class _EventsView extends StatelessWidget {
+class _EventsView extends StatefulWidget {
   const _EventsView();
+
+  @override
+  State<_EventsView> createState() => _EventsViewState();
+}
+
+class _EventsViewState extends State<_EventsView> {
+  // Sorting state
+  String _sortBy = 'date'; // 'date' or 'time'
+  bool _sortAscending = true;
+
+  List<dynamic> _sortEvents(List<dynamic> events) {
+    final sorted = List.from(events);
+    
+    if (_sortBy == 'date') {
+      sorted.sort((a, b) {
+        if (a.eventDate == null && b.eventDate == null) return 0;
+        if (a.eventDate == null) return 1;
+        if (b.eventDate == null) return -1;
+        return _sortAscending 
+            ? a.eventDate!.compareTo(b.eventDate!)
+            : b.eventDate!.compareTo(a.eventDate!);
+      });
+    } else {
+      // Sort by time (using eventTime string)
+      sorted.sort((a, b) {
+        final timeCompare = a.eventTime.compareTo(b.eventTime);
+        return _sortAscending ? timeCompare : -timeCompare;
+      });
+    }
+    
+    return sorted;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +65,80 @@ class _EventsView extends StatelessWidget {
         title: const Text('Events'),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
+        actions: [
+          // Sort button
+          Consumer<EventsProvider>(
+            builder: (context, provider, child) {
+              if (provider.events.isEmpty) return const SizedBox.shrink();
+              
+              return PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.sort,
+                  color: theme.colorScheme.primary,
+                ),
+                onSelected: (value) {
+                  setState(() {
+                    if (value == 'date_asc') {
+                      _sortBy = 'date';
+                      _sortAscending = true;
+                    } else if (value == 'date_desc') {
+                      _sortBy = 'date';
+                      _sortAscending = false;
+                    } else if (value == 'time_asc') {
+                      _sortBy = 'time';
+                      _sortAscending = true;
+                    } else if (value == 'time_desc') {
+                      _sortBy = 'time';
+                      _sortAscending = false;
+                    }
+                  });
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'date_asc',
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 18),
+                        SizedBox(width: 8),
+                        Text('Date (Low to High)'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'date_desc',
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 18),
+                        SizedBox(width: 8),
+                        Text('Date (High to Low)'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'time_asc',
+                    child: Row(
+                      children: [
+                        Icon(Icons.access_time, size: 18),
+                        SizedBox(width: 8),
+                        Text('Time (Low to High)'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'time_desc',
+                    child: Row(
+                      children: [
+                        Icon(Icons.access_time, size: 18),
+                        SizedBox(width: 8),
+                        Text('Time (High to Low)'),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
       body: Consumer<EventsProvider>(
         builder: (context, provider, child) {
@@ -63,14 +169,17 @@ class _EventsView extends StatelessWidget {
             return const Center(child: Text('No events available'));
           }
 
+          // Apply sorting
+          final sortedEvents = _sortEvents(provider.events);
+
           return RefreshIndicator(
             onRefresh: () => provider.fetchEvents(),
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              itemCount: provider.events.length,
+              itemCount: sortedEvents.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
-                final event = provider.events[index];
+                final event = sortedEvents[index];
 
                 final dateText = event.eventDate != null
                     ? DateFormat('dd MMM yyyy').format(event.eventDate!.toLocal())

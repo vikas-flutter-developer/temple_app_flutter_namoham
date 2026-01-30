@@ -10,34 +10,52 @@ import '../widgets/reel_video_widget.dart';
 import 'create_reel_screen.dart';
 
 class VideosScreen extends StatelessWidget {
-  const VideosScreen({Key? key}) : super(key: key);
+  final List<ReelModel>? initialReels;
+  final int initialIndex;
+
+  const VideosScreen({
+    Key? key,
+    this.initialReels,
+    this.initialIndex = 0,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => ReelsProvider(ApiService.create())..loadReels(),
-      child: const _VideosView(),
+      create: (_) {
+        final provider = ReelsProvider(ApiService.create());
+        if (initialReels != null && initialReels!.isNotEmpty) {
+          provider.setReels(initialReels!);
+        } else {
+          provider.loadReels();
+        }
+        return provider;
+      },
+      child: _VideosView(initialIndex: initialIndex),
     );
   }
 }
 
 class _VideosView extends StatefulWidget {
-  const _VideosView();
+  final int initialIndex;
+  const _VideosView({this.initialIndex = 0});
 
   @override
   State<_VideosView> createState() => _VideosViewState();
 }
 
 class _VideosViewState extends State<_VideosView> {
-  final PageController _pageController = PageController();
+  late PageController _pageController;
   final Map<String, VideoPlayerController> _controllers = {};
-  int _currentIndex = 0;
+  late int _currentIndex;
   String? _currentlyPlayingId;
   String? _userType;
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
     _loadUserType();
   }
 

@@ -1,5 +1,6 @@
 // widgets/profile_stats.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
 
 class CreatorProfileStats extends StatelessWidget {
@@ -16,19 +17,20 @@ class CreatorProfileStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: EdgeInsets.symmetric(vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildStat('${profile.posts}', 'Posts', context),
+          _buildStat('${profile.posts}', l10n.posts, context),
           _buildStat(
             '${followersOverride ?? profile.followers}',
-            'Followers',
+            l10n.followers,
             context,
             onTap: onFollowersTap,
           ),
-          _buildStat('${profile.following}', 'Following', context),
+          _buildStat('${profile.following}', l10n.following, context),
         ],
       ),
     );

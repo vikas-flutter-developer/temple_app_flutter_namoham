@@ -1,0 +1,132 @@
+{
+  "@@locale": "en",
+  
+  "home": "Home",
+  "search": "Search",
+  "reels": "Reels",
+  "profile": "Profile",
+  
+  "following": "Following",
+  "yourFollowingList": "Your following list",
+  "savedPost": "Saved Post",
+  "savedPhotosVideos": "Saved Photos, Videos",
+  "messages": "Messages",
+  "chatsConversations": "Chats & conversations",
+  "events": "Events",
+  "viewAllEvents": "View all events",
+  "donation": "Donation",
+  "donationHistory": "Donation History",
+  "bankAccount": "Bank Account",
+  "forReceiveDonation": "For recieve Donation",
+  
+  "settings": "SETTINGS",
+  "theme": "Theme",
+  "currentSystem": "Current: System",
+  "language": "Language",
+  "selectYourFavouriteLanguage": "Select Your Favourite Language",
+  "switchToCreator": "Switch To Creator",
+  "switchYourAccountToCreator": "Switch your account to creator",
+  
+  "more": "MORE",
+  "contactUs": "Contact Us",
+  "forMoreInformation": "For more information",
+  "logout": "Logout",
+  "logoutFromCurrentAccount": "Logout from the current account",
+  
+  "edit": "Edit",
+  "follow": "Follow",
+  "unfollow": "Unfollow",
+  "message": "Message",
+  "donate": "Donate",
+  
+  "about": "About",
+  "review": "Review",
+  "gallery": "Gallery",
+  "calendar": "Calendar",
+  
+  "description": "Description",
+  "posts": "Posts",
+  "followers": "Followers",
+  "followersCount": "{count} followers",
+  "@followersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "searchTemples": "Search temples...",
+  "searchCreators": "Search creators...",
+  "searchAll": "Search...",
+  "allTemples": "All Temples",
+  "allCreators": "All Creators",
+  "foundResults": "Found {count} results",
+  "@foundResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "temples": "Temples",
+  "templesCount": "Temples: {count}",
+  "@templesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creators": "Creators",
+  "creatorsCount": "Creators: {count}",
+  "@creatorsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "all": "All",
+  
+  "reviews": "reviews",
+  "rating": "Rating",
+  
+  "followed": "Followed {name}",
+  "@followed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "unfollowed": "Unfollowed {name}",
+  "@unfollowed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "general": "GENERAL",
+  
+  "selectLanguage": "Select Language",
+  "english": "English",
+  "marathi": "मराठी (Marathi)",
+  "hindi": "हिंदी (Hindi)",
+  "gujarati": "ગુજરાતી (Gujarati)",
+  
+  "mostPopularTemple": "Most Popular Temple",
+  "mostPopularCreator": "Most Popular Creator",
+  "seeAll": "See All",
+  "noResultsFound": "No results found",
+  "noTemplesFound": "No temples found",
+  "noCreatorsFound": "No creators found",
+  "searchPlaceholder": "Search Temples & Creators...",
+  
+  "retry": "Retry",
+  "noFollowersYet": "No followers yet.",
+  "noFollowingYet": "You are not following anyone yet.",
+  "onlyUsersHaveFollowingList": "Only users have a following list."
+}

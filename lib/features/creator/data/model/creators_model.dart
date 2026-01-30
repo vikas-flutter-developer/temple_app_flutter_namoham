@@ -13,6 +13,11 @@ class CreatorModel {
   final int posts;
   final bool isVerified;
   final DateTime? createdAt;
+  final String city;
+  final String state;
+  final String country;
+  final String zipCode;
+  final String dob;
 
   CreatorModel({
     required this.id,
@@ -29,6 +34,11 @@ class CreatorModel {
     this.posts = 0,
     this.isVerified = false,
     this.createdAt,
+    this.city = '',
+    this.state = '',
+    this.country = '',
+    this.zipCode = '',
+    this.dob = '',
   });
 
   factory CreatorModel.fromJson(Map<String, dynamic> json) {
@@ -52,6 +62,11 @@ class CreatorModel {
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'])
           : null,
+      city: json['city'] ?? '',
+      state: json['state'] ?? '',
+      country: json['country'] ?? '',
+      zipCode: json['zipCode'] ?? '',
+      dob: json['dob'] ?? '',
     );
   }
 
@@ -71,6 +86,11 @@ class CreatorModel {
       'posts': posts,
       'isVerified': isVerified,
       'createdAt': createdAt?.toIso8601String(),
+      'city': city,
+      'state': state,
+      'country': country,
+      'zipCode': zipCode,
+      'dob': dob,
     };
   }
 

@@ -1,6 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
-import 'package:flutter_user_app/features/posts/data/model/post_comment_model.dart';
+import 'package:flutter_user_app/features/posts/data/models/post_comment_model.dart';
 import 'package:flutter_user_app/features/posts/domain/entities/post_comment_entity.dart';
 import 'package:flutter_user_app/features/posts/domain/repository/post_comment_repository.dart';
 
@@ -78,17 +78,91 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
   @override
   Future<Either<Exception, PostCommentEntity>> addReply(
       String commentId, PostCommentEntity reply) async {
-    // TODO: API doesn't support nested replies yet
-    // Return error for now
-    return Left(Exception('Replies feature not supported by API yet'));
+    try {
+      final response = await apiService.addReply(
+        commentId, 
+        {
+           'userId': reply.userId,
+           'username': reply.username,
+           'userImage': reply.userImage,
+           'text': reply.text,
+        }
+      );
+      
+      final replyData = response['reply'] ?? response['data']; // Adapt to backend response
+      
+      final newReply = PostCommentModel(
+        id: replyData['_id'] ?? replyData['id'] ?? reply.id,
+        postId: reply.postId,
+        userId: replyData['userId'] ?? reply.userId,
+        username: replyData['username'] ?? reply.username,
+        userImage: replyData['userImage'] ?? reply.userImage,
+        text: replyData['text'] ?? reply.text,
+        timestamp: replyData['timestamp'] ?? reply.timestamp,
+        replies: [],
+        likes: replyData['likes'] ?? 0,
+        likedBy: replyData['likedBy'] != null 
+            ? List<String>.from(replyData['likedBy']) 
+            : [],
+        isExpanded: false,
+      );
+
+      return Right(newReply);
+    } catch (e) {
+      return Left(Exception('Failed to add reply: ${e.toString()}'));
+    }
   }
 
   @override
   Future<Either<Exception, PostCommentEntity>> toggleLikeComment(
       String commentId, String userId) async {
-    // TODO: API doesn't support comment likes yet
-    // Return error for now
-    return Left(Exception('Comment likes not supported by API yet'));
+    try {
+      final response = await apiService.toggleLikeComment(commentId, userId);
+      // Backend usually returns the updated comment or success status
+      // We can return a mock updated entity if backend just returns status, 
+      // or parse the actual comment if returned. 
+      // For now, let's assume we just need to return success/failure signal essentially,
+      // but the signature requires PostCommentEntity.
+      
+      // If backend returns the updated comment:
+      if (response['comment'] != null || response['data'] != null) {
+          final commentData = response['comment'] ?? response['data'];
+          return Right(PostCommentModel(
+            id: commentData['_id'] ?? commentData['id'] ?? commentId,
+            postId: '', // Might not be in response, usually not needed for just like update
+            userId: commentData['userId'] ?? '',
+            username: commentData['username'] ?? '',
+            userImage: commentData['userImage'] ?? '',
+            text: commentData['text'] ?? '',
+            timestamp: commentData['timestamp'] ?? '',
+            replies: [],
+            likes: commentData['likes'] ?? 0,
+            likedBy: commentData['likedBy'] != null 
+                ? List<String>.from(commentData['likedBy']) 
+                : [],
+            isExpanded: false,
+          ));
+      }
+      
+      // Fallback: Return a placeholder entity if we just needed to confirm success
+      // In Clean Architecture, usually 'void' or 'bool' is better for toggleLike, 
+      // but we must respect the interface.
+      return Right(PostCommentModel(
+            id: commentId,
+            postId: '',
+            userId: '',
+            username: '',
+            userImage: '',
+            text: '',
+            timestamp: '',
+            replies: [],
+            likes: 0,
+            likedBy: [],
+      ));
+      
+    } catch (e) {
+      return Left(Exception('Failed to toggle like: ${e.toString()}'));
+    }
   }
 
   @override

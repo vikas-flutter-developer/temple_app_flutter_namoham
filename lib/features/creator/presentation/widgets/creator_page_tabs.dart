@@ -1,5 +1,6 @@
 // widgets/profile_tabs.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
 import 'package:flutter_user_app/features/creator/presentation/tabs/creator_about_tab.dart';
 import 'package:flutter_user_app/features/creator/presentation/tabs/creator_calender_tab.dart';
@@ -18,6 +19,7 @@ class CreatorProfileTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Expanded(
       child: Column(
         children: [
@@ -31,9 +33,9 @@ class CreatorProfileTabs extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
             tabs: [
-              Tab(text: 'About'),
-              Tab(text: 'Gallery'),
-              Tab(text: 'Calendar'),
+              Tab(text: l10n.about),
+              Tab(text: l10n.gallery),
+              Tab(text: l10n.calendar),
             ],
           ),
           Expanded(
@@ -41,8 +43,8 @@ class CreatorProfileTabs extends StatelessWidget {
               controller: tabController,
               children: [
                 CreatorAboutTab(profile: profile),
-                CreatorGalleryTab(),
-                CreatorCalendarTab(),
+                CreatorGalleryTab(creatorId: profile.id),
+                CreatorCalendarTab(creatorId: profile.id),
               ],
             ),
           ),

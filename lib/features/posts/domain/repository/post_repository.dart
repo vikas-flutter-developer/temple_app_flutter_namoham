@@ -12,4 +12,10 @@ abstract class PostRepository {
   Future<Either<Exception, void>> savePost(String postId);
   Future<Either<Exception, void>> unsavePost(String postId);
   Future<Either<Exception, List<PostEntity>>> getSavedPosts();
+
+  // Like
+  Future<Either<Exception, void>> toggleLikePost(String postId);
+
+  // View Count
+  Future<void> incrementPostView(String postId);
 }

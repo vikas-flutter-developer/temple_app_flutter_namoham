@@ -1,5 +1,4 @@
 
-
 import 'package:flutter_user_app/features/posts/domain/entities/post_comment_entity.dart';
 
 class PostCommentModel extends PostCommentEntity {

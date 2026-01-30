@@ -1,6 +1,7 @@
 // widgets/profile_actions.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
@@ -14,6 +15,7 @@ class CreatorProfileActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -22,7 +24,7 @@ class CreatorProfileActions extends StatelessWidget {
             builder: (context, followProvider, child) {
               if (!followProvider.canFollow) {
                 return _buildButton(
-                  text: 'Follow',
+                  text: l10n.follow,
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -35,7 +37,7 @@ class CreatorProfileActions extends StatelessWidget {
               }
 
               final isFollowing = followProvider.isFollowing(profile.id);
-              final label = isFollowing ? 'Unfollow' : 'Follow';
+              final label = isFollowing ? l10n.unfollow : l10n.follow;
 
               return _buildButton(
                 text: followProvider.isToggling ? '...' : label,
@@ -43,13 +45,16 @@ class CreatorProfileActions extends StatelessWidget {
                     ? () {}
                     : () async {
                         final ok = isFollowing
-                            ? await followProvider.unfollow(profile.id)
-                            : await followProvider.follow(
+                            ? await followProvider.unfollow(
                                 followingId: profile.id,
                                 followingType: 'creator',
+                              )
+                            : await followProvider.follow(
+                                followingId: profile.id,
+                                followingType: 'Creator', // Capitalized
                               );
 
-                        // Refresh followers count so UI updates immediately
+                        // Reload follower count from API to get accurate data
                         await followProvider.loadFollowers(profile.id);
 
                         if (context.mounted) {
@@ -58,8 +63,8 @@ class CreatorProfileActions extends StatelessWidget {
                               content: Text(
                                 ok
                                     ? (isFollowing
-                                        ? 'Unfollowed ${profile.creatorName}'
-                                        : 'Followed ${profile.creatorName}')
+                                        ? l10n.unfollowed(profile.creatorName)
+                                        : l10n.followed(profile.creatorName))
                                     : (followProvider.error ?? 'Action failed'),
                               ),
                             ),
@@ -72,7 +77,7 @@ class CreatorProfileActions extends StatelessWidget {
           ),
           SizedBox(width: 10),
           _buildButton(
-            text: 'Message',
+            text: l10n.message,
             onPressed: () {
               Navigator.push(
                 context,
@@ -90,7 +95,7 @@ class CreatorProfileActions extends StatelessWidget {
           ),
           SizedBox(width: 10),
           _buildButton(
-              text: 'Donate',
+              text: l10n.donate,
               onPressed: () {
                 Navigator.push(
                   context,

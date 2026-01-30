@@ -58,6 +58,19 @@ class EventsProvider with ChangeNotifier {
     }
   }
 
+  Future<void> fetchEventsByOrganizer(String organizerId) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final data = await _apiService.getEventsByOrganizer(organizerId);
+      _events = data.map((e) => EventModel.fromJson(e)).toList();
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<EventModel?> fetchEventById(String eventId) async {
     _setError(null);
     try {
@@ -89,10 +102,22 @@ class EventsProvider with ChangeNotifier {
       return false;
     }
 
+    if (_userId == null) {
+      _setError('User ID not found. Please log in again.');
+      return false;
+    }
+
+    if (_userType == null) {
+      _setError('User type not found. Please log in again.');
+      return false;
+    }
+
     _setLoading(true);
     _setError(null);
     try {
       await _apiService.createEvent({
+        'organizerId': _userId!, // Required: Temple or Creator ID
+        'organizerType': _userType!.toLowerCase(), // Required: "temple" or "creator"
         'eventName': eventName,
         'description': description,
         'eventDate': eventDate.toUtc().toIso8601String(),
@@ -107,6 +132,7 @@ class EventsProvider with ChangeNotifier {
         'price': price,
       });
 
+      // Refresh events after creating
       await fetchEvents();
       return true;
     } catch (e) {

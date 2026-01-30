@@ -348,14 +348,19 @@ class _PostsScreenState extends State<PostsScreen> {
             case PostsStatus.loading:
               return const Center(child: CircularProgressIndicator());
             case PostsStatus.loaded:
-              return RefreshIndicator(
-                onRefresh: () => postsProvider.loadPosts(),
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: postsProvider.posts.length,
-                  itemBuilder: (context, index) {
-                    return PostWidget(postModel: postsProvider.posts[index]);
-                  },
+              return Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: RefreshIndicator(
+                    onRefresh: () => postsProvider.loadPosts(),
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: postsProvider.posts.length,
+                      itemBuilder: (context, index) {
+                        return PostWidget(postModel: postsProvider.posts[index]);
+                      },
+                    ),
+                  ),
                 ),
               );
             case PostsStatus.error:

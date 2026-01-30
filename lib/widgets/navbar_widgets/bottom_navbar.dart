@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 
 class CustomBottomNav extends StatefulWidget {
   final int selectedIndex;
@@ -27,6 +28,7 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return SafeArea(
       child: Material(
@@ -62,7 +64,7 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
               tabs: [
                 GButton(
                   icon: Icons.home,
-                  text: 'Home',
+                  text: l10n.home,
                   leading: SvgPicture.asset(
                     widget.selectedIndex == 0
                         ? 'assets/icons_bottomnav/home_filled.svg'
@@ -78,7 +80,7 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
                 ),
                 GButton(
                   icon: Icons.search,
-                  text: 'Search',
+                  text: l10n.search,
                   leading: SvgPicture.asset(
                     widget.selectedIndex == 1
                         ? 'assets/icons_bottomnav/search_filled.svg'
@@ -94,7 +96,7 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
                 ),
                 GButton(
                   icon: Icons.video_file,
-                  text: 'Videos',
+                  text: l10n.reels,
                   leading: SvgPicture.asset(
                     widget.selectedIndex == 2
                         ? 'assets/icons_bottomnav/video_filled.svg'
@@ -110,7 +112,7 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
                 ),
                 GButton(
                   icon: Icons.person,
-                  text: 'Profile',
+                  text: l10n.profile,
                   leading: SvgPicture.asset(
                     widget.selectedIndex == 3
                         ? 'assets/icons_bottomnav/profile_filled.svg'

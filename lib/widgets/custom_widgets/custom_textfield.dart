@@ -67,7 +67,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        widget.controller.text = DateFormat('MM/dd/yyyy').format(picked);
+        widget.controller.text = DateFormat('yyyy-MM-dd').format(picked);
       });
     }
   }

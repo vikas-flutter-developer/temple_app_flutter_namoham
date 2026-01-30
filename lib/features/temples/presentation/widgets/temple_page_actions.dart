@@ -1,5 +1,6 @@
 // widgets/profile_actions.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:flutter_user_app/features/temples/data/models/temple_model.dart';
 import 'package:flutter_user_app/features/donations/presentation/screens/make_donation_screen.dart';
 import 'package:flutter_user_app/features/messages/presentation/screens/direct_chat_screen.dart';
@@ -14,6 +15,7 @@ class ProfileActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -22,7 +24,7 @@ class ProfileActions extends StatelessWidget {
             builder: (context, followProvider, child) {
               if (!followProvider.canFollow) {
                 return _buildButton(
-                  text: 'Follow',
+                  text: l10n.follow,
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -35,22 +37,37 @@ class ProfileActions extends StatelessWidget {
               }
 
               final isFollowing = followProvider.isFollowing(profile.id);
-              final label = isFollowing ? 'Unfollow' : 'Follow';
+              final label = isFollowing ? l10n.unfollow : l10n.follow;
 
               return _buildButton(
                 text: followProvider.isToggling ? '...' : label,
                 onPressed: followProvider.isToggling
                     ? () {}
                     : () async {
+                        print('TEMPLE_ACTIONS: Before follow - isFollowing: $isFollowing');
+                        print('TEMPLE_ACTIONS: Temple ID: ${profile.id}');
+                        
                         final ok = isFollowing
-                            ? await followProvider.unfollow(profile.id)
-                            : await followProvider.follow(
+                            ? await followProvider.unfollow(
                                 followingId: profile.id,
                                 followingType: 'temple',
+                              )
+                            : await followProvider.follow(
+                                followingId: profile.id,
+                                followingType: 'Temple', // Capitalized
                               );
 
-                        // Refresh followers count so UI updates immediately
+                        print('TEMPLE_ACTIONS: Follow API result: $ok');
+                        print('TEMPLE_ACTIONS: After follow - isFollowing: ${followProvider.isFollowing(profile.id)}');
+                        print('TEMPLE_ACTIONS: MyFollowing list length: ${followProvider.myFollowing.length}');
+                        if (followProvider.myFollowing.isNotEmpty) {
+                          print('TEMPLE_ACTIONS: First following ID: ${followProvider.myFollowing.first.followingId}');
+                        }
+
+                        // Reload follower count from API to get accurate data
                         await followProvider.loadFollowers(profile.id);
+                        
+                        print('TEMPLE_ACTIONS: Followers count: ${followProvider.followersCount}');
 
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -58,8 +75,8 @@ class ProfileActions extends StatelessWidget {
                               content: Text(
                                 ok
                                     ? (isFollowing
-                                        ? 'Unfollowed ${profile.name}'
-                                        : 'Followed ${profile.name}')
+                                        ? l10n.unfollowed(profile.name)
+                                        : l10n.followed(profile.name))
                                     : (followProvider.error ?? 'Action failed'),
                               ),
                             ),
@@ -72,7 +89,7 @@ class ProfileActions extends StatelessWidget {
           ),
           SizedBox(width: 10),
           _buildButton(
-            text: 'Message',
+            text: l10n.message,
             onPressed: () {
               Navigator.push(
                 context,
@@ -90,7 +107,7 @@ class ProfileActions extends StatelessWidget {
           ),
           SizedBox(width: 10),
           _buildButton(
-              text: 'Donate',
+              text: l10n.donate,
               onPressed: () {
                 Navigator.push(
                   context,

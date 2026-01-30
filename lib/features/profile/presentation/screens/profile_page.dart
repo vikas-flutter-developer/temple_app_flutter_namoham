@@ -1,10 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
 import 'package:flutter_user_app/core/provider/theme_provider.dart';
 import 'package:flutter_user_app/features/auth/register/presentation/screens/add_account_page.dart';
+import 'package:flutter_user_app/core/api/api_service.dart'; // Import ApiService
 
 import 'package:flutter_user_app/features/profile/presentation/screens/contact_us_page.dart';
+import 'package:flutter_user_app/features/settings/presentation/screens/language_screen.dart';
 import 'package:flutter_user_app/features/creator/presentation/screens/creator_account_setup_screen.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
 import 'package:flutter_user_app/features/profile/presentation/screens/saved_post.dart';
@@ -31,27 +34,83 @@ class _ProfilePageState extends State<ProfilePage> {
   bool isDarkModeEnabled = true;
   String? _profilePhotoUrl;
   String? _localPhotoPath;
+  String _fullName = '';
+  String _userType = 'User';
+  String _email = '';
+  bool _isLoading = true;
+  final ApiService _apiService = ApiService.create();
 
   @override
   void initState() {
     super.initState();
-    _loadProfilePhoto();
+    _loadProfileData();
   }
 
-  Future<void> _loadProfilePhoto() async {
+  Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // Try to get photo URL from database first
-    final photoUrl = prefs.getString('profile_photo_url');
-    
-    // Also get local cached path
-    final localPath = prefs.getString('profile_photo_path');
-    
+    // Load local cached data first for immediate display
     if (mounted) {
       setState(() {
-        _profilePhotoUrl = photoUrl;
-        _localPhotoPath = localPath;
+        _profilePhotoUrl = prefs.getString('profile_photo_url');
+        _localPhotoPath = prefs.getString('profile_photo_path');
+        _fullName = prefs.getString('full_name') ?? '';
+        _email = prefs.getString('email') ?? '';
+        _userType = prefs.getString('user_type') ?? 'User';
       });
+    }
+
+    // Then fetch fresh data from API
+    try {
+      final userId = prefs.getString('user_id');
+      final userType = prefs.getString('user_type');
+
+      if (userId == null) return;
+
+      Map<String, dynamic>? fetchedData;
+      String? newName;
+      String? newEmail;
+      String? newPhoto;
+
+      if (userType == 'User') {
+        try {
+          final userData = await _apiService.getUserById(userId);
+          newName = userData['name'] ?? userData['fullName'];
+          newEmail = userData['email'];
+          newPhoto = userData['profilePic'] ?? userData['userImage'] ?? userData['imageUrl'] ?? userData['image'] ?? userData['profileImage'];
+        } catch (e) {
+          debugPrint('User profile API fetch failed, using local data: $e');
+        }
+      } else if (userType == 'Temple') {
+        final temple = await _apiService.getTempleById(userId);
+        newName = temple.name;
+        newEmail = temple.email;
+        newPhoto = temple.imageUrl;
+      } else if (userType == 'Creator') {
+        final creator = await _apiService.getCreatorById(userId);
+        newName = creator.creatorName;
+        newEmail = creator.email;
+        newPhoto = creator.profilePic;
+      }
+
+      if (newName != null) {
+        // Update local storage
+        await prefs.setString('full_name', newName);
+        if (newEmail != null) await prefs.setString('email', newEmail);
+        if (newPhoto != null) await prefs.setString('profile_photo_url', newPhoto);
+
+        if (mounted) {
+           setState(() {
+             _fullName = newName!;
+             if (newEmail != null) _email = newEmail!;
+             if (newPhoto != null) _profilePhotoUrl = newPhoto!;
+             _isLoading = false;
+           });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading profile: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -129,9 +188,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (result == true) {
-      // Clear auth token
+      // Clear all stored data (auth token, profile info, etc.) to prevent mix-ups
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('auth_token');
+      await prefs.clear();
 
       // Navigate to login and clear stack
       if (mounted) {
@@ -143,9 +202,16 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    
+    // Check types
+    final isUser = _userType == 'User';
+    final isTemple = _userType == 'Temple';
+    final isCreator = _userType == 'Creator';
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      appBar: CustomPageBar(title: "Profile"),
+      appBar: CustomPageBar(title: l10n.profile),
       body: SafeArea(
         child: Column(
           children: [
@@ -201,16 +267,17 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Hannah Turin',
-                  style: TextStyle(
+                const SizedBox(height: 10),
+                Text(
+                  _fullName.isNotEmpty ? _fullName : 'Guest User',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'madhuresh@gmail.com',
+                  _email.isNotEmpty ? _email : '',
                   style: TextStyle(
                     fontSize: 14,
                     color: theme.colorScheme.primary,
@@ -225,8 +292,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         builder: (context) => const ProfileEditScreen(),
                       ),
                     );
-                    // Reload photo when returning from edit screen
-                    _loadProfilePhoto();
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfileEditScreen(),
+                      ),
+                    );
+                    // Reload profile when returning from edit screen
+                    _loadProfileData();
                   },
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(
@@ -235,7 +308,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     side: BorderSide(color: theme.colorScheme.primary),
                   ),
                   child: Text(
-                    'Edit',
+                    l10n.edit,
                     style: TextStyle(color: theme.colorScheme.primary),
                   ),
                 ),
@@ -247,7 +320,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: RefreshIndicator(
                 onRefresh: () async {
                   // Refresh user profile data
-                  setState(() {});
+                  await _loadProfileData();
                 },
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -256,13 +329,13 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 18),
 
                   // GENERAL Section
-                  _buildSectionHeader('GENERAL'),
+                  _buildSectionHeader(l10n.general),
 
                   // Profile Items
                   ProfileItemsWidget(
                     icon: Icons.people,
-                    title: 'Following',
-                    subtitle: 'Your following list',
+                    title: l10n.following,
+                    subtitle: l10n.yourFollowingList,
                     onTap: () {
                       navigateToPage(context, const FollowingListScreen());
                     },
@@ -270,8 +343,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   ProfileItemsWidget(
                     icon: Icons.bookmark,
-                    title: 'Saved Post',
-                    subtitle: 'Saved Photos, Videos',
+                    title: l10n.savedPost,
+                    subtitle: l10n.savedPhotosVideos,
                     onTap: () {
                       final postsProvider = Provider.of<PostsProvider>(context, listen: false);
                       Navigator.push(
@@ -288,8 +361,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   ProfileItemsWidget(
                     icon: Icons.message_outlined,
-                    title: 'Messages',
-                    subtitle: 'Chats & conversations',
+                    title: l10n.messages,
+                    subtitle: l10n.chatsConversations,
                     onTap: () {
                       navigateToPage(context, const ConversationsScreen());
                     },
@@ -297,8 +370,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   ProfileItemsWidget(
                     icon: Icons.event,
-                    title: 'Events',
-                    subtitle: 'View all events',
+                    title: l10n.events,
+                    subtitle: l10n.viewAllEvents,
                     onTap: () {
                       navigateToPage(context, const EventsScreen());
                     },
@@ -306,57 +379,59 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   ProfileItemsWidget(
                     icon: Icons.money,
-                    title: 'Donation',
-                    subtitle: 'Donation History',
+                    title: l10n.donation,
+                    subtitle: l10n.donationHistory,
                     onTap: () {
                       navigateToPage(context, DonationScreen());
                     },
                   ),
 
-                  ProfileItemsWidget(
-                    icon: Icons.credit_card_outlined,
-                    title: 'Bank Account',
-                    subtitle: 'For recieve Donation',
-                    onTap: () {
-                      navigateToPage(context, const AddAccountPage());
-                    },
-                  ),
+                  if (isTemple || isCreator)
+                    ProfileItemsWidget(
+                      icon: Icons.credit_card_outlined,
+                      title: l10n.bankAccount,
+                      subtitle: l10n.forReceiveDonation,
+                      onTap: () {
+                        navigateToPage(context, const AddAccountPage());
+                      },
+                    ),
 
                   const SizedBox(height: 10),
 
                   // SETTINGS Section
-                  _buildSectionHeader('SETTINGS'),
+                  _buildSectionHeader(l10n.settings),
                   _buildDarkModeToggle(context),
 
                   ProfileItemsWidget(
                     icon: Icons.language,
-                    title: 'Language',
-                    subtitle: 'Select Your Favourite Language',
-                    onTap: () {},
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  ProfileItemsWidget(
-                    icon: Icons.person,
-                    title: 'Switch To Creator ',
-                    subtitle: 'Switch your account to creator',
+                    title: l10n.language,
+                    subtitle: l10n.selectYourFavouriteLanguage,
                     onTap: () {
-                      navigateToPage(context, const CreatorAccountSetupScreen());
+                      navigateToPage(context, const LanguageScreen());
                     },
                   ),
 
                   const SizedBox(height: 10),
 
+                  if (isUser)
+                    ProfileItemsWidget(
+                      icon: Icons.person,
+                      title: l10n.switchToCreator,
+                      subtitle: l10n.switchYourAccountToCreator,
+                      onTap: () {
+                        navigateToPage(context, const CreatorAccountSetupScreen());
+                      },
+                    ),
+
+                  const SizedBox(height: 10),
+
                   // MORE Section
-                  _buildSectionHeader('MORE'),
-
-
+                  _buildSectionHeader(l10n.more),
 
                   ProfileItemsWidget(
                     icon: Icons.phone,
-                    title: 'Contact Us',
-                    subtitle: 'For more information',
+                    title: l10n.contactUs,
+                    subtitle: l10n.forMoreInformation,
                     onTap: () {
                       navigateToPage(context, const ContactUs());
                     },
@@ -364,8 +439,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   ProfileItemsWidget(
                     icon: Icons.logout,
-                    title: 'Logout',
-                    subtitle: 'Logout from the current account',
+                    title: l10n.logout,
+                    subtitle: l10n.logoutFromCurrentAccount,
                     onTap: _showLogoutDialog,
                   ),
                   ],

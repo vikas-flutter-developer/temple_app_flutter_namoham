@@ -1,0 +1,90 @@
+{
+  "@@locale": "mr",
+  
+  "home": "होम",
+  "search": "शोध",
+  "reels": "रील्स",
+  "profile": "प्रोफाइल",
+  
+  "following": "फॉलोइंग",
+  "yourFollowingList": "तुमची फॉलोइंग यादी",
+  "savedPost": "सेव्ह केलेली पोस्ट",
+  "savedPhotosVideos": "सेव्ह केलेले फोटो, व्हिडिओ",
+  "messages": "संदेश",
+  "chatsConversations": "चॅट्स आणि संभाषणे",
+  "events": "कार्यक्रम",
+  "viewAllEvents": "सर्व कार्यक्रम पहा",
+  "donation": "दान",
+  "donationHistory": "दान इतिहास",
+  "bankAccount": "बँक खाते",
+  "forReceiveDonation": "दान प्राप्त करण्यासाठी",
+  
+  "settings": "सेटिंग्ज",
+  "theme": "थीम",
+  "currentSystem": "सध्याची: सिस्टम",
+  "language": "भाषा",
+  "selectYourFavouriteLanguage": "तुमची आवडती भाषा निवडा",
+  "switchToCreator": "क्रिएटरवर स्विच करा",
+  "switchYourAccountToCreator": "तुमचे खाते क्रिएटरवर स्विच करा",
+  
+  "more": "अधिक",
+  "contactUs": "आमच्याशी संपर्क साधा",
+  "forMoreInformation": "अधिक माहितीसाठी",
+  "logout": "लॉगआउट",
+  "logoutFromCurrentAccount": "वर्तमान खात्यातून लॉगआउट करा",
+  
+  "edit": "संपादित करा",
+  "follow": "फॉलो करा",
+  "unfollow": "अनफॉलो करा",
+  "message": "संदेश",
+  "donate": "दान करा",
+  
+  "about": "बद्दल",
+  "review": "पुनरावलोकन",
+  "gallery": "गॅलरी",
+  "calendar": "कॅलेंडर",
+  
+  "description": "वर्णन",
+  "posts": "पोस्ट",
+  "followers": "फॉलोअर्स",
+  "followersCount": "{count} फॉलोअर्स",
+  
+  "searchTemples": "मंदिरे शोधा...",
+  "searchCreators": "क्रिएटर्स शोधा...",
+  "searchAll": "शोधा...",
+  "allTemples": "सर्व मंदिरे",
+  "allCreators": "सर्व क्रिएटर्स",
+  "foundResults": "{count} परिणाम सापडले",
+  
+  "temples": "मंदिरे",
+  "templesCount": "मंदिरे: {count}",
+  "creators": "क्रिएटर्स",
+  "creatorsCount": "क्रिएटर्स: {count}",
+  "all": "सर्व",
+  
+  "reviews": "पुनरावलोकने",
+  "rating": "रेटिंग",
+  
+  "followed": "{name} ला फॉलो केले",
+  "unfollowed": "{name} ला अनफॉलो केले",
+  "general": "सामान्य",
+  
+  "selectLanguage": "भाषा निवडा",
+  "english": "English",
+  "marathi": "मराठी (Marathi)",
+  "hindi": "हिंदी (Hindi)",
+  "gujarati": "ગુજરાતી (Gujarati)",
+  
+  "mostPopularTemple": "सर्वाधिक लोकप्रिय मंदिर",
+  "mostPopularCreator": "सर्वाधिक लोकप्रिय निर्माता",
+  "seeAll": "सर्व पहा",
+  "noResultsFound": "काहीही सापडले नाही",
+  "noTemplesFound": "कोणतीही मंदिरे सापडली नाहीत",
+  "noCreatorsFound": "कोणतेही निर्माते सापडले नाहीत",
+  "searchPlaceholder": "मंदिरे आणि निर्माते शोधा...",
+  
+  "retry": "पुन्हा प्रयत्न करा",
+  "noFollowersYet": "अद्याप कोणीही फॉलोअर्स नाहीत.",
+  "noFollowingYet": "तुम्ही अद्याप कोणालाही फॉलो करत नाही.",
+  "onlyUsersHaveFollowingList": "फक्त यूजर्सना फॉलोअर लिस्ट असते."
+}

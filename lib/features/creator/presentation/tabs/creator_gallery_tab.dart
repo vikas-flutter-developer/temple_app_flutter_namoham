@@ -1,93 +1,263 @@
 // tabs/gallery_tab.dart
 import 'package:flutter/material.dart';
+import '../../../../core/api/api_service.dart';
+import '../../../posts/data/models/post_model.dart';
+import '../../../posts/presentation/screens/post_detail_screen.dart';
+import '../../../reels/data/models/reel_model.dart';
+import '../../../reels/presentation/screens/video_screen.dart';
 
 class CreatorGalleryTab extends StatefulWidget {
+  final String creatorId;
+  
+  const CreatorGalleryTab({super.key, required this.creatorId});
+
   @override
-  _CreatorGalleryTabState createState() => _CreatorGalleryTabState();
+  CreatorGalleryTabState createState() => CreatorGalleryTabState();
 }
 
-class _CreatorGalleryTabState extends State<CreatorGalleryTab> {
+class CreatorGalleryTabState extends State<CreatorGalleryTab> {
   String selectedTab = 'Post';
+  bool _isLoading = true;
+  List<PostModel> _posts = [];
+  List<ReelModel> _reels = [];
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final apiService = ApiService.create();
+      
+      // Fetch posts and reels in parallel
+      final results = await Future.wait([
+        apiService.getPostsByUser(widget.creatorId),
+        apiService.getReels(), // Get ALL reels, then filter
+      ]);
+
+      final postsData = results[0] as List;
+      final allReelsData = results[1] as List;
+
+      // Filter reels by this creator's ID
+      // Also exclude dummy/test reels (those with /uploads/reels/example.mp4)
+      final reelsData = allReelsData.where((reel) {
+        final reelUserId = reel['userId'];
+        final reelCreatorId = reel['creatorId'];
+        final videoUrl = reel['videoUrl'] ?? '';
+        
+        // Match by creator ID
+        bool matchesId = reelUserId == widget.creatorId || reelCreatorId == widget.creatorId;
+        
+        // Exclude dummy test videos - only show real Supabase videos
+        bool isRealVideo = videoUrl.contains('supabase.co') || 
+                          (!videoUrl.contains('/uploads/reels/example.mp4'));
+        
+        return matchesId && isRealVideo;
+      }).toList();
+
+      setState(() {
+        _posts = postsData.map((json) => PostModel.fromJson(json)).toList();
+        _reels = reelsData.map((json) => ReelModel.fromJson(json)).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Dummy image data
-    final List<String> imageUrls = [
-      'https://images.unsplash.com/photo-1533929736458-ca588d08c8be?q=80&w=400', // Mining/cave worker
-      'https://images.unsplash.com/photo-1454496522488-7a8e488e8606?q=80&w=400', // Mountains
-      'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=400', // Woman with coffee
-      'https://images.unsplash.com/photo-1520962880247-cfaf541c8724?q=80&w=400', // Pine forest
-      'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=400', // Black dog
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=400', // Man portrait
-      'https://images.unsplash.com/photo-1569230516306-5a8cb5586399?q=80&w=400', // Ferris wheel
-      'https://images.unsplash.com/photo-1502730696376-43b3d8020703?q=80&w=400', // Sunset
-      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=400', // Concert lights
-      'https://images.unsplash.com/photo-1511317559916-56d5ddb62563?q=80&w=400', // Man in stripe shirt
-      'https://images.unsplash.com/photo-1516383607781-4d6c28a600fa?q=80&w=400', // Man in blue
-      'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=400', // Two dogs
-      'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?q=80&w=400', // Pug
-      'https://images.unsplash.com/photo-1587300003388-59208cc962cb?q=80&w=400', // Puppy
-      'https://images.unsplash.com/photo-1561948955-570b270e7c36?q=80&w=400',
-    ];
+    final theme = Theme.of(context);
 
     return Column(
       children: [
         Padding(
-          padding: EdgeInsets.all(18),
+          padding: const EdgeInsets.all(18),
           child: Row(
             children: [
-              Expanded(child: _buildTabButton('Post', selectedTab == 'Post')),
+              Expanded(child: _buildTabButton('Post', selectedTab == 'Post', theme)),
               const SizedBox(width: 10),
               Expanded(
-                  child: _buildTabButton('Videos', selectedTab == 'Videos')),
+                  child: _buildTabButton('Videos', selectedTab == 'Videos', theme)),
             ],
           ),
         ),
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: imageUrls.length,
-            itemBuilder: (context, index) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  imageUrls[index],
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: Colors.grey[300],
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Error: $_error'),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: _loadData,
+                            child: const Text('Retry'),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.error),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
+                    )
+                  : _buildGalleryGrid(theme),
         ),
       ],
     );
   }
 
-  Widget _buildTabButton(String title, bool isSelected) {
+  Widget _buildGalleryGrid(ThemeData theme) {
+    final items = selectedTab == 'Post' ? _posts : _reels;
+
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              selectedTab == 'Post' ? Icons.photo_library : Icons.video_library,
+              size: 64,
+              color: theme.colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              selectedTab == 'Post' ? 'No posts yet' : 'No videos yet',
+              style: TextStyle(
+                fontSize: 16,
+                color: theme.colorScheme.outline,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        if (selectedTab == 'Post') {
+          final post = _posts[index];
+          final imageUrl = post.imageUrls.isNotEmpty ? post.imageUrls[0] : '';
+          
+          return GestureDetector(
+            onTap: () {
+              // Navigate to post detail screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PostDetailScreen(post: post),
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: Icon(Icons.error, color: theme.colorScheme.error),
+                        );
+                      },
+                    )
+                  : Container(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      child: Icon(Icons.image, color: theme.colorScheme.outline),
+                    ),
+            ),
+          );
+        } else {
+          // Reel thumbnail
+          final reel = _reels[index];
+          return GestureDetector(
+            onTap: () {
+              // Navigate to reels screen with specific reel
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VideosScreen(
+                    initialReels: _reels,
+                    initialIndex: index,
+                  ),
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      Icons.play_circle_outline,
+                      size: 48,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  // Play icon overlay
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.play_arrow, color: Colors.white, size: 14),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${reel.views}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildTabButton(String title, bool isSelected, ThemeData theme) {
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -97,14 +267,14 @@ class _CreatorGalleryTabState extends State<CreatorGalleryTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue : Colors.grey[200],
+          color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(30),
         ),
         child: Center(
           child: Text(
             title,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.black,
+              color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
               fontWeight: FontWeight.w500,
             ),
           ),

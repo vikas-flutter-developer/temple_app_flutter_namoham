@@ -15,6 +15,8 @@ class FollowItem {
   final String image;
   final String username;
   final bool isPerson;
+  final bool isFollowing; // Added isFollowing status
+  final int followersCount; // Follower count for optimistic updates
   final dynamic data; // Added to hold the full model (TempleModel or CreatorModel)
 
   FollowItem({
@@ -27,6 +29,8 @@ class FollowItem {
     required this.image,
     this.username = '',
     this.isPerson = false,
+    this.isFollowing = false,
+    this.followersCount = 0,
     this.data,
   });
 
@@ -41,7 +45,40 @@ class FollowItem {
       image: json['image'] ?? '',
       username: json['username'] ?? '',
       isPerson: json['isPerson'] ?? false,
+      isFollowing: json['isFollowing'] ?? false,
+      followersCount: json['followersCount'] ?? 0,
       data: json,
+    );
+  }
+
+  // Create a copyWith method for easier state updates
+  FollowItem copyWith({
+    String? id,
+    String? name,
+    String? location,
+    String? distance,
+    double? rating,
+    int? reviews,
+    String? image,
+    String? username,
+    bool? isPerson,
+    bool? isFollowing,
+    int? followersCount,
+    dynamic data,
+  }) {
+    return FollowItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      location: location ?? this.location,
+      distance: distance ?? this.distance,
+      rating: rating ?? this.rating,
+      reviews: reviews ?? this.reviews,
+      image: image ?? this.image,
+      username: username ?? this.username,
+      isPerson: isPerson ?? this.isPerson,
+      isFollowing: isFollowing ?? this.isFollowing,
+      followersCount: followersCount ?? this.followersCount,
+      data: data ?? this.data,
     );
   }
 }
@@ -59,6 +96,7 @@ class FollowingMockService {
       'image':
       'https://tse4.mm.bing.net/th?id=OIP.pNCXDt0gEeYeMpanx7pSjQHaE8&pid=Api&P=0&h=180',
       'isPerson': false,
+      'isFollowing': true,
     },
     {
       'name': 'Shiv Mandir',
@@ -69,6 +107,7 @@ class FollowingMockService {
       'image':
       'http://images.unsplash.com/photo-1557062975-96113e46608b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMjA3fDB8MXxzZWFyY2h8Mnx8aW5kaWFuJTIwdGVtcGxlfHwwfHx8fDE2Mjc4MDg1NzM&ixlib=rb-1.2.1&q=80&w=1080',
       'isPerson': false,
+      'isFollowing': true,
     },
     {
       'name': 'Shiv Mandir',
@@ -79,6 +118,7 @@ class FollowingMockService {
       'image':
       'http://images.unsplash.com/photo-1557062975-96113e46608b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMjA3fDB8MXxzZWFyY2h8Mnx8aW5kaWFuJTIwdGVtcGxlfHwwfHx8fDE2Mjc4MDg1NzM&ixlib=rb-1.2.1&q=80&w=1080',
       'isPerson': false,
+      'isFollowing': true,
     },
     {
       'name': 'Shiv Mandir',
@@ -89,6 +129,7 @@ class FollowingMockService {
       'image':
       'http://images.unsplash.com/photo-1557062975-96113e46608b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMjA3fDB8MXxzZWFyY2h8Mnx8aW5kaWFuJTIwdGVtcGxlfHwwfHx8fDE2Mjc4MDg1NzM&ixlib=rb-1.2.1&q=80&w=1080',
       'isPerson': false,
+      'isFollowing': true,
     },
     {
       'name': 'Shiv Mandir',
@@ -99,6 +140,7 @@ class FollowingMockService {
       'image':
       'http://images.unsplash.com/photo-1557062975-96113e46608b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMjA3fDB8MXxzZWFyY2h8Mnx8aW5kaWFuJTIwdGVtcGxlfHwwfHx8fDE2Mjc4MDg1NzM&ixlib=rb-1.2.1&q=80&w=1080',
       'isPerson': false,
+      'isFollowing': true,
     },
     {
       'name': 'Shiv Mandir',
@@ -109,6 +151,7 @@ class FollowingMockService {
       'image':
       'http://images.unsplash.com/photo-1557062975-96113e46608b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMjA3fDB8MXxzZWFyY2h8Mnx8aW5kaWFuJTIwdGVtcGxlfHwwfHx8fDE2Mjc4MDg1NzM&ixlib=rb-1.2.1&q=80&w=1080',
       'isPerson': false,
+      'isFollowing': true,
     },
   ];
 
@@ -202,7 +245,7 @@ class _FollowingsScreenState extends State<FollowingsScreen> {
                   final item = _filteredItems[index];
                   return FollowCard(
                     item: item,
-                    onUnfollowPressed: () {
+                    onToggleFollow: () {
                       // Handle unfollow action
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(

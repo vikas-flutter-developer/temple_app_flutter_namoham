@@ -67,23 +67,20 @@ class PostsProvider extends ChangeNotifier {
   }
 
   /// Toggle like on a post
-  void likePost(String postId) {
+  Future<void> likePost(String postId) async {
     if (_status != PostsStatus.loaded) return;
 
     final String currentUserId = _userId ?? 'currentUser';
+    // 1. Optimistic Update
+    // Capture original state in case we need to revert
+    final originalPosts = List<PostEntity>.from(_posts);
 
     _posts = _posts.map((post) {
       if (post.id == postId) {
         final bool alreadyLiked = post.likedBy.contains(currentUserId);
-
-        final List<String> updatedLikedBy;
-        if (alreadyLiked) {
-          updatedLikedBy = post.likedBy
-              .where((userId) => userId != currentUserId)
-              .toList();
-        } else {
-          updatedLikedBy = [...post.likedBy, currentUserId];
-        }
+        final List<String> updatedLikedBy = alreadyLiked
+            ? post.likedBy.where((userId) => userId != currentUserId).toList()
+            : [...post.likedBy, currentUserId];
 
         final int updatedLikes = alreadyLiked ? post.likes - 1 : post.likes + 1;
 
@@ -96,6 +93,28 @@ class PostsProvider extends ChangeNotifier {
     }).toList();
 
     notifyListeners();
+
+    // 2. Call API
+    try {
+      final result = await postRepository.toggleLikePost(postId);
+      result.fold(
+        (failure) {
+          // Revert on failure
+          print("LIKE FAILED: ${failure.toString()}");
+          _posts = originalPosts;
+          notifyListeners();
+        },
+        (success) {
+          print("LIKE SUCCESS");
+          // Optionally update with server response if needed, 
+          // but optimistic update is usually enough
+        }
+      );
+    } catch (e) {
+       print("LIKE EXCEPTION: $e");
+       _posts = originalPosts;
+       notifyListeners();
+    }
   }
 
   /// Delete a post (owner only)
@@ -183,5 +202,12 @@ class PostsProvider extends ChangeNotifier {
       }
       notifyListeners();
     }
+  }
+
+  Future<void> incrementPostView(String postId) async {
+    // Fire and forget
+    try {
+      await postRepository.incrementPostView(postId);
+    } catch (_) {}
   }
 }

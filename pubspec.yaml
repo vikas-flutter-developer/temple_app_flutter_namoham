@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_native_splash: ^2.4.4
   flutter_otp_text_field: ^1.5.1+1
   flutter_svg: ^2.0.17
@@ -42,6 +44,8 @@ dependencies:
   screenshot: ^3.0.0
   gal: ^2.3.2
   photo_manager: ^3.8.3
+  jwt_decoder: ^2.0.1
+  crop_your_image: ^2.0.0
 
 dev_dependencies:
   flutter_test:
@@ -49,6 +53,7 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
 flutter:
+  generate: true
   uses-material-design: true
   
   assets:

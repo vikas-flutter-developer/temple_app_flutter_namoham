@@ -204,7 +204,7 @@ class ApiService {
     }
   }
 
-  /// Update user profile (works for User, Temple, and Creator)
+  /// Update user profile (Generic user)
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> profileData) async {
     final response = await client.post(
       Uri.parse('$baseUrl/auth/updateProfile'),
@@ -216,6 +216,109 @@ class ApiService {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
       throw Exception('Failed to update profile: ${response.statusCode} ${response.body}');
+    }
+  }
+
+  /// Update Temple Profile
+  Future<Map<String, dynamic>> updateTempleProfile(String templeId, Map<String, dynamic> data) async {
+    print('API_SERVICE: Updating temple $templeId with data: $data');
+    final response = await client.put(
+      Uri.parse('$baseUrl/temples/$templeId'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+       // Fallback: Try POST if PUT fails (some APIs use POST for updates)
+       print('API_SERVICE: PUT failed, trying POST...');
+       final postResponse = await client.post(
+          Uri.parse('$baseUrl/temples/update/$templeId'),
+          headers: await _getHeaders(),
+          body: json.encode(data),
+       );
+       
+       if (postResponse.statusCode == 200 || postResponse.statusCode == 201) {
+          return json.decode(postResponse.body) as Map<String, dynamic>;
+       }
+       
+      throw Exception('Failed to update temple profile: ${response.statusCode}');
+    }
+  }
+
+  /// Update Creator Profile
+  Future<Map<String, dynamic>> updateCreatorProfile(String creatorId, Map<String, dynamic> data) async {
+    print('API_SERVICE: Updating creator $creatorId with data: $data');
+    final response = await client.put(
+      Uri.parse('$baseUrl/creators/$creatorId'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+        // Fallback
+       final postResponse = await client.post(
+          Uri.parse('$baseUrl/creators/update/$creatorId'),
+          headers: await _getHeaders(),
+          body: json.encode(data),
+       );
+       if (postResponse.statusCode == 200 || postResponse.statusCode == 201) {
+          return json.decode(postResponse.body) as Map<String, dynamic>;
+       }
+
+      throw Exception('Failed to update creator profile: ${response.statusCode}');
+    }
+  }
+
+  /// Get user profile
+  Future<Map<String, dynamic>> getProfile() async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/auth/profile'), // Assuming there is a GET /auth/profile or similar
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to fetch profile: ${response.statusCode} ${response.body}');
+    }
+  }
+
+  /// Get specific user by ID
+  Future<Map<String, dynamic>> getUserById(String userId) async {
+    try {
+      final response = await client.get(
+        Uri.parse('$baseUrl/users/$userId'), // Try generic users endpoint
+        headers: await _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        
+        // Handle { success: true, data: {} } (Common pattern)
+        if (decoded is Map<String, dynamic> && decoded['data'] is Map) {
+          return decoded['data'];
+        }
+        
+        // Handle { success: true, user: {} }
+        if (decoded is Map<String, dynamic> && decoded['user'] is Map) {
+          return decoded['user'];
+        }
+        
+        return decoded as Map<String, dynamic>;
+      } else {
+        // If /users/:id fails, try to return empty so we can try other types (Creator/Temple)
+        // without throwing immediately if we want to chain them.
+        // But for consistency with existing code, let's just log and throw.
+        print('API: getUserById failed for $userId: ${response.statusCode}');
+        throw Exception('Failed to fetch user: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('API: getUserById Exception for $userId: $e');
+      rethrow;
     }
   }
 
@@ -530,7 +633,7 @@ class ApiService {
           throw Exception(decoded['message'].toString());
         }
       } catch (_) {}
-      throw Exception('Failed to follow: ${response.statusCode}');
+      throw Exception('Failed to follow: ${response.statusCode}, Body: ${response.body}');
     }
   }
 
@@ -696,6 +799,15 @@ class ApiService {
     if (response.statusCode != 200 && response.statusCode != 204) {
       throw Exception('Failed to delete post: ${response.statusCode}');
     }
+  }
+
+  Future<void> incrementPostView(String postId) async {
+    // Fire and forget or simple await without return
+    final response = await client.post(
+      Uri.parse('$baseUrl/posts/$postId/view'),
+      headers: await _getHeaders(),
+    );
+    // Silent failure if view counting fails (non-critical)
   }
 
   // ============== MESSAGES ==============
@@ -1663,6 +1775,23 @@ class ApiService {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
       throw Exception('Failed to fetch event stats: ${response.statusCode}');
+    }
+  }
+
+
+
+  /// Get events by organizer (Temple/Creator)
+  Future<List<Map<String, dynamic>>> getEventsByOrganizer(String organizerId) async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/events/organizer/$organizerId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception('Failed to fetch organizer events: ${response.statusCode}');
     }
   }
 

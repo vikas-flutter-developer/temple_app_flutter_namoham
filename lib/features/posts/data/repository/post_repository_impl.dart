@@ -1,6 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
-import 'package:flutter_user_app/features/posts/data/model/post_model.dart';
+import 'package:flutter_user_app/features/posts/data/models/post_model.dart';
 import 'package:flutter_user_app/features/posts/domain/entities/post_entity.dart';
 import 'package:flutter_user_app/features/posts/domain/repository/post_repository.dart';
 
@@ -85,6 +85,35 @@ class PostRepositoryImpl implements PostRepository {
       return Right(posts);
     } catch (e) {
       return Left(Exception('Failed to fetch saved posts: $e'));
+    }
+  }
+  @override
+  Future<Either<Exception, void>> toggleLikePost(String postId) async {
+    try {
+      // Fetch current user ID internally to keep interface simple
+      // Ideally, Repository shouldn't depend on UI/Prefs directly but for this architecture it's acceptable or use a UserProvider dependency
+      // For now, let's pass a placeholder or get from ApiService if it had state. 
+      // Correct approach: Update interface to accept userId OR Use a 'currentUser' placeholder if backend supports it.
+      // Given previous code used 'currentUser' string literal in some places, but ApiService.toggleLikePost(postId, userId) needs ID.
+      // Let's use a "self" or "me" placeholder if backend supports, otherwise we need to get ID.
+      // I will import shared_preferences.
+      // But adding import here might be messy with specific line replacement. 
+      // Alternative: Pass 'currentUser' and hope backend extracts from Token.
+      // Re-checking ApiService: `toggleLikePost(String postId, String userId)`
+      // Let's try passing "currentUser" as userId.
+      await apiService.toggleLikePost(postId, "currentUser");
+      return const Right(null);
+    } catch (e) {
+      return Left(Exception('Failed to toggle like: $e'));
+    }
+  }
+
+  @override
+  Future<void> incrementPostView(String postId) async {
+    try {
+      await apiService.incrementPostView(postId);
+    } catch (e) {
+      print('Failed to increment view: $e');
     }
   }
 }

@@ -12,6 +12,10 @@ import 'package:flutter_user_app/widgets/card_widgets/custom_creator_card.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_page_bar.dart';
 import 'package:flutter_user_app/widgets/card_widgets/custom_temple_card.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/follow_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
+import 'package:flutter_user_app/l10n/app_localizations.dart';
 
 // ERROR FIXED: Removed the import of 'temples_dummy_data.dart' because it is no longer needed.
 
@@ -43,6 +47,10 @@ class _SearchPageState extends State<SearchPage> {
   List<FollowItem> _searchResults = [];
   List<TempleModel> _popularTemples = [];
   List<CreatorModel> _popularCreators = [];
+  
+  // Follow State
+  // Follow State managed by FollowProvider
+
   bool _isLoading = false;
   bool _isInitialLoading = true;
   bool _isCreatorsLoading = true;
@@ -62,25 +70,66 @@ class _SearchPageState extends State<SearchPage> {
     // 2. Fetch Popular Creators on Init
     _loadPopularCreators();
 
-    // 3. Setup Search Listeners
+    // 3. User's Following List is handled directly by FollowProvider
+    // which should already be initialized if used within the app tree.
+    // We can explicitly refresh it here if needed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<FollowProvider>(context, listen: false).loadMyFollowing();
+    });
+
+    // 4. Setup Search Listeners
     _searchFocusNode.addListener(() {
-      setState(() {
-        _isSearchActive = _searchFocusNode.hasFocus && _searchQuery.isNotEmpty;
-        if (_isSearchActive) {
-          _loadSearchResults();
-        }
-      });
+      // Rebuild to update UI if needed (e.g. focus border)
+      setState(() {});
     });
 
     _searchController.addListener(() {
       setState(() {
-        _isSearchActive =
-            _searchController.text.isNotEmpty && _searchFocusNode.hasFocus;
+        _isSearchActive = _searchController.text.isNotEmpty;
       });
     });
   }
 
+  // Toggle follow status
+  Future<void> _handleToggleFollow(FollowItem item) async {
+    final followProvider = Provider.of<FollowProvider>(context, listen: false);
+    
+    // Determine follow type
+    final type = item.isPerson ? 'Creator' : 'Temple';
+    final isCurrentlyFollowing = item.isFollowing;
+    
+    bool success;
+    
+    if (isCurrentlyFollowing) {
+       success = await followProvider.unfollow(
+           followingId: item.id, 
+           followingType: type.toLowerCase()
+       );
+       if (success) _showToast(AppLocalizations.of(context)!.unfollowed(item.name));
+    } else {
+       success = await followProvider.follow(followingId: item.id, followingType: type);
+       if (success) _showToast(AppLocalizations.of(context)!.followed(item.name));
+    }
 
+    // Reload search results from API to get updated follower counts
+    if (success && mounted) {
+      await _loadSearchResults();
+    } else if (!success && mounted) {
+      _showToast(followProvider.error ?? 'Action failed');
+    }
+  }
+
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
   // Fetch search suggestions and results with debounce
   void _onSearchChanged(String query) {
@@ -177,9 +226,16 @@ class _SearchPageState extends State<SearchPage> {
       }
 
       // Local Fallback for Temples (search in _popularTemples)
-      final localTempleMatches = _popularTemples.where((t) => 
-          t.name.toLowerCase().contains(q.toLowerCase()) || 
-          t.location.toLowerCase().contains(q.toLowerCase())).toList();
+      final localTempleMatches = _popularTemples.where((t) {
+        final nameLower = t.name.toLowerCase();
+        final qLower = q.toLowerCase();
+        // Use startsWith for short queries to improve relevance (e.g. "d" shouldn't match "Golden")
+        if (q.length < 3) {
+          return nameLower.startsWith(qLower);
+        }
+        return nameLower.contains(qLower) || 
+               t.location.toLowerCase().contains(qLower);
+      }).toList();
       print('SEARCH_PAGE: Found ${localTempleMatches.length} local temple matches');
 
       // Merge and Deduplicate Temples (prefer API result)
@@ -190,19 +246,27 @@ class _SearchPageState extends State<SearchPage> {
         }
       }
 
+      final followProvider = Provider.of<FollowProvider>(context, listen: false);
+
       final templeItems = temples
           .map(
-            (t) => FollowItem(
-              id: t.id,
-              name: t.name,
-              location: t.location,
-              distance: '',
-              rating: t.rating,
-              reviews: t.totalReviews,
-              image: t.imageUrl,
-              isPerson: false,
-              data: t, // Pass full model
-            ),
+            (t) {
+              // Check follow status via Provider
+              final isFollowing = followProvider.isFollowing(t.id);
+              return FollowItem(
+                id: t.id,
+                name: t.name,
+                location: t.location,
+                distance: '',
+                rating: t.rating,
+                reviews: t.totalReviews,
+                image: t.imageUrl,
+                isPerson: false,
+                isFollowing: isFollowing, // Set status from provider
+                followersCount: t.followers, // Pass follower count
+                data: t, // Pass full model
+              );
+            },
           )
           .toList();
 
@@ -218,9 +282,16 @@ class _SearchPageState extends State<SearchPage> {
       }
 
       // Local Fallback for Creators (search in _popularCreators)
-      final localCreatorMatches = _popularCreators.where((c) => 
-          c.creatorName.toLowerCase().contains(q.toLowerCase()) || 
-          c.title.toLowerCase().contains(q.toLowerCase())).toList();
+      final localCreatorMatches = _popularCreators.where((c) {
+        final nameLower = c.creatorName.toLowerCase();
+        final qLower = q.toLowerCase();
+        // Use startsWith for short queries
+        if (q.length < 3) {
+          return nameLower.startsWith(qLower);
+        }
+        return nameLower.contains(qLower) || 
+               c.title.toLowerCase().contains(qLower);
+      }).toList();
       print('SEARCH_PAGE: Found ${localCreatorMatches.length} local creator matches');
 
       // Merge and Deduplicate Creators
@@ -233,15 +304,21 @@ class _SearchPageState extends State<SearchPage> {
       
       final creatorItems = creators
           .map(
-            (c) => FollowItem(
-              id: c.id,
-              name: c.creatorName,
-              location: c.address.isNotEmpty ? c.address : 'India',
-              image: c.displayImage,
-              isPerson: true,
-              username: c.title,
-              data: c, // Pass full model
-            ),
+            (c) {
+              // Check follow status via Provider
+              final isFollowing = followProvider.isFollowing(c.id);
+              return FollowItem(
+                id: c.id,
+                name: c.creatorName,
+                location: c.address.isNotEmpty ? c.address : 'India',
+                image: c.displayImage,
+                isPerson: true,
+                username: c.title,
+                isFollowing: isFollowing, // Set status from provider
+                followersCount: c.followers, // Pass follower count
+                data: c, // Pass full model
+              );
+            },
           )
           .toList();
 
@@ -296,79 +373,83 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      appBar: CustomPageBar(title: "Search"),
+      appBar: CustomPageBar(title: l10n.search),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              height: 56,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: SvgPicture.asset(
-                      'assets/icons/searchbar.svg',
-                      fit: BoxFit.fill,
-                    ),
-                  ),
-                  TextField(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    textAlign: TextAlign.center,
-                    // Slight upward nudge so text looks visually centered inside the SVG
-                    // (TextAlignVertical.center can look a bit low depending on font metrics).
-                    textAlignVertical: const TextAlignVertical(y: -0.1),
-                    cursorColor: theme.colorScheme.onSurface,
-                    style: TextStyle(color: theme.colorScheme.onSurface, height: 1.0),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                        _isSearchActive = value.isNotEmpty;
-                      });
-                      // Auto-search as user types (debounced)
-                      _onSearchChanged(value);
-                    },
-                    onSubmitted: (value) {
-                      // Immediate search when user presses enter
-                      if (value.isNotEmpty) {
-                        _debounceTimer?.cancel();
-                        _loadSearchResults();
-                      }
-                    },
-                    decoration: InputDecoration(
-                      // IMPORTANT: prevent Material3/Theme from painting a filled background
-                      filled: false,
-                      fillColor: Colors.transparent,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      hintText: 'Search Temples & Creators...',
-                      hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
-                        height: 1.0,
-                      ),
-                      // Your SVG already contains the left search icon, so we push text to the right.
-                      // Keep left/right padding equal so centered text doesn't overlap the SVG icon.
-                      contentPadding:
-                          const EdgeInsets.only(left: 56, right: 56, top: 0, bottom: 0),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _searchQuery = '';
-                                  _isSearchActive = false;
-                                  _searchResults = [];
-                                });
-                              },
-                            )
-                          : null,
-                    ),
-                  ),
-                ],
+          Container(
+            height: 56,
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), // Move padding here
+            decoration: BoxDecoration(
+              // 1. Clean Background Color
+              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3), 
+              
+              // 2. smooth rounded corners
+              borderRadius: BorderRadius.circular(16),
+              
+              // 3. Optional: Add a subtle border if you want a "outlined" look
+              border: Border.all(
+                color: theme.colorScheme.outline.withOpacity(0.2), 
+                width: 1
+              ),
+            ),
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              textInputAction: TextInputAction.search,
+              textAlignVertical: TextAlignVertical.center, // Vertically centers text
+              style: TextStyle(
+                color: theme.colorScheme.onSurface, 
+                fontSize: 16 // Explicit font size helps alignment
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                  _isSearchActive = value.isNotEmpty;
+                });
+                // Auto-search as user types (debounced)
+                _onSearchChanged(value);
+              },
+              onSubmitted: (value) {
+                if (value.isNotEmpty) {
+                  _debounceTimer?.cancel();
+                  _loadSearchResults();
+                }
+              },
+              decoration: InputDecoration(
+                isDense: true, // Reduces default height bloat
+                filled: false, // We handled color in the Container
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                hintText: 'Search...',
+                hintStyle: TextStyle(
+                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  fontSize: 16,
+                ),
+                // 4. Use a native Icon instead of the SVG background icon
+                prefixIcon: Icon(
+                  Icons.search,
+                  size: 27,
+                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                ),
+                // 5. Clean logic for the clear button
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                            _isSearchActive = false;
+                            _searchResults = [];
+                          });
+                        },
+                      )
+                    : null,
               ),
             ),
           ),
@@ -383,13 +464,28 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget buildCategory(String categoryName) {
+  Widget buildCategory(String categoryKey) {
     final theme = Theme.of(context);
-    final isSelected = selectedCategory == categoryName;
+    final l10n = AppLocalizations.of(context)!;
+    final isSelected = selectedCategory == categoryKey;
+    
+    String displayLabel;
+    switch (categoryKey) {
+      case 'Temples':
+        displayLabel = l10n.temples;
+        break;
+      case 'Creators':
+        displayLabel = l10n.creators;
+        break;
+      case 'All':
+      default:
+        displayLabel = l10n.all;
+    }
+
     return GestureDetector(
       onTap: () {
         setState(() {
-          selectedCategory = categoryName;
+          selectedCategory = categoryKey;
         });
       },
       child: Container(
@@ -403,7 +499,7 @@ class _SearchPageState extends State<SearchPage> {
         margin: const EdgeInsets.only(right: 8),
         child: Center(
           child: Text(
-            categoryName,
+            displayLabel,
             style: TextStyle(
               color: isSelected
                   ? theme.colorScheme.onPrimary
@@ -418,6 +514,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Widget _buildSearchResultsView(ThemeData theme) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         // Search count info
@@ -427,7 +524,7 @@ class _SearchPageState extends State<SearchPage> {
             child: Row(
               children: [
                 Text(
-                  'Found $_totalCount results',
+                  l10n.foundResults(_totalCount),
                   style: TextStyle(
                     color: theme.colorScheme.outline,
                     fontSize: 13,
@@ -435,9 +532,9 @@ class _SearchPageState extends State<SearchPage> {
                 ),
                 const SizedBox(width: 8),
                 if (_templesCount > 0)
-                  _buildCountChip('Temples: $_templesCount', theme),
+                  _buildCountChip(l10n.templesCount(_templesCount), theme),
                 if (_creatorsCount > 0)
-                  _buildCountChip('Creators: $_creatorsCount', theme),
+                  _buildCountChip(l10n.creatorsCount(_creatorsCount), theme),
               ],
             ),
           ),
@@ -463,17 +560,25 @@ class _SearchPageState extends State<SearchPage> {
   // Show all temples in search results
   void _showAllTemples() {
     // Map all popular temples to search results
+    final followProvider = Provider.of<FollowProvider>(context, listen: false);
     final List<FollowItem> items = _popularTemples
         .map(
-          (temple) => FollowItem(
-            name: temple.name,
-            location: temple.location,
-            distance: '',
-            rating: temple.rating,
-            reviews: temple.totalReviews,
-            image: temple.imageUrl,
-            isPerson: false,
-          ),
+          (temple) {
+            final isFollowing = followProvider.isFollowing(temple.id);
+            return FollowItem(
+              id: temple.id,
+              name: temple.name,
+              location: temple.location,
+              distance: '',
+              rating: temple.rating,
+              reviews: temple.totalReviews,
+              image: temple.imageUrl,
+              isPerson: false,
+              isFollowing: isFollowing,
+              followersCount: temple.followers,
+              data: temple,
+            );
+          },
         )
         .toList();
 
@@ -500,15 +605,23 @@ class _SearchPageState extends State<SearchPage> {
       final response = await _apiService.getCreators(page: 1, limit: 1000);
       final creators = response.creators;
 
+      final followProvider = Provider.of<FollowProvider>(context, listen: false);
       final List<FollowItem> items = creators
           .map(
-            (c) => FollowItem(
-              name: c.creatorName,
-              location: c.address.isNotEmpty ? c.address : 'India',
-              image: c.displayImage,
-              isPerson: true,
-              username: c.title,
-            ),
+            (c) {
+              final isFollowing = followProvider.isFollowing(c.id);
+              return FollowItem(
+                id: c.id,
+                name: c.creatorName,
+                location: c.address.isNotEmpty ? c.address : 'India',
+                image: c.displayImage,
+                isPerson: true,
+                username: c.title,
+                isFollowing: isFollowing,
+                followersCount: c.followers,
+                data: c,
+              );
+            },
           )
           .toList();
 
@@ -557,9 +670,9 @@ class _SearchPageState extends State<SearchPage> {
       return RefreshIndicator(
         onRefresh: _loadSearchResults,
         child: ListView(
-          children: const [
+          children: [
             SizedBox(height: 100),
-            Center(child: Text("No results found")),
+            Center(child: Text(AppLocalizations.of(context)!.noResultsFound)),
           ],
         ),
       );
@@ -596,10 +709,8 @@ class _SearchPageState extends State<SearchPage> {
             },
             child: FollowCard(
               item: item,
-              onUnfollowPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Action on ${item.name}'), duration: const Duration(seconds: 1)),
-                );
+              onToggleFollow: () {
+                _handleToggleFollow(item);
               },
             ),
           );
@@ -609,6 +720,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Widget _buildRegularContent(ThemeData theme) {
+    final l10n = AppLocalizations.of(context)!;
     return RefreshIndicator(
       onRefresh: () async {
         await Future.wait([
@@ -628,8 +740,8 @@ class _SearchPageState extends State<SearchPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Most Popular Temple',
+                Text(
+                  l10n.mostPopularTemple,
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 TextButton(
@@ -637,7 +749,7 @@ class _SearchPageState extends State<SearchPage> {
                     // Show all temples by triggering search
                     _showAllTemples();
                   },
-                  child: Text('See All', style: TextStyle(color: theme.colorScheme.primary)),
+                  child: Text(l10n.seeAll, style: TextStyle(color: theme.colorScheme.primary)),
                 ),
               ],
             ),
@@ -647,7 +759,7 @@ class _SearchPageState extends State<SearchPage> {
               child: _isInitialLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _popularTemples.isEmpty
-                  ? const Center(child: Text("No temples found"))
+                  ? Center(child: Text(l10n.noTemplesFound))
                   : ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _popularTemples.length,
@@ -675,8 +787,8 @@ class _SearchPageState extends State<SearchPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Most Popular Creator',
+                Text(
+                  l10n.mostPopularCreator,
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 // TODO: add a dedicated creators list page if needed
@@ -684,7 +796,7 @@ class _SearchPageState extends State<SearchPage> {
                   onPressed: () async {
                     await _showAllCreators();
                   },
-                  child: Text('See All', style: TextStyle(color: theme.colorScheme.primary)),
+                  child: Text(l10n.seeAll, style: TextStyle(color: theme.colorScheme.primary)),
                 ),
               ],
             ),
@@ -694,7 +806,7 @@ class _SearchPageState extends State<SearchPage> {
               child: _isCreatorsLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _popularCreators.isEmpty
-                      ? const Center(child: Text('No creators found'))
+                      ? Center(child: Text(l10n.noCreatorsFound))
                       : ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: _popularCreators.length,

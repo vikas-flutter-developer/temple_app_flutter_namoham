@@ -38,6 +38,13 @@ class ReelsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Set reels manually (e.g. from gallery navigation)
+  void setReels(List<ReelModel> reels) {
+    _reels = reels;
+    _status = ReelsStatus.loaded;
+    notifyListeners();
+  }
+
   /// Load all reels
   Future<void> loadReels() async {
     _status = ReelsStatus.loading;

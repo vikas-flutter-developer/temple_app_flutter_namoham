@@ -8,11 +8,19 @@ import 'package:flutter_user_app/features/posts/domain/entities/post_entity.dart
 import 'package:flutter_user_app/features/posts/presentation/provider/comment_provider.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
 import 'package:flutter_user_app/features/posts/presentation/screens/posts_comments_sheet.dart';
+import 'package:intl/intl.dart';
 import 'package:like_button/like_button.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:readmore/readmore.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+
+// New Imports for Navigation
+import 'package:flutter_user_app/features/temples/presentation/screens/temple_page.dart';
+import 'package:flutter_user_app/features/creator/presentation/screens/creator_page.dart';
+import 'package:flutter_user_app/features/temples/data/models/temple_model.dart';
+import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
+import 'liked_by_text.dart'; // Helper widget
 
 class PostWidget extends StatefulWidget {
   final PostEntity postModel;
@@ -33,7 +41,6 @@ class _PostWidgetState extends State<PostWidget>
   bool _isAnimatingLike = true; // true for like, false for unlike
 
   late AnimationController _animationController;
-  late AnimationController _commentAnimationController;
 
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
@@ -94,6 +101,11 @@ class _PostWidgetState extends State<PostWidget>
         });
       }
     });
+    
+    // Log View
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+       context.read<PostsProvider>().incrementPostView(widget.postModel.id);
+    });
   }
 
   @override
@@ -147,6 +159,58 @@ class _PostWidgetState extends State<PostWidget>
     _animationController.forward(from: 0.0); // Start the animation
   }
 
+  /// Navigate to Temple/Creator profile based on userType
+  void _navigateToProfile() {
+    final userType = widget.postModel.userType; 
+    debugPrint('NAVIGATON DEBUG: Tapped profile for ${widget.postModel.username}');
+    debugPrint('NAVIGATON DEBUG: userType is "$userType" (Raw: ${widget.postModel.userType})');
+    
+    if (userType == 'Temple') {
+      final partialTemple = TempleModel(
+        id: widget.postModel.userId,
+        name: widget.postModel.username,
+        imageUrl: widget.postModel.userImage,
+        rating: 0,
+        totalReviews: 0,
+        posts: 0,
+        followers: 0,
+        following: 0,
+        recommendationPercentage: 0,
+        reviews: [],
+        donations: [],
+        totalDonations: 0,
+        location: widget.postModel.location,
+        email: '',
+        phoneNumber: '',
+        isVerified: false,
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TemplePage(templeModel: partialTemple),
+        ),
+      );
+    } else if (userType == 'Creator') {
+      final partialCreator = CreatorModel(
+        id: widget.postModel.userId,
+        creatorName: widget.postModel.username,
+        email: '',
+        phoneNumber: '',
+        profilePic: widget.postModel.userImage,
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CreatorPage(creator: partialCreator),
+        ),
+      );
+    } else {
+      debugPrint('Navigate to Generic User Profile: ${widget.postModel.username}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final postsProvider = context.read<PostsProvider>();
@@ -167,45 +231,52 @@ class _PostWidgetState extends State<PostWidget>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    backgroundImage: _isValidHttpUrl(widget.postModel.userImage)
-                        ? NetworkImage(widget.postModel.userImage)
-                        : null,
-                    child: !_isValidHttpUrl(widget.postModel.userImage)
-                        ? Text(
-                            _initials(widget.postModel.username),
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          )
-                        : null,
+                  InkWell(
+                    onTap: _navigateToProfile,
+                    borderRadius: BorderRadius.circular(50),
+                    child: CircleAvatar(
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                      backgroundImage: _isValidHttpUrl(widget.postModel.userImage)
+                          ? NetworkImage(widget.postModel.userImage)
+                          : null,
+                      child: !_isValidHttpUrl(widget.postModel.userImage)
+                          ? Text(
+                              _initials(widget.postModel.username),
+                              style: TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          : null,
+                    ),
                   ),
                   const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.postModel.username,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                  InkWell(
+                    onTap: _navigateToProfile,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.postModel.username,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                      Text(
-                        widget.postModel.location,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.outline,
+                        Text(
+                          widget.postModel.location,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.outline,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const Spacer(),
                   Consumer<PostsProvider>(
                     builder: (context, provider, child) {
-                      // Only show menu if user can delete this post
                       if (!provider.canDeletePost(widget.postModel.userId)) {
                         return const SizedBox.shrink();
                       }
@@ -242,14 +313,12 @@ class _PostWidgetState extends State<PostWidget>
                 GestureDetector(
                 onDoubleTap: () {
                     HapticFeedback.mediumImpact();
-                    // Determine if the double-tap results in a like or unlike
                     bool willBeLiked = !isLikedByCurrentUser;
-                    _triggerAnimation(
-                        willBeLiked); // Trigger animation BEFORE dispatching
+                    _triggerAnimation(willBeLiked); 
                     postsProvider.likePost(widget.postModel.id);
                   },
                   child: SizedBox(
-                    height: 300,
+                    height: 320,
                     child: Padding(
                       padding: const EdgeInsets.only(left: 10, right: 10),
                       child: ClipRRect(
@@ -281,17 +350,11 @@ class _PostWidgetState extends State<PostWidget>
                         height: _isAnimatingLike ? 300 : 100,
                         width: _isAnimatingLike ? 300 : 100,
                       ),
-                      // child: Icon(
-                      //   _isAnimatingLike ? Icons.favorite : Icons.heart_broken,
-                      //   color: _isAnimatingLike ? Colors.red : Colors.grey[700],
-                      //   size: 100, // Adjust size as needed
-                      // ),
                     ),
                   ),
               ],
             ),
 
-            const SizedBox(height: 8),
             if (widget.postModel.imageUrls.length > 1)
               Center(
                 child: SmoothPageIndicator(
@@ -305,7 +368,7 @@ class _PostWidgetState extends State<PostWidget>
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
               child: Row(
                 children: [
                   LikeButton(
@@ -342,9 +405,8 @@ class _PostWidgetState extends State<PostWidget>
                     },
                     onTap: (bool isLiked) async {
                       HapticFeedback.mediumImpact();
-                      // The LikeButton handles its own optimistic animation
                       postsProvider.likePost(widget.postModel.id);
-                      return !isLiked; // Return the opposite for optimistic UI
+                      return !isLiked; 
                     },
                   ),
                   const SizedBox(width: 8),
@@ -413,48 +475,48 @@ class _PostWidgetState extends State<PostWidget>
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Builder(
-                builder: (context) {
-                  final likedByText = _formattedLikedByList(widget.postModel.likedBy);
-                  if (likedByText.isEmpty) {
-                    return Text(
-                      '${widget.postModel.likes} likes',
-                      style: TextStyle(color: theme.colorScheme.onSurface),
-                    );
-                  }
-
-                  return RichText(
-                    text: TextSpan(
-                      style: TextStyle(color: theme.colorScheme.onSurface),
-                      children: [
-                        const TextSpan(
-                          text: 'Liked by ',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        TextSpan(
-                          text: likedByText,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const TextSpan(
-                          text: ' and ',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        TextSpan(
-                          text: '${widget.postModel.likes} others',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Builder(
+                      builder: (context) {
+                        // Use a specialized widget to handle name fetching if needed
+                        return LikedByText(
+                          likedBy: widget.postModel.likedBy,
+                          likedByNames: widget.postModel.likedByNames,
+                          totalLikes: widget.postModel.likes,
+                          theme: theme,
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                  // Spacer(), // Removed Spacer to allow Expanded to take space
+                  // Face Pile (Mock visual to match design as we don't have liker image URLs yet)
+                  if (widget.postModel.likes > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: SizedBox(
+                        height: 24,
+                        width: 50,
+                        child: Stack(
+                          children: [
+                            Positioned(
+                                left: 0,
+                                child: _buildFacePileCircle(theme, Colors.blue.shade100)),
+                            Positioned(
+                                left: 12,
+                                child: _buildFacePileCircle(theme, Colors.red.shade100)),
+                            Positioned(
+                                left: 24,
+                                child: _buildFacePileCircle(theme, Colors.green.shade100)),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
+            const SizedBox(height: 6),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -463,32 +525,36 @@ class _PostWidgetState extends State<PostWidget>
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.tag, size: 14),
-                      const SizedBox(width: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2.0, right: 6.0),
+                        child: Icon(Icons.format_quote, size: 20, color: theme.colorScheme.onSurface),
+                      ),
                       Expanded(
                         child: ReadMoreText(
                           widget.postModel.caption,
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(
+                            fontSize: 13, 
+                            color: theme.colorScheme.onSurface,
+                            height: 1.4
+                          ),
                           trimMode: TrimMode.Line,
                           trimLines: 2,
-                          trimCollapsedText: 'Read More',
-                          trimExpandedText: 'Read Less',
+                          trimCollapsedText: ' (More)',
+                          trimExpandedText: ' (Less)',
                           moreStyle: TextStyle(
-                            color: theme.colorScheme.primary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.outline,
+                            fontSize: 13,
                           ),
                           lessStyle: TextStyle(
-                            color: theme.colorScheme.primary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.outline,
+                            fontSize: 13,
                           ),
                         ),
                       ),
                     ],
                   ),
                   Text(
-                    widget.postModel.timestamp,
+                    _formatDate(widget.postModel.timestamp),
                     style: TextStyle(
                       fontSize: 12,
                       color: theme.colorScheme.outline,
@@ -502,6 +568,17 @@ class _PostWidgetState extends State<PostWidget>
         ),
       ),
     );
+  }
+
+  String _formatDate(String timestamp) {
+    if (timestamp.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(timestamp).toLocal();
+      // Format: Wed, 27 Jan 2026, 10:07 AM
+      return DateFormat('EEE, dd MMM yyyy, hh:mm a').format(dt);
+    } catch (e) {
+      return timestamp;
+    }
   }
 
   bool _isValidHttpUrl(String value) {
@@ -588,16 +665,7 @@ class _PostWidgetState extends State<PostWidget>
     return result.isEmpty ? '?' : result;
   }
 
-  String _formattedLikedByList(List<String> likedBy) {
-    // Basic formatting, replace with your actual logic
-    if (likedBy.isEmpty) {
-      return '';
-    } else if (likedBy.length == 1) {
-      return likedBy.first;
-    } else {
-      return likedBy.take(2).join(', '); // Show first two likers
-    }
-  }
+
 
   Widget _buildAnimatedButton(
       {required Widget icon, required VoidCallback onTap}) {
@@ -607,6 +675,27 @@ class _PostWidgetState extends State<PostWidget>
       child: Padding(
         padding: const EdgeInsets.all(4.0),
         child: icon,
+      ),
+    );
+  }
+
+  Widget _buildFacePileCircle(ThemeData theme, Color color) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: theme.colorScheme.surface, width: 2),
+        image: const DecorationImage(
+          image: AssetImage('assets/splash/namo_logo.png'), // Or generic user icon
+          fit: BoxFit.cover
+        )
+      ),
+      // Fallback if asset missing or just color
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(color: color.withOpacity(0.5)),
       ),
     );
   }

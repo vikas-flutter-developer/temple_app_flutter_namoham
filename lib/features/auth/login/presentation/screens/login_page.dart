@@ -140,15 +140,28 @@ class _LoginPageState extends State<LoginPage> {
       final String userId = (user['_id'] ?? user['id'] ?? '').toString();
 
       final prefs = await SharedPreferences.getInstance();
+      
+      // Clear previous session data to prevent profile mix-ups
+      await prefs.clear();
+
       await prefs.setString('auth_token', token);
       await prefs.setString('user_type', apiUserType);
       await prefs.setString('user_id', userId);
 
       // Optional: store name/image for chat sender fields
-      final userName = (user['name'] ?? user['username'] ?? user['templeName'] ?? user['creatorName'] ?? '').toString();
-      final userImage = (user['userImage'] ?? user['profileImage'] ?? user['imageUrl'] ?? user['image'] ?? '').toString();
-      if (userName.isNotEmpty) await prefs.setString('user_name', userName);
-      if (userImage.isNotEmpty) await prefs.setString('user_image', userImage);
+      final userName = (user['fullName'] ?? user['name'] ?? user['username'] ?? user['templeName'] ?? user['creatorName'] ?? '').toString();
+      final userEmail = (user['email'] ?? '').toString();
+      final userImage = (user['profilePic'] ?? user['userImage'] ?? user['profileImage'] ?? user['imageUrl'] ?? user['image'] ?? '').toString();
+      
+      if (userName.isNotEmpty) {
+        await prefs.setString('user_name', userName);
+        await prefs.setString('full_name', userName); // Save as full_name for ProfilePage
+      }
+      if (userEmail.isNotEmpty) await prefs.setString('email', userEmail);
+      if (userImage.isNotEmpty) {
+        await prefs.setString('user_image', userImage);
+        await prefs.setString('profile_photo_url', userImage); // Save for ProfilePage
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

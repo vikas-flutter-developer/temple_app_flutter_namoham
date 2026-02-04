@@ -52,9 +52,25 @@ class ReelsProvider extends ChangeNotifier {
 
     try {
       final reelsData = await _apiService.getReels();
-      _reels = reelsData.map((json) => ReelModel.fromJson(json)).toList();
+      final allReels = reelsData.map((json) => ReelModel.fromJson(json)).toList();
+      
+      print('REELS_PROVIDER: ========== FILTERING REELS ==========');
+      print('REELS_PROVIDER: Total reels from backend: ${allReels.length}');
+      for (var i = 0; i < allReels.length; i++) {
+        print('REELS_PROVIDER: Reel $i URL: ${allReels[i].videoUrl}');
+      }
+      
+      // Filter out placeholder/test reels with invalid video URLs
+      _reels = allReels.where((reel) => _isValidVideoUrl(reel.videoUrl)).toList();
+      
+      // Shuffle reels for random order
+      _reels.shuffle();
+      
+      print('REELS_PROVIDER: Valid Supabase reels after filtering: ${_reels.length}');
+      print('REELS_PROVIDER: Reels shuffled for random playback');
+      print('REELS_PROVIDER: ========================================');
       _status = ReelsStatus.loaded;
-      _errorMessage = '';
+      _errorMessage = '';;
     } catch (e) {
       _status = ReelsStatus.error;
       _errorMessage = e.toString();
@@ -71,7 +87,11 @@ class ReelsProvider extends ChangeNotifier {
 
     try {
       final reelsData = await _apiService.getReelsByUser(userId);
-      _reels = reelsData.map((json) => ReelModel.fromJson(json)).toList();
+      final allReels = reelsData.map((json) => ReelModel.fromJson(json)).toList();
+      
+      // Filter out placeholder/test reels with invalid video URLs
+      _reels = allReels.where((reel) => _isValidVideoUrl(reel.videoUrl)).toList();
+      
       _status = ReelsStatus.loaded;
       _errorMessage = '';
     } catch (e) {
@@ -102,9 +122,12 @@ class ReelsProvider extends ChangeNotifier {
     }
 
     try {
+      // Capitalize userType for backend (e.g., "temple" -> "Temple")
+      final capitalizedType = type[0].toUpperCase() + type.substring(1);
+      
       final response = await _apiService.createReel(
         userId: _userId!,
-        userType: type,
+        userType: capitalizedType,
         videoUrl: videoUrl,
         caption: caption,
       );
@@ -132,17 +155,31 @@ class ReelsProvider extends ChangeNotifier {
 
     // Find reel index
     final index = _reels.indexWhere((r) => r.id == reelId);
-    if (index == -1) return;
+    if (index == -1) {
+      print('REELS_PROVIDER: Reel not found: $reelId');
+      return;
+    }
 
     // Optimistic update
     final reel = _reels[index];
     final isCurrentlyLiked = reel.isLikedBy(_userId);
+    
+    print('REELS_PROVIDER: ========== LIKE TOGGLE DEBUG ==========');
+    print('REELS_PROVIDER: Reel ID: $reelId');
+    print('REELS_PROVIDER: User ID: $_userId');
+    print('REELS_PROVIDER: Current liked state: $isCurrentlyLiked');
+    print('REELS_PROVIDER: Current likes count: ${reel.likes}');
+    print('REELS_PROVIDER: Current likedBy list: ${reel.likedBy}');
     
     final newLikedBy = isCurrentlyLiked
         ? reel.likedBy.where((id) => id != _userId).toList()
         : [...reel.likedBy, _userId!];
     
     final newLikes = isCurrentlyLiked ? reel.likes - 1 : reel.likes + 1;
+
+    print('REELS_PROVIDER: Expected new liked state: ${!isCurrentlyLiked}');
+    print('REELS_PROVIDER: Expected new likes count: $newLikes');
+    print('REELS_PROVIDER: Expected new likedBy list: $newLikedBy');
 
     _reels[index] = reel.copyWith(
       likes: newLikes,
@@ -151,22 +188,43 @@ class ReelsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      print('REELS_PROVIDER: Calling API to toggle like...');
       final response = await _apiService.toggleLikeReel(reelId, _userId!);
       
+      print('REELS_PROVIDER: API Response received: $response');
+      print('REELS_PROVIDER: Server likes count: ${response['likes']}');
+      print('REELS_PROVIDER: Server likedBy list: ${response['likedBy']}');
+      
       // Update with server response
+      final serverLikes = response['likes'] ?? newLikes;
+      final serverLikedBy = (response['likedBy'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          newLikedBy;
+      
+      final serverIsLiked = serverLikedBy.contains(_userId);
+      print('REELS_PROVIDER: Server indicates liked: $serverIsLiked');
+      
+      // CRITICAL: Check if server response matches our expectation
+      if (serverIsLiked == isCurrentlyLiked) {
+        print('REELS_PROVIDER: ⚠️ WARNING: Server returned SAME like state!');
+        print('REELS_PROVIDER: This indicates the backend may be inverting the logic');
+      } else {
+        print('REELS_PROVIDER: ✓ Server response matches expected state');
+      }
+      
       _reels[index] = reel.copyWith(
-        likes: response['likes'] ?? newLikes,
-        likedBy: (response['likedBy'] as List<dynamic>?)
-                ?.map((e) => e.toString())
-                .toList() ??
-            newLikedBy,
+        likes: serverLikes,
+        likedBy: serverLikedBy,
       );
+      
+      print('REELS_PROVIDER: ========================================');
       notifyListeners();
     } catch (e) {
       // Revert on error
+      print('REELS_PROVIDER: ❌ Error toggling like - reverting: $e');
       _reels[index] = reel;
       notifyListeners();
-      print('REELS_PROVIDER: Error toggling like - $e');
     }
   }
 
@@ -274,6 +332,70 @@ class ReelsProvider extends ChangeNotifier {
       return _reels.firstWhere((r) => r.id == reelId);
     } catch (_) {
       return null;
+    }
+  }
+  
+  /// Validate if video URL is from Supabase storage only
+  bool _isValidVideoUrl(String url) {
+    if (url.isEmpty) return false;
+    
+    // Only accept Supabase URLs
+    // Typical Supabase storage URLs contain 'supabase' in the domain
+    // Example: https://xyz.supabase.co/storage/v1/object/public/...
+    final lowerUrl = url.toLowerCase();
+    
+    if (!lowerUrl.contains('supabase')) {
+      print('REELS_PROVIDER: Filtering out non-Supabase URL: $url');
+      return false;
+    }
+    
+    // Additional check: Filter out common placeholder patterns even from Supabase
+    final invalidPatterns = [
+      'example.mp4',
+      'test.mp4',
+      'placeholder',
+      'sample.mp4',
+      'demo.mp4',
+    ];
+    
+    for (final pattern in invalidPatterns) {
+      if (lowerUrl.contains(pattern)) {
+        print('REELS_PROVIDER: Filtering out placeholder URL: $url');
+        return false;
+      }
+    }
+    
+    print('REELS_PROVIDER: Valid Supabase URL: $url');
+    return true;
+  }
+
+  /// Delete a reel
+  Future<bool> deleteReel(String reelId) async {
+    try {
+      if (_userId == null) {
+        print('REELS_PROVIDER: Cannot delete - user not logged in');
+        return false;
+      }
+      
+      // Check ownership locally first
+      final reel = getReelById(reelId);
+      if (reel == null) return false;
+      
+      if (reel.userId != _userId) {
+        print('REELS_PROVIDER: Cannot delete - user is not owner');
+        return false;
+      }
+      
+      await _apiService.deleteReel(reelId);
+      
+      // Remove local
+      _reels.removeWhere((r) => r.id == reelId);
+      notifyListeners();
+      
+      return true;
+    } catch (e) {
+      print('REELS_PROVIDER: Error deleting reel: $e');
+      return false;
     }
   }
 

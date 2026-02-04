@@ -1,4 +1,3 @@
-import 'package:csc_picker_plus/csc_picker_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/countryphone.dart';
@@ -11,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
+import 'package:flutter_user_app/core/constants/indian_locations.dart';
 import 'dart:io';
 
 class ProfileEditScreen extends StatefulWidget {
@@ -52,11 +52,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final TextEditingController _ifscController = TextEditingController();
   final TextEditingController _bankNameController = TextEditingController();
 
-  String _selectedCountry = "India";
-  String _selectedState = "";
-  String _selectedCity = "";
+  // Location controllers
+  final TextEditingController _countryController = TextEditingController();
+  final TextEditingController _stateController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController();
+  
+  
   String _countryCode = "+91";
-  bool _isLoadingState = false;
 
   @override
   void initState() {
@@ -70,97 +72,128 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     
     setState(() {
       _userType = prefs.getString('user_type') ?? 'user';
-      
-      // Load basic info
-      _nameController.text = prefs.getString('full_name') ?? '';
-      _emailController.text = prefs.getString('email') ?? '';
-      _phoneController.text = prefs.getString('phone_number') ?? '';
-      
-      _addressController.text = prefs.getString('address') ?? '';
-      _zipController.text = prefs.getString('zip_code') ?? '';
-      _selectedCity = prefs.getString('city') ?? '';
-      _selectedState = prefs.getString('state') ?? '';
-      _selectedCountry = prefs.getString('country') ?? 'India';
-
-      // Type specific loads
-      if (_userType == 'creator') {
-        _titleController.text = prefs.getString('title') ?? '';
-        _bioController.text = prefs.getString('bio') ?? '';
-        _descController.text = prefs.getString('description') ?? '';
-        _dobController.text = prefs.getString('dob') ?? '';
-      } else if (_userType == 'temple') {
-        _websiteController.text = prefs.getString('website') ?? '';
-        _descController.text = prefs.getString('description') ?? '';
-        _openTimeController.text = prefs.getString('open_time') ?? '';
-        _closeTimeController.text = prefs.getString('close_time') ?? '';
-        // Bank details
-        _bankNameController.text = prefs.getString('bank_name') ?? '';
-        _bankHolderController.text = prefs.getString('bank_holder') ?? '';
-        _bankAcctController.text = prefs.getString('bank_acct') ?? '';
-        _ifscController.text = prefs.getString('bank_ifsc') ?? '';
-      } else {
-        _dobController.text = prefs.getString('dob') ?? '';
-      }
-      
-      // Load saved photo path
-      final imagePath = prefs.getString('profile_photo_path');
-      if (imagePath != null && File(imagePath).existsSync()) {
-        _savedImagePath = imagePath;
-      }
-      
-      // Load remote photo URL
-      _remotePhotoUrl = prefs.getString('profile_photo_url');
     });
 
-    // Fetch full profile content from API to pre-fill fields
+    // Fetch profile data from backend API
+    print('EDIT_PROFILE: Fetching from backend API for type: $_userType');
+    
     try {
-      final userId = prefs.getString('user_id');
-      print('EDIT_PROFILE: Fetching data for userId: $userId, type: $_userType');
+      // Call GET /auth/profile endpoint
+      final profileData = await _apiService.getProfile();
       
-      if (userId == null) return;
+      print('EDIT_PROFILE: API Response: $profileData');
+      
+      // Extract user object from response
+      final user = profileData['user'] ?? profileData;
+      
+      print('EDIT_PROFILE: User data: $user');
+      
+      setState(() {
+        // Populate all fields from API response
+        if (user['fullName'] != null) _nameController.text = user['fullName'];
+        if (user['email'] != null) _emailController.text = user['email'];
+        if (user['phoneNumber'] != null) {
+          _phoneController.text = user['phoneNumber'].toString().replaceAll(_countryCode, '');
+        }
+        if (user['address'] != null) _addressController.text = user['address'];
+        if (user['city'] != null) _cityController.text = user['city'];
+        if (user['state'] != null) _stateController.text = user['state'];
+        if (user['zipCode'] != null) _zipController.text = user['zipCode'];
+        if (user['country'] != null) {
+          // Remove emoji and extra spaces from country
+          final country = user['country'].toString().replaceAll(RegExp(r'[^\w\s]'), '').trim();
+          _countryController.text = country;
+        }
+        if (user['dob'] != null) {
+          // Extract date part from ISO string (e.g., "2026-02-01T00:00:00.000Z" -> "2026-02-01")
+          final dobString = user['dob'].toString();
+          _dobController.text = dobString.split('T')[0];
+        }
+        if (user['bio'] != null) _bioController.text = user['bio'];
+        if (user['profilePic'] != null) _remotePhotoUrl = user['profilePic'];
+        
+        print('EDIT_PROFILE: Loaded from API - Name: ${_nameController.text}, Email: ${_emailController.text}');
+        print('EDIT_PROFILE: City: ${_cityController.text}, State: ${_stateController.text}, Country: ${_countryController.text}, Zip: ${_zipController.text}');
+        print('EDIT_PROFILE: DOB: ${_dobController.text}, ProfilePic: $_remotePhotoUrl');
 
-      if (_userType == 'user' || _userType == 'User') {
-         // Use getProfile() to fetch full personal details (including private ones)
-         final userData = await _apiService.getProfile();
-         print('EDIT_PROFILE: API Data received: $userData'); 
-         
-         // Helper to extract user object if nested
-         final userObj = userData['user'] ?? userData['data'] ?? userData;
-         _populateUserData(userObj);
-      } else if (_userType == 'temple' || _userType == 'Temple') {
-         final temple = await _apiService.getTempleById(userId);
-         _populateTempleData(temple);
-      } else if (_userType == 'creator' || _userType == 'Creator') {
-         final creator = await _apiService.getCreatorById(userId);
-         _populateCreatorData(creator);
+         // Populate specialized data based on user type
+        if (_userType.toLowerCase() == 'temple') {
+           _populateTempleDataFromMap(user);
+        } else if (_userType.toLowerCase() == 'creator') {
+           _populateCreatorDataFromMap(user);
+        }
+      });
+    } catch (e, stackTrace) {
+      print('EDIT_PROFILE: Error loading from API: $e');
+      print('EDIT_PROFILE: Stack trace: $stackTrace');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('Failed to load profile. Please check internet.'), backgroundColor: Colors.red),
+        );
       }
-    } catch (e) {
-      debugPrint('Error loading profile for edit: $e');
-      // Don't show snackbar here to avoid annoying user if they have offline data
     }
   }
 
   void _populateUserData(Map<String, dynamic> data) {
+    print('EDIT_PROFILE: _populateUserData called with: $data');
     if (mounted) {
       setState(() {
-         // Only overwrite if API returns valid data (not null or empty)
-         if (data['name'] != null) _nameController.text = data['name'];
-         if (data['fullName'] != null) _nameController.text = data['fullName'];
-         if (data['email'] != null) _emailController.text = data['email'];
-         
-         if (data['phoneNumber'] != null) {
-             _phoneController.text = data['phoneNumber'].toString().replaceAll(_countryCode, '');
-         }
-         
-         if (data['address'] != null) _addressController.text = data['address'];
-         if (data['zipCode'] != null) _zipController.text = data['zipCode'];
-         if (data['city'] != null) _selectedCity = data['city'];
-         if (data['state'] != null) _selectedState = data['state'];
-         if (data['country'] != null) _selectedCountry = data['country'];
-         
-         if (data['dob'] != null) _dobController.text = data['dob'];
-         
-         if (data['profilePic'] != null) _remotePhotoUrl = data['profilePic'];
+        // Basic info
+        if (data['fullName'] != null) {
+          print('EDIT_PROFILE: Setting fullName: ${data['fullName']}');
+          _nameController.text = data['fullName'];
+        }
+        if (data['email'] != null) {
+          print('EDIT_PROFILE: Setting email: ${data['email']}');
+          _emailController.text = data['email'];
+        }
+        
+        // Phone number - remove country code if present
+        if (data['phoneNumber'] != null) {
+          print('EDIT_PROFILE: Setting phoneNumber: ${data['phoneNumber']}');
+          _phoneController.text = data['phoneNumber'].toString().replaceAll(_countryCode, '');
+        }
+        
+        // Location details
+        if (data['address'] != null) {
+          print('EDIT_PROFILE: Setting address: ${data['address']}');
+          _addressController.text = data['address'];
+        }
+        if (data['zipCode'] != null) {
+          print('EDIT_PROFILE: Setting zipCode: ${data['zipCode']}');
+          _zipController.text = data['zipCode'];
+        }
+        if (data['city'] != null) {
+          print('EDIT_PROFILE: Setting city: ${data['city']}');
+          _cityController.text = data['city'];
+        }
+        if (data['state'] != null) {
+          print('EDIT_PROFILE: Setting state: ${data['state']}');
+          _stateController.text = data['state'];
+        }
+        if (data['country'] != null) {
+          print('EDIT_PROFILE: Setting country: ${data['country']}');
+          _countryController.text = data['country'];
+        }
+        
+        // Personal details
+        if (data['dob'] != null) {
+          print('EDIT_PROFILE: Setting dob: ${data['dob']}');
+          _dobController.text = data['dob'];
+        }
+        if (data['bio'] != null) {
+          print('EDIT_PROFILE: Setting bio: ${data['bio']}');
+          _bioController.text = data['bio'];
+        }
+        
+        // Profile picture
+        if (data['profilePic'] != null) {
+          print('EDIT_PROFILE: Setting profilePic: ${data['profilePic']}');
+          _remotePhotoUrl = data['profilePic'];
+        }
+        
+        print('EDIT_PROFILE: _populateUserData completed');
       });
     }
   }
@@ -173,9 +206,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
          _phoneController.text = temple.phoneNumber.replaceAll(_countryCode, '');
          _descController.text = temple.description;
          
-         if (temple.city.isNotEmpty) _selectedCity = temple.city;
-         if (temple.state.isNotEmpty) _selectedState = temple.state;
-         if (temple.country.isNotEmpty) _selectedCountry = temple.country;
+         if (temple.city.isNotEmpty) _cityController.text = temple.city;
+         if (temple.state.isNotEmpty) _stateController.text = temple.state;
+         if (temple.country.isNotEmpty) _countryController.text = temple.country;
          if (temple.zipCode.isNotEmpty) _zipController.text = temple.zipCode;
 
          // Fallback address if structured data is missing logic in model, 
@@ -195,10 +228,79 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         _descController.text = creator.description;
         _addressController.text = creator.address;
         
-        if (creator.city.isNotEmpty) _selectedCity = creator.city;
-        if (creator.state.isNotEmpty) _selectedState = creator.state;
-        if (creator.country.isNotEmpty) _selectedCountry = creator.country;
+        if (creator.city.isNotEmpty) _cityController.text = creator.city;
+        if (creator.state.isNotEmpty) _stateController.text = creator.state;
+        if (creator.country.isNotEmpty) _countryController.text = creator.country;
         if (creator.zipCode.isNotEmpty) _zipController.text = creator.zipCode;
+      });
+    }
+  }
+
+  // New helper methods for Map-based data from GET registration endpoints
+  void _populateTempleDataFromMap(Map<String, dynamic> data) {
+     if (mounted) {
+       setState(() {
+         if (data['templeName'] != null) _nameController.text = data['templeName'];
+         if (data['email'] != null) _emailController.text = data['email'];
+         
+         if (data['pocPhoneNumber'] != null) {
+             _phoneController.text = data['pocPhoneNumber'].toString().replaceAll(_countryCode, '');
+         }
+         
+         if (data['address'] != null) _addressController.text = data['address'];
+         if (data['zipCode'] != null) _zipController.text = data['zipCode'];
+         if (data['state'] != null) _stateController.text = data['state'];
+         if (data['city'] != null) _cityController.text = data['city'];
+         if (data['country'] != null) _countryController.text = data['country'];
+         
+         if (data['description'] != null) _descController.text = data['description'];
+         if (data['website'] != null) _websiteController.text = data['website'];
+         
+         // Timings
+         if (data['timings'] != null && data['timings'] is Map) {
+           final timings = data['timings'] as Map<String, dynamic>;
+           if (timings['openTime'] != null) _openTimeController.text = timings['openTime'];
+           if (timings['closeTime'] != null) _closeTimeController.text = timings['closeTime'];
+         }
+         
+         // Bank details  
+         if (data['bankDetails'] != null && data['bankDetails'] is Map) {
+           final bank = data['bankDetails'] as Map<String, dynamic>;
+           if (bank['bankName'] != null) _bankNameController.text = bank['bankName'];
+           if (bank['accountHolderName'] != null) _bankHolderController.text = bank['accountHolderName'];
+           if (bank['bankAccountNumber'] != null) _bankAcctController.text = bank['bankAccountNumber'];
+           if (bank['ifscCode'] != null) _ifscController.text = bank['ifscCode'];
+         }
+         
+         if (data['templePics'] != null && data['templePics'] is List && (data['templePics'] as List).isNotEmpty) {
+           _remotePhotoUrl = (data['templePics'] as List).first.toString();
+         }
+       });
+     }
+  }
+
+  void _populateCreatorDataFromMap(Map<String, dynamic> data) {
+    if (mounted) {
+      setState(() {
+        if (data['creatorName'] != null) _nameController.text = data['creatorName'];
+        if (data['email'] != null) _emailController.text = data['email'];
+        
+        if (data['phoneNumber'] != null) {
+            _phoneController.text = data['phoneNumber'].toString().replaceAll(_countryCode, '');
+        }
+        
+        if (data['address'] != null) _addressController.text = data['address'];
+        if (data['zipCode'] != null) _zipController.text = data['zipCode'];
+        if (data['state'] != null) _stateController.text = data['state'];
+        if (data['city'] != null) _cityController.text = data['city'];
+        if (data['country'] != null) _countryController.text = data['country'];
+        
+        if (data['title'] != null) _titleController.text = data['title'];
+        if (data['bio'] != null) _bioController.text = data['bio'];
+        if (data['description'] != null) _descController.text = data['description'];
+        if (data['dob'] != null) _dobController.text = data['dob'];
+        
+        if (data['profilePic'] != null) _remotePhotoUrl = data['profilePic'];
       });
     }
   }
@@ -244,7 +346,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   // Temple profile pictures might be an array or a single field, adjust as per API
                   await _apiService.updateTempleProfile(userId, {'templePics': [photoUrl]}); 
                } else {
-                  await _apiService.updateProfile({'profilePic': photoUrl});
+                  await _apiService.updateProfile(userId, {'profilePic': photoUrl});
                }
                
                // Update local cache
@@ -308,9 +410,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       // Note: Backend might expect these at root or inside address object, sending flat for now based on model
       if (_addressController.text.isNotEmpty) profileData['address'] = _addressController.text.trim();
       if (_zipController.text.isNotEmpty) profileData['zipCode'] = _zipController.text.trim();
-      if (_selectedState.isNotEmpty) profileData['state'] = _selectedState;
-      if (_selectedCity.isNotEmpty) profileData['city'] = _selectedCity;
-      if (_selectedCountry.isNotEmpty) profileData['country'] = _selectedCountry;
+      if (_stateController.text.isNotEmpty) profileData['state'] = _stateController.text.trim();
+      if (_cityController.text.isNotEmpty) profileData['city'] = _cityController.text.trim();
+      if (_countryController.text.isNotEmpty) profileData['country'] = _countryController.text.trim();
 
       // Map 'name' for all types to ensure persistence on login logic which often checks 'name'
       profileData['name'] = _nameController.text.trim();
@@ -362,7 +464,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         // User specific
         if (_dobController.text.isNotEmpty) profileData['dob'] = _dobController.text.trim();
         
-        response = await _apiService.updateProfile(profileData);
+        response = await _apiService.updateProfile(userId, profileData);
       }
 
       if (mounted) {
@@ -370,38 +472,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           SnackBar(content: Text(response['message'] ?? 'Profile updated successfully!'), backgroundColor: Colors.green),
         );
 
-        // Update Local Cache (SharedPreferences) to reflect changes immediately
-        // (This logic remains valid for offline-first experience)
-        if (response['user'] != null || response['data'] != null) { // Handle different response structures
-           // ... (Existing logic for updating prefs can stay or be redundant, keeping for safety)
-        }
-        
-        await prefs.setString('full_name', _nameController.text.trim());
-        await prefs.setString('email', _emailController.text.trim());
-        await prefs.setString('phone_number', _phoneController.text.trim());
-        await prefs.setString('address', _addressController.text.trim());
-        await prefs.setString('zip_code', _zipController.text.trim());
-        await prefs.setString('city', _selectedCity);
-        await prefs.setString('state', _selectedState);
-        await prefs.setString('country', _selectedCountry);
-        
-        if (_userType == 'creator' || _userType == 'Creator') {
-            await prefs.setString('title', _titleController.text.trim());
-            await prefs.setString('bio', _bioController.text.trim());
-            await prefs.setString('description', _descController.text.trim());
-            await prefs.setString('dob', _dobController.text.trim());
-        } else if (_userType == 'temple' || _userType == 'Temple') {
-           await prefs.setString('description', _descController.text.trim());
-           await prefs.setString('website', _websiteController.text.trim());
-           await prefs.setString('open_time', _openTimeController.text.trim());
-           await prefs.setString('close_time', _closeTimeController.text.trim());
-           await prefs.setString('bank_name', _bankNameController.text.trim());
-           await prefs.setString('bank_holder', _bankHolderController.text.trim());
-           await prefs.setString('bank_acct', _bankAcctController.text.trim());
-           await prefs.setString('bank_ifsc', _ifscController.text.trim());
-        } else {
-           await prefs.setString('dob', _dobController.text.trim());
-        }
+        // Update Local Cache (SharedPreferences) update logic REMOVED as per request.
+        // We now rely purely on the backend.
         Navigator.pop(context);
       }
     } catch (e) {
@@ -473,27 +545,60 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               
               // Address Section (All Types)
               _buildSectionTitle(theme, 'Location'),
-              CSCPickerPlus(
-                countryStateLanguage: CountryStateLanguage.englishOrNative,
-                onCountryChanged: (v) {
+              
+              // Country TextField
+              CustomTextField(
+                labelText: 'Country',
+                controller: _countryController,
+                keyboardType: TextInputType.text,
+              ),
+              const SizedBox(height: 16),
+              
+              // State Dropdown
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'State',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
+                isExpanded: true,
+                value: IndianLocations.states.contains(_stateController.text) ? _stateController.text : null,
+                items: IndianLocations.states.map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value, overflow: TextOverflow.ellipsis),
+                  );
+                }).toList(),
+                onChanged: (newValue) {
                   setState(() {
-                    _selectedCountry = v;
-                    // Reset state/city if country changes manually
-                    // _selectedState = "";
-                    // _selectedCity = "";
+                    _stateController.text = newValue!;
+                    _cityController.text = ''; // Reset city on state change
+                    _countryController.text = 'India'; // Auto-set country
                   });
                 },
-                onStateChanged: (v) => setState(() => _selectedState = v ?? ''),
-                onCityChanged: (v) => setState(() => _selectedCity = v ?? ''),
-                defaultCountry: CscCountry.India,
-                // Attempting to set initial values via these labels if the package supports them
-                // Common props for CSC Picker:
-                countryDropdownLabel: _selectedCountry.isNotEmpty ? _selectedCountry : "*Country",
-                stateDropdownLabel: _selectedState.isNotEmpty ? _selectedState : "*State",
-                cityDropdownLabel: _selectedCity.isNotEmpty ? _selectedCity : "*City",
-                dropdownDecoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: theme.colorScheme.outline.withAlpha(50))),
+              ),
+              const SizedBox(height: 16),
+              
+              // City Dropdown
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'City',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
+                isExpanded: true,
+                value: IndianLocations.getCitiesForState(_stateController.text).contains(_cityController.text) ? _cityController.text : null,
+                items: IndianLocations.getCitiesForState(_stateController.text).map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value, overflow: TextOverflow.ellipsis),
+                  );
+                }).toList(),
+                onChanged: (newValue) {
+                  setState(() {
+                    _cityController.text = newValue!;
+                  });
+                },
               ),
               const SizedBox(height: 16),
               CustomTextField(labelText: 'Address', controller: _addressController),

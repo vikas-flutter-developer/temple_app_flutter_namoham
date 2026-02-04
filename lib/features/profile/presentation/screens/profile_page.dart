@@ -35,7 +35,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _profilePhotoUrl;
   String? _localPhotoPath;
   String _fullName = '';
-  String _userType = 'User';
+  String _userType = 'user';
   String _email = '';
   bool _isLoading = true;
   final ApiService _apiService = ApiService.create();
@@ -56,7 +56,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _localPhotoPath = prefs.getString('profile_photo_path');
         _fullName = prefs.getString('full_name') ?? '';
         _email = prefs.getString('email') ?? '';
-        _userType = prefs.getString('user_type') ?? 'User';
+        _userType = prefs.getString('user_type') ?? 'user';
       });
     }
 
@@ -72,7 +72,7 @@ class _ProfilePageState extends State<ProfilePage> {
       String? newEmail;
       String? newPhoto;
 
-      if (userType == 'User') {
+      if (userType == 'user' || userType == 'User') {
         try {
           final userData = await _apiService.getUserById(userId);
           newName = userData['name'] ?? userData['fullName'];
@@ -81,12 +81,12 @@ class _ProfilePageState extends State<ProfilePage> {
         } catch (e) {
           debugPrint('User profile API fetch failed, using local data: $e');
         }
-      } else if (userType == 'Temple') {
+      } else if (userType == 'temple' || userType == 'Temple') {
         final temple = await _apiService.getTempleById(userId);
         newName = temple.name;
         newEmail = temple.email;
         newPhoto = temple.imageUrl;
-      } else if (userType == 'Creator') {
+      } else if (userType == 'creator' || userType == 'Creator') {
         final creator = await _apiService.getCreatorById(userId);
         newName = creator.creatorName;
         newEmail = creator.email;
@@ -205,9 +205,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final l10n = AppLocalizations.of(context)!;
     
     // Check types
-    final isUser = _userType == 'User';
-    final isTemple = _userType == 'Temple';
-    final isCreator = _userType == 'Creator';
+    final isUser = _userType.toLowerCase() == 'user';
+    final isTemple = _userType.toLowerCase() == 'temple';
+    final isCreator = _userType.toLowerCase() == 'creator';
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,

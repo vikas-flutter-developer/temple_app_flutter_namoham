@@ -99,6 +99,9 @@ class _VideosViewState extends State<_VideosView> {
       _currentIndex = index;
     });
 
+    // Cleanup old controllers to prevent memory leaks
+    _cleanupOldControllers(index, reels);
+
     // Pause previous video
     if (_currentlyPlayingId != null && _controllers.containsKey(_currentlyPlayingId)) {
       _controllers[_currentlyPlayingId]?.pause();
@@ -118,7 +121,44 @@ class _VideosViewState extends State<_VideosView> {
     }
   }
 
-  @override
+  
+
+  /// Cleanup old video controllers to prevent memory leaks
+  /// Only keep controllers for: previous reel, current reel, next reel
+  void _cleanupOldControllers(int currentIndex, List<ReelModel> reels) {
+    if (reels.isEmpty || _controllers.length <= 3) return;
+
+    // Calculate indices with modulo for circular pagination
+    final actualCurrentIndex = currentIndex % reels.length;
+    final previousIndex = (actualCurrentIndex - 1 + reels.length) % reels.length;
+    final nextIndex = (actualCurrentIndex + 1) % reels.length;
+
+    // Get IDs to keep
+    final idsToKeep = {
+      reels[actualCurrentIndex].id,
+      reels[previousIndex].id,
+      reels[nextIndex].id,
+    };
+
+    // Dispose controllers not in the keep list
+    final controllersToRemove = <String>[];
+    _controllers.forEach((id, controller) {
+      if (!idsToKeep.contains(id)) {
+        controller.dispose();
+        controllersToRemove.add(id);
+      }
+    });
+
+    // Remove disposed controllers from map
+    for (final id in controllersToRemove) {
+      _controllers.remove(id);
+    }
+
+    if (controllersToRemove.isNotEmpty) {
+      print('REELS_SCREEN: Cleaned up ${controllersToRemove.length} old controllers. Active: ${_controllers.length}');
+    }
+  }
+@override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const CustomPageBar(title: 'Reels'),
@@ -156,9 +196,12 @@ class _VideosViewState extends State<_VideosView> {
               controller: _pageController,
               scrollDirection: Axis.vertical,
               onPageChanged: (index) => _onPageChanged(index, provider.reels),
-              itemCount: provider.reels.length,
+              // Use a very large itemCount for infinite scrolling
+              itemCount: provider.reels.isEmpty ? 0 : 999999,
               itemBuilder: (context, index) {
-                final reel = provider.reels[index];
+                // Transform index using modulo for circular pagination
+                final actualIndex = index % provider.reels.length;
+                final reel = provider.reels[actualIndex];
                 
                 return FutureBuilder<VideoPlayerController>(
                   future: _getController(reel),
@@ -231,6 +274,9 @@ class _VideosViewState extends State<_VideosView> {
                       isLiked: reel.isLikedBy(provider.userId),
                       onLikePressed: () => provider.toggleLike(reel.id),
                       onCommentPressed: () => _showCommentsSheet(context, reel),
+                      onDeletePressed: provider.userId == reel.userId
+                          ? () => _confirmDelete(context, provider, reel)
+                          : null,
                     );
                   },
                 );
@@ -298,6 +344,39 @@ class _VideosViewState extends State<_VideosView> {
       builder: (sheetContext) => _ReelCommentsSheet(
         reel: reel,
         provider: provider,
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, ReelsProvider provider, ReelModel reel) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Reel'),
+        content: const Text('Are you sure you want to delete this reel? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog
+              
+              final success = await provider.deleteReel(reel.id);
+              if (success && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Reel deleted successfully')),
+                );
+              } else if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to delete reel')),
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

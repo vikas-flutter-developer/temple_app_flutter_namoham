@@ -27,7 +27,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   // Dropdown State
-  String _selectedLoginType = 'User Login';
+  String _selectedLoginType = 'Temple Login';
   final List<String> _loginTypes = [
     'User Login',
     'Temple Login',
@@ -40,7 +40,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    _autoFillCredentials('User Login');
+    _autoFillCredentials('Temple Login');
   }
 
   @override
@@ -57,10 +57,10 @@ class _LoginPageState extends State<LoginPage> {
         _passwordController.text = "raj";
       } else if (type == 'Temple Login') {
         _emailController.text = "golden@example.com";
-        _passwordController.text = "golden";
+        _passwordController.text = "Temple@123";
       } else if (type == 'Creator Login') {
         _emailController.text = "swami@example.com";
-        _passwordController.text = "swami";
+        _passwordController.text = "Creator@123";
       } else if (type == 'Admin Login') {
         _emailController.text = AppConfig.adminUsername;
         _passwordController.text = AppConfig.adminPassword;
@@ -124,9 +124,9 @@ class _LoginPageState extends State<LoginPage> {
         return; // Return early for Admin
       }
 
-      String apiUserType = "User";
-      if (_selectedLoginType == 'Temple Login') apiUserType = "Temple";
-      if (_selectedLoginType == 'Creator Login') apiUserType = "Creator";
+      String apiUserType = "user";
+      if (_selectedLoginType == 'Temple Login') apiUserType = "temple";
+      if (_selectedLoginType == 'Creator Login') apiUserType = "creator";
 
       final response = await _apiService.login(
         _emailController.text.trim(),
@@ -148,20 +148,56 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('user_type', apiUserType);
       await prefs.setString('user_id', userId);
 
-      // Optional: store name/image for chat sender fields
+      // Save Refresh Token
+      final String refreshToken = (response['refreshToken'] ?? '').toString();
+      if (refreshToken.isNotEmpty) {
+        await prefs.setString('refresh_token', refreshToken);
+      }
+
+      // Save ALL profile data returned from backend
       final userName = (user['fullName'] ?? user['name'] ?? user['username'] ?? user['templeName'] ?? user['creatorName'] ?? '').toString();
       final userEmail = (user['email'] ?? '').toString();
       final userImage = (user['profilePic'] ?? user['userImage'] ?? user['profileImage'] ?? user['imageUrl'] ?? user['image'] ?? '').toString();
+      final phoneNumber = (user['phoneNumber'] ?? '').toString();
+      final address = (user['address'] ?? '').toString();
+      final city = (user['city'] ?? '').toString();
+      final state = (user['state'] ?? '').toString();
+      final zipCode = (user['zipCode'] ?? '').toString();
+      final country = (user['country'] ?? '').toString();
+      final dob = (user['dob'] ?? '').toString();
+      final bio = (user['bio'] ?? '').toString();
+      final title = (user['title'] ?? '').toString();
+      final description = (user['description'] ?? '').toString();
+      final website = (user['website'] ?? '').toString();
       
+      // Save basic fields
       if (userName.isNotEmpty) {
         await prefs.setString('user_name', userName);
-        await prefs.setString('full_name', userName); // Save as full_name for ProfilePage
+        await prefs.setString('full_name', userName);
       }
       if (userEmail.isNotEmpty) await prefs.setString('email', userEmail);
       if (userImage.isNotEmpty) {
         await prefs.setString('user_image', userImage);
-        await prefs.setString('profile_photo_url', userImage); // Save for ProfilePage
+        await prefs.setString('profile_photo_url', userImage);
       }
+      
+      // Save additional profile fields
+      if (phoneNumber.isNotEmpty) await prefs.setString('phone_number', phoneNumber);
+      if (address.isNotEmpty) await prefs.setString('address', address);
+      if (city.isNotEmpty) await prefs.setString('city', city);
+      if (state.isNotEmpty) await prefs.setString('state', state);
+      if (zipCode.isNotEmpty) await prefs.setString('zip_code', zipCode);
+      if (country.isNotEmpty) await prefs.setString('country', country);
+      if (dob.isNotEmpty) await prefs.setString('dob', dob);
+      if (bio.isNotEmpty) await prefs.setString('bio', bio);
+      if (title.isNotEmpty) await prefs.setString('title', title);
+      if (description.isNotEmpty) await prefs.setString('description', description);
+      if (website.isNotEmpty) await prefs.setString('website', website);
+      
+      print('LOGIN: Saved all profile data to SharedPreferences');
+      print('LOGIN: fullName=$userName, email=$userEmail, phone=$phoneNumber');
+      print('LOGIN: city=$city, state=$state, country=$country, zipCode=$zipCode');
+      print('LOGIN: dob=$dob, address=$address');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

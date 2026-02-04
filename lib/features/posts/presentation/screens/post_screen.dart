@@ -34,7 +34,7 @@ class _PostsScreenState extends State<PostsScreen> {
     });
   }
 
-  bool get _canCreatePost => _userType == 'Temple' || _userType == 'Creator';
+  bool get _canCreatePost => (_userType?.toLowerCase() == 'temple') || (_userType?.toLowerCase() == 'creator');
 
   void _showCreatePostDialog(BuildContext context) {
     final captionController = TextEditingController();

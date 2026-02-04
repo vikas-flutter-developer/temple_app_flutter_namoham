@@ -10,6 +10,7 @@ class ReelVideoWidget extends StatelessWidget {
   final bool isLiked;
   final VoidCallback onLikePressed;
   final VoidCallback onCommentPressed;
+  final VoidCallback? onDeletePressed;
 
   const ReelVideoWidget({
     super.key,
@@ -18,6 +19,7 @@ class ReelVideoWidget extends StatelessWidget {
     required this.isLiked,
     required this.onLikePressed,
     required this.onCommentPressed,
+    this.onDeletePressed,
   });
 
   @override
@@ -100,12 +102,48 @@ class ReelVideoWidget extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 18),
-                _ActionButton(
+                 _ActionButton(
                   icon: Icons.remove_red_eye_outlined,
                   iconColor: Colors.white,
                   label: reel.views.toString(),
                   onPressed: () {},
                 ),
+                 if (onDeletePressed != null) ...[
+                  const SizedBox(height: 18),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'delete' && onDeletePressed != null) {
+                        onDeletePressed!();
+                      }
+                    },
+                    color: Colors.white,
+                    icon: const Column(
+                      children: [
+                        Icon(Icons.more_vert, color: Colors.white, size: 32),
+                        Text(
+                          'More',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

@@ -149,9 +149,12 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       setState(() => _uploadProgress = 0.7);
       print('CREATE_REEL: Calling API with userId=$userId, userType=$userType, videoUrl=$videoUrl');
       
+      // Capitalize userType for backend (e.g., "temple" -> "Temple")
+      final capitalizedUserType = userType[0].toUpperCase() + userType.substring(1).toLowerCase();
+      
       final response = await _apiService.createReel(
         userId: userId,
-        userType: userType.toLowerCase(), // Convert to lowercase for API
+        userType: capitalizedUserType, // Send capitalized for backend 
         videoUrl: videoUrl,
         caption: _captionController.text,
       );

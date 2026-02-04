@@ -32,8 +32,6 @@ class PostWidget extends StatefulWidget {
 
 class _PostWidgetState extends State<PostWidget>
     with SingleTickerProviderStateMixin {
-  final String currentUserId =
-      'currentUser'; // Consider fetching this dynamically
   final PageController _photoPageController = PageController();
 
   // Animation state for the heart/broken heart icon
@@ -214,7 +212,10 @@ class _PostWidgetState extends State<PostWidget>
   @override
   Widget build(BuildContext context) {
     final postsProvider = context.read<PostsProvider>();
-    final bool isLikedByCurrentUser =
+    
+    // Get the actual current user ID from the provider (no fallback)
+    final String? currentUserId = postsProvider.userId;
+    final bool isLikedByCurrentUser = currentUserId != null && 
         widget.postModel.likedBy.contains(currentUserId);
 
     final theme = Theme.of(context);

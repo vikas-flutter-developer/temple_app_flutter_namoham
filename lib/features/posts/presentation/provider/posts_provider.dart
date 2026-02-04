@@ -32,7 +32,8 @@ class PostsProvider extends ChangeNotifier {
   // Permission check: can delete if user is Temple/Creator and owns the post, or if user is Admin
   bool canDeletePost(String postUserId) {
     if (_userType == 'Admin') return true;
-    return (_userType == 'Temple' || _userType == 'Creator') && postUserId == _userId;
+    final type = _userType?.toLowerCase();
+    return (type == 'temple' || type == 'creator') && postUserId == _userId;
   }
   
   Future<void> _loadUserInfo() async {
@@ -69,8 +70,14 @@ class PostsProvider extends ChangeNotifier {
   /// Toggle like on a post
   Future<void> likePost(String postId) async {
     if (_status != PostsStatus.loaded) return;
+    
+    // Don't allow liking if user is not logged in
+    if (_userId == null) {
+      print('LIKE FAILED: User not logged in');
+      return;
+    }
 
-    final String currentUserId = _userId ?? 'currentUser';
+    final String currentUserId = _userId!;
     // 1. Optimistic Update
     // Capture original state in case we need to revert
     final originalPosts = List<PostEntity>.from(_posts);

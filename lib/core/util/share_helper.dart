@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../util/url_generator.dart';
 
 class ShareHelper {
   static final ApiService _apiService = ApiService.create();
@@ -142,16 +146,76 @@ class ShareHelper {
 
   static Future<void> _sharePost(BuildContext context, String postId, String platform) async {
     try {
-      final response = await _apiService.sharePost(postId, sharedVia: platform);
+      // Generate shareable URL for the post
+      final postUrl = UrlGenerator.generatePostUrl(postId);
+      final shareText = 'Check out this post on Temple App!\n$postUrl';
       
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] ?? 'Post shared successfully'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+      // Share using the native share sheet or specific platform
+      switch (platform) {
+        case 'copy':
+          // Copy link to clipboard
+          await Clipboard.setData(ClipboardData(text: postUrl));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Link copied to clipboard'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          break;
+          
+        case 'whatsapp':
+          // Share via WhatsApp using URL scheme
+          final whatsappUrl = 'whatsapp://send?text=${Uri.encodeComponent(shareText)}';
+          if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
+            await launchUrl(Uri.parse(whatsappUrl));
+          } else {
+            // Fallback to general share
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'telegram':
+          // Share via Telegram
+          final telegramUrl = 'https://t.me/share/url?url=${Uri.encodeComponent(postUrl)}&text=Check%20out%20this%20post';
+          if (await canLaunchUrl(Uri.parse(telegramUrl))) {
+            await launchUrl(Uri.parse(telegramUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'facebook':
+          // Share via Facebook  
+          final facebookUrl = 'https://www.facebook.com/sharer/sharer.php?u=${Uri.encodeComponent(postUrl)}';
+          if (await canLaunchUrl(Uri.parse(facebookUrl))) {
+            await launchUrl(Uri.parse(facebookUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'twitter':
+          // Share via Twitter/X
+          final twitterUrl = 'https://twitter.com/intent/tweet?text=${Uri.encodeComponent(shareText)}';
+          if (await canLaunchUrl(Uri.parse(twitterUrl))) {
+            await launchUrl(Uri.parse(twitterUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        default:
+          // Use native share sheet for other platforms
+          await Share.share(shareText);
       }
+      
+      // Call backend API for analytics (don't wait for it)
+      _apiService.sharePost(postId, sharedVia: platform).catchError((e) {
+        debugPrint('Analytics tracking failed: $e');
+      });
+      
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -166,16 +230,76 @@ class ShareHelper {
 
   static Future<void> _shareReel(BuildContext context, String reelId, String platform) async {
     try {
-      final response = await _apiService.shareReel(reelId, sharedVia: platform);
+      // Generate shareable URL for the reel
+      final reelUrl = UrlGenerator.generateReelUrl(reelId);
+      final shareText = 'Check out this reel on Temple App!\n$reelUrl';
       
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] ?? 'Reel shared successfully'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+      // Share using the native share sheet or specific platform
+      switch (platform) {
+        case 'copy':
+          // Copy link to clipboard
+          await Clipboard.setData(ClipboardData(text: reelUrl));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Link copied to clipboard'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          break;
+          
+        case 'whatsapp':
+          // Share via WhatsApp using URL scheme
+          final whatsappUrl = 'whatsapp://send?text=${Uri.encodeComponent(shareText)}';
+          if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
+            await launchUrl(Uri.parse(whatsappUrl));
+          } else {
+            // Fallback to general share
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'telegram':
+          // Share via Telegram
+          final telegramUrl = 'https://t.me/share/url?url=${Uri.encodeComponent(reelUrl)}&text=Check%20out%20this%20reel';
+          if (await canLaunchUrl(Uri.parse(telegramUrl))) {
+            await launchUrl(Uri.parse(telegramUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'facebook':
+          // Share via Facebook  
+          final facebookUrl = 'https://www.facebook.com/sharer/sharer.php?u=${Uri.encodeComponent(reelUrl)}';
+          if (await canLaunchUrl(Uri.parse(facebookUrl))) {
+            await launchUrl(Uri.parse(facebookUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'twitter':
+          // Share via Twitter/X
+          final twitterUrl = 'https://twitter.com/intent/tweet?text=${Uri.encodeComponent(shareText)}';
+          if (await canLaunchUrl(Uri.parse(twitterUrl))) {
+            await launchUrl(Uri.parse(twitterUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        default:
+          // Use native share sheet for other platforms
+          await Share.share(shareText);
       }
+      
+      // Call backend API for analytics (don't wait for it)
+      _apiService.shareReel(reelId, sharedVia: platform).catchError((e) {
+        debugPrint('Analytics tracking failed: $e');
+      });
+      
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

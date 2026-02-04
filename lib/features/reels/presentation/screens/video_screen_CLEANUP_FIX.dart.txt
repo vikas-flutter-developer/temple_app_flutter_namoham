@@ -1,0 +1,181 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:video_player/video_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/api/api_service.dart';
+import '../../../../widgets/custom_widgets/custom_page_bar.dart';
+import '../../data/models/reel_model.dart';
+import '../providers/reels_provider.dart';
+import '../widgets/reel_video_widget.dart';
+import 'create_reel_screen.dart';
+
+class VideosScreen extends StatelessWidget {
+  final List<ReelModel>? initialReels;
+  final int initialIndex;
+
+  const VideosScreen({
+    Key? key,
+    this.initialReels,
+    this.initialIndex = 0,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Provider.value(
+      value: initialReels,
+      child: VideosView(initialIndex: initialIndex),
+    );
+  }
+}
+
+class VideosView extends StatefulWidget {
+  final int initialIndex;
+
+  const VideosView({
+    Key? key,
+    this.initialIndex = 0,
+  }) : super(key: key);
+
+  @override
+  State<VideosView> createState() => _VideosViewState();
+}
+
+class _VideosViewState extends State<VideosView> {
+  late PageController _pageController;
+  final Map<String, VideoPlayerController> _controllers = {};
+  String? _currentlyPlayingId;
+  int _currentIndex = 0;
+  String? _userType;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: widget.initialIndex);
+    _currentIndex = widget.initialIndex;
+    _loadUserType();
+
+    // Load reels in background
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<ReelsProvider>();
+      if (provider.reels.isEmpty) {
+        provider.loadReels();
+      }
+    });
+  }
+
+  Future<void> _loadUserType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userType = prefs.getString('user_type');
+    print('REELS_SCREEN: User type loaded = $userType');
+    setState(() {
+      _userType = userType;
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    // Dispose all video controllers
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<VideoPlayerController> _getController(ReelModel reel) async {
+    if (_controllers.containsKey(reel.id)) {
+      return _controllers[reel.id]!;
+    }
+
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(reel.fullVideoUrl),
+    );
+    
+    try {
+      await controller.initialize();
+      controller.setLooping(true);
+      
+      // Listen for runtime errors during playback (for logging only)
+      controller.addListener(() {
+        if (controller.value.hasError) {
+          print('REELS_SCREEN: Video playback error detected for ${reel.id}');
+          print('REELS_SCREEN: URL: ${reel.fullVideoUrl}');
+        }
+      });
+      
+      _controllers[reel.id] = controller;
+      return controller;
+    } catch (e) {
+      print('REELS_SCREEN: Failed to initialize video ${reel.id}: $e');
+      print('REELS_SCREEN: Broken video URL: ${reel.fullVideoUrl}');
+      
+      // Clean up the failed controller
+      controller.dispose();
+      
+      // Rethrow to show error in FutureBuilder
+      rethrow;
+    }
+  }
+
+  void _onPageChanged(int index, List<ReelModel> reels) {
+    setState(() {
+      _currentIndex = index;
+    });
+
+    // Cleanup old controllers to prevent memory leaks
+    _cleanupOldControllers(index, reels);
+
+    // Pause previous video
+    if (_currentlyPlayingId != null && _controllers.containsKey(_currentlyPlayingId)) {
+      _controllers[_currentlyPlayingId]?.pause();
+    }
+
+    // Play current video and increment view
+    if (index < reels.length) {
+      final reel = reels[index];
+      _currentlyPlayingId = reel.id;
+      
+      if (_controllers.containsKey(reel.id)) {
+        _controllers[reel.id]?.play();
+      }
+
+      // Increment view count
+      context.read<ReelsProvider>().incrementView(reel.id);
+    }
+  }
+
+  /// Cleanup old video controllers to prevent memory leaks
+  /// Only keep controllers for: previous reel, current reel, next reel
+  void _cleanupOldControllers(int currentIndex, List<ReelModel> reels) {
+    if (reels.isEmpty || _controllers.length <= 3) return;
+
+    // Calculate indices with modulo for circular pagination
+    final actualCurrentIndex = currentIndex % reels.length;
+    final previousIndex = (actualCurrentIndex - 1 + reels.length) % reels.length;
+    final nextIndex = (actualCurrentIndex + 1) % reels.length;
+
+    // Get IDs to keep
+    final idsToKeep = {
+      reels[actualCurrentIndex].id,
+      reels[previousIndex].id,
+      reels[nextIndex].id,
+    };
+
+    // Dispose controllers not in the keep list
+    final controllersToRemove = <String>[];
+    _controllers.forEach((id, controller) {
+      if (!idsToKeep.contains(id)) {
+        controller.dispose();
+        controllersToRemove.add(id);
+      }
+    });
+
+    // Remove disposed controllers from map
+    for (final id in controllersToRemove) {
+      _controllers.remove(id);
+    }
+
+    if (controllersToRemove.isNotEmpty) {
+      print('REELS_SCREEN: Cleaned up ${controllersToRemove.length} old controllers. Active: ${_controllers.length}');
+    }
+  }

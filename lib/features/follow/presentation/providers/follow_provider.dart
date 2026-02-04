@@ -36,7 +36,7 @@ class FollowProvider with ChangeNotifier {
   List<FollowerModel> get followers => _followers;
   int get followersCount => _followersCount;
 
-  bool get canFollow => _userType == 'User';
+  bool get canFollow => _userType?.toLowerCase() == 'user';
 
   Future<void> init() async {
     await _loadUserInfo();

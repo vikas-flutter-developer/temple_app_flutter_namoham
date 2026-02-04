@@ -1,0 +1,92 @@
+MEMORY CRASH FIX - Manual Instructions
+=======================================
+
+PROBLEM: App crashes with "Fatal signal 6 (SIGABRT)" while scrolling reels
+CAUSE: All video controllers are kept in memory forever, causing memory leak
+
+FIX: Add these changes to video_screen.dart
+
+STEP 1: Find the _onPageChanged method (around line 116)
+-------------------------------------------------------
+Current code:
+```dart
+void _onPageChanged(int index, List<ReelModel> reels) {
+  setState(() {
+    _currentIndex = index;
+  });
+
+  // Pause previous video
+  if (_currentlyPlayingId != null && _controllers.containsKey(_currentlyPlayingId)) {
+    _controllers[_currentlyPlayingId]?.pause();
+  }
+```
+
+ADD THIS LINE after setState:
+```dart
+void _onPageChanged(int index, List<ReelModel> reels) {
+  setState(() {
+    _currentIndex = index;
+  });
+
+  // Cleanup old controllers to prevent memory leaks
+  _cleanupOldControllers(index, reels);  // <-- ADD THIS LINE
+
+  // Pause previous video
+  if (_currentlyPlayingId != null && _controllers.containsKey(_currentlyPlayingId)) {
+    _controllers[_currentlyPlayingId]?.pause();
+  }
+```
+
+STEP 2: Add the cleanup method
+-------------------------------
+Find the end of the _onPageChanged method (around line 138) and add this NEW METHOD:
+
+```dart
+  /// Cleanup old video controllers to prevent memory leaks
+  /// Only keep controllers for: previous reel, current reel, next reel
+  void _cleanupOldControllers(int currentIndex, List<ReelModel> reels) {
+    if (reels.isEmpty || _controllers.length <= 3) return;
+
+    // Calculate indices with modulo for circular pagination
+    final actualCurrentIndex = currentIndex % reels.length;
+    final previousIndex = (actualCurrentIndex - 1 + reels.length) % reels.length;
+    final nextIndex = (actualCurrentIndex + 1) % reels.length;
+
+    // Get IDs to keep
+    final idsToKeep = {
+      reels[actualCurrentIndex].id,
+      reels[previousIndex].id,
+      reels[nextIndex].id,
+    };
+
+    // Dispose controllers not in the keep list
+    final controllersToRemove = <String>[];
+    _controllers.forEach((id, controller) {
+      if (!idsToKeep.contains(id)) {
+        controller.dispose();
+        controllersToRemove.add(id);
+      }
+    });
+
+    // Remove disposed controllers from map
+    for (final id in controllersToRemove) {
+      _controllers.remove(id);
+    }
+
+    if (controllersToRemove.isNotEmpty) {
+      print('REELS_SCREEN: Cleaned up ${controllersToRemove.length} old controllers. Active: ${_controllers.length}');
+    }
+  }
+```
+
+STEP 3: Save and hot restart
+-----------------------------
+1. Save the file
+2. Hot restart the app (not hot reload)
+3. Test scrolling - should not crash anymore!
+
+WHAT THIS DOES:
+- Keeps only 3 video controllers in memory at any time
+- Automatically disposes old controllers when scrolling
+- Prevents memory from filling up
+- Logs cleanup activity in console

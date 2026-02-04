@@ -15,6 +15,7 @@ import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/a
 import 'package:flutter_user_app/features/home/presentation/screens/home_page.dart';
 import 'core/config/app_config.dart';
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
+import 'package:flutter_user_app/core/deep_links/deep_link_handler.dart';
 
 void main() async {
   // Ensure Flutter is initialized and preserve splash screen
@@ -96,6 +97,9 @@ class _MainAppState extends State<MainApp> {
     // Remove splash screen once everything is ready
     FlutterNativeSplash.remove();
 
+    // Note: Deep link handler will be initialized in MainApp build method
+    // after the context is available
+
     // Return appropriate screen based on login status
     if (authToken != null && authToken.isNotEmpty) {
       if (userType == 'Admin') {
@@ -133,6 +137,11 @@ class _MainAppState extends State<MainApp> {
       builder: (context, themeProvider, localeProvider, _) {
         // Update system UI whenever theme changes
         _updateSystemUI(themeProvider.themeMode);
+
+        // Initialize deep link handler after first frame
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          DeepLinkHandler().initialize(context);
+        });
 
         return MaterialApp(
           debugShowCheckedModeBanner: false,

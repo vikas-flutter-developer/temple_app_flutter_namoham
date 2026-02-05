@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import 'package:flutter_user_app/features/events/data/models/event_model.dart';
 import 'package:flutter_user_app/features/events/presentation/providers/events_provider.dart';
+import 'package:flutter_user_app/features/events/presentation/screens/event_detail_screen.dart';
 
 class EventCalendarWidget extends StatefulWidget {
   final String? organizerId; // Make optional
@@ -334,8 +335,28 @@ class _EventCalendarWidgetState extends State<EventCalendarWidget> {
                           ),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(12),
-                            onTap: () {
+                            onTap: () async {
                               // Navigate to event details
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => EventDetailScreen(event: event),
+                                ),
+                              );
+                              
+                              if (result == true || result == null) { // result might be null if just popped, but usually we want to refresh to be safe, or only if true.
+                                // Actually, if we edit/delete, we pop.
+                                // If deleted, we must refresh.
+                                // If edited, we must refresh.
+                                if (mounted) {
+                                   final provider = Provider.of<EventsProvider>(context, listen: false);
+                                   if (widget.organizerId != null) {
+                                     provider.fetchEventsByOrganizer(widget.organizerId!);
+                                   } else {
+                                     provider.fetchEvents();
+                                   }
+                                }
+                              }
                             },
                             child: Padding(
                               padding: const EdgeInsets.all(12),

@@ -6,6 +6,7 @@ class TempleModel {
   final String name;
   final String description;
   final String imageUrl;
+  final String profilePic;
   final double rating;
   final int totalReviews;
   final int posts;
@@ -36,6 +37,7 @@ class TempleModel {
     required this.name,
     this.description = '',
     required this.imageUrl,
+    this.profilePic = '',
     required this.rating,
     required this.totalReviews,
     required this.posts,
@@ -65,9 +67,23 @@ class TempleModel {
   factory TempleModel.fromJson(Map<String, dynamic> json) {
     // 1. Handle Images (API returns a list, UI needs a single string)
     List<dynamic> pics = json['templePics'] ?? [];
-    String mainImage = pics.isNotEmpty
-        ? pics[0].toString()
-        : 'https://via.placeholder.com/150'; // Default placeholder
+    
+    // Logic for main cover image
+    String mainImage = '';
+    if (pics.isNotEmpty) {
+      mainImage = pics.first.toString();
+    } else if (json['templeImage'] != null) {
+      mainImage = json['templeImage'];
+    }
+    
+    // Logic for profile pic (avatar)
+    String avatar = json['profilePic'] ?? json['userImage'] ?? '';
+    // If avatar missing, maybe use mainImage or placeholder
+    if (avatar.isEmpty && mainImage.isNotEmpty) avatar = mainImage;
+    if (avatar.isEmpty) avatar = 'https://via.placeholder.com/150';
+    
+    // If mainImage is still empty, fallback to avatar
+    if (mainImage.isEmpty) mainImage = avatar;
 
     // 2. Construct Location String from address, city, state
     String loc = '';
@@ -94,6 +110,7 @@ class TempleModel {
       name: json['templeName'] ?? 'Unknown Temple',
       description: json['description'] ?? '',
       imageUrl: mainImage,
+      profilePic: avatar,
       rating: (json['rating'] ?? 0).toDouble(),
       totalReviews: json['totalReviews'] ?? 0,
       posts: json['posts'] ?? 0,

@@ -272,7 +272,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
            if (bank['ifscCode'] != null) _ifscController.text = bank['ifscCode'];
          }
          
-         if (data['templePics'] != null && data['templePics'] is List && (data['templePics'] as List).isNotEmpty) {
+         if (data['profilePic'] != null && data['profilePic'].toString().isNotEmpty) {
+           _remotePhotoUrl = data['profilePic'];
+         } else if (data['templePics'] != null && data['templePics'] is List && (data['templePics'] as List).isNotEmpty) {
            _remotePhotoUrl = (data['templePics'] as List).first.toString();
          }
        });
@@ -298,7 +300,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         if (data['title'] != null) _titleController.text = data['title'];
         if (data['bio'] != null) _bioController.text = data['bio'];
         if (data['description'] != null) _descController.text = data['description'];
-        if (data['dob'] != null) _dobController.text = data['dob'];
+        if (data['dob'] != null) {
+          final dobString = data['dob'].toString();
+          _dobController.text = dobString.split('T')[0];
+        }
         
         if (data['profilePic'] != null) _remotePhotoUrl = data['profilePic'];
       });
@@ -343,8 +348,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                if (_userType == 'creator' || _userType == 'Creator') {
                   await _apiService.updateCreatorProfile(userId, {'profilePic': photoUrl});
                } else if (_userType == 'temple' || _userType == 'Temple') {
-                  // Temple profile pictures might be an array or a single field, adjust as per API
-                  await _apiService.updateTempleProfile(userId, {'templePics': [photoUrl]}); 
+                  // Updated to match API: Use 'profilePic' for the avatar, not 'templePics'
+                  await _apiService.updateTempleProfile(userId, {'profilePic': photoUrl}); 
                } else {
                   await _apiService.updateProfile(userId, {'profilePic': photoUrl});
                }

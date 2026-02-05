@@ -36,7 +36,10 @@ class FollowProvider with ChangeNotifier {
   List<FollowerModel> get followers => _followers;
   int get followersCount => _followersCount;
 
-  bool get canFollow => _userType?.toLowerCase() == 'user';
+  bool get canFollow {
+    final type = _userType?.toLowerCase();
+    return type == 'user' || type == 'creator';
+  }
 
   Future<void> init() async {
     await _loadUserInfo();
@@ -87,6 +90,51 @@ class FollowProvider with ChangeNotifier {
              print('FOLLOW_PROVIDER: Failed to parse item: $e');
           }
         }
+      }
+
+      // ENRICHMENT STEP: Fetch details for items with "Unknown" or empty names
+      // The backend isn't populating the details, so we must fetch them manually.
+      if (parsedList.isNotEmpty) {
+        final List<FollowingModel> enrichedList = [];
+        
+        // We do this in parallel to speed it up, but careful with rate limits
+        await Future.wait(parsedList.map((item) async {
+          if (item.followingName.trim().isEmpty || item.followingName == 'Unknown') {
+            try {
+              FollowingModel enrichedItem = item;
+              if (item.followingType.toLowerCase() == 'temple') {
+                final temple = await _apiService.getTempleById(item.followingId);
+                enrichedItem = FollowingModel(
+                  id: item.id,
+                  followingId: item.followingId,
+                  followingType: item.followingType,
+                  followingName: temple.name,
+                  followingImage: temple.profilePic.isNotEmpty ? temple.profilePic : temple.imageUrl,
+                  followingLocation: temple.location,
+                );
+              } else if (item.followingType.toLowerCase() == 'creator') {
+                final creator = await _apiService.getCreatorById(item.followingId);
+                enrichedItem = FollowingModel(
+                  id: item.id,
+                  followingId: item.followingId,
+                  followingType: item.followingType,
+                  followingName: creator.creatorName,
+                  followingImage: creator.profilePic.isNotEmpty ? creator.profilePic : creator.displayImage,
+                  followingLocation: creator.address,
+                );
+              }
+              enrichedList.add(enrichedItem);
+            } catch (e) {
+              print('FOLLOW_PROVIDER: Failed to enrich item ${item.followingId}: $e');
+              enrichedList.add(item); // Keep original if fetch fails
+            }
+          } else {
+            enrichedList.add(item);
+          }
+        }));
+        
+        // Replace parsedList with enrichedList
+        parsedList = enrichedList;
       }
       
       // 2. Schema: { temples: [TempleModel...], creators: [CreatorModel...] }
@@ -160,10 +208,88 @@ class FollowProvider with ChangeNotifier {
           .map((e) => FollowerModel.fromJson(e))
           .toList();
       _followersCount = (res['count'] is num) ? (res['count'] as num).toInt() : _followers.length;
+
+      // ENRICHMENT: Fetch details for followers with "Unknown" names
+      if (_followers.isNotEmpty) {
+        final List<FollowerModel> enrichedList = [];
+        await Future.wait(_followers.map((item) async {
+           if (item.followerName.trim().isEmpty || item.followerName == 'Unknown') {
+             try {
+                FollowerModel enrichedItem = item;
+                final type = item.followerType.toLowerCase();
+                
+                if (type == 'user') {
+                  final user = await _apiService.getUserById(item.followerId);
+                  enrichedItem = FollowerModel(
+                    id: item.id,
+                    followerId: item.followerId,
+                    followerType: item.followerType,
+                    followerName: user['name'] ?? user['fullName'] ?? 'Unknown',
+                    followerImage: user['profilePic'] ?? user['userImage'] ?? '',
+                  );
+                } else if (type == 'creator') {
+                  final creator = await _apiService.getCreatorById(item.followerId);
+                  enrichedItem = FollowerModel(
+                    id: item.id,
+                    followerId: item.followerId,
+                    followerType: item.followerType,
+                    followerName: creator.creatorName,
+                    followerImage: creator.profilePic.isNotEmpty ? creator.profilePic : creator.displayImage,
+                  );
+                } else if (type == 'temple') {
+                  final temple = await _apiService.getTempleById(item.followerId);
+                  enrichedItem = FollowerModel(
+                    id: item.id,
+                    followerId: item.followerId,
+                    followerType: item.followerType,
+                    followerName: temple.name,
+                    followerImage: temple.profilePic.isNotEmpty ? temple.profilePic : temple.imageUrl,
+                  );
+                }
+                enrichedList.add(enrichedItem);
+             } catch (e) {
+               print('FOLLOW_PROVIDER: Failed to enrich follower ${item.followerId}: $e');
+               enrichedList.add(item);
+             }
+           } else {
+             enrichedList.add(item);
+           }
+        }));
+        _followers = enrichedList;
+      }
     } catch (e) {
       _setError(e.toString());
     } finally {
       _isLoadingFollowers = false;
+      notifyListeners();
+    }
+  }
+
+  // Value for the viewed profile's following count
+  int _viewedFollowingCount = 0;
+  bool _isLoadingFollowing = false;
+  int get viewedFollowingCount => _viewedFollowingCount;
+  bool get isLoadingFollowing => _isLoadingFollowing;
+
+  Future<void> loadFollowing(String entityId) async {
+    _isLoadingFollowing = true;
+    notifyListeners();
+
+    try {
+      final res = await _apiService.getFollowing(entityId);
+      // API returns { "following": [...], "count": 2 }
+      if (res['count'] is num) {
+        _viewedFollowingCount = (res['count'] as num).toInt();
+      } else if (res['following'] is List) {
+        _viewedFollowingCount = (res['following'] as List).length;
+      } else {
+         _viewedFollowingCount = 0;
+      }
+    } catch (e) {
+      print('FOLLOW_PROVIDER: Error loading following count: $e');
+      _viewedFollowingCount = 0;
+    } finally {
+      _isLoadingFollowing = false;
       notifyListeners();
     }
   }
@@ -173,7 +299,7 @@ class FollowProvider with ChangeNotifier {
     required String followingType,
   }) async {
     if (!canFollow) {
-      _setError('Only users can follow');
+      _setError('Only users and creators can follow');
       return false;
     }
 
@@ -186,7 +312,7 @@ class FollowProvider with ChangeNotifier {
       // Always use the unified follow endpoint: POST /follow
       await _apiService.followEntity(
         followingId: followingId,
-        followingType: followingType.toLowerCase(), // Backend expects lowercase
+        followingType: followingType.toLowerCase(),
       );
       
       print('FOLLOW_PROVIDER: Follow API success, reloading following list');
@@ -210,7 +336,7 @@ class FollowProvider with ChangeNotifier {
     required String followingType,
   }) async {
     if (!canFollow) {
-      _setError('Only users can unfollow');
+      _setError('Only users and creators can unfollow');
       return false;
     }
 
@@ -220,7 +346,7 @@ class FollowProvider with ChangeNotifier {
     try {
       print('FOLLOW_PROVIDER: Calling unfollowEntity - ID: $followingId');
       
-      // Always use the unified unfollow endpoint: DELETE /follow/{id}
+      // Use the unified unfollow endpoint: DELETE /follow/{id}
       await _apiService.unfollowEntity(followingId);
       
       print('FOLLOW_PROVIDER: Unfollow API success, reloading following list');

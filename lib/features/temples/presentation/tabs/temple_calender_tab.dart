@@ -8,7 +8,7 @@ class CalendarTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Pass null to show ALL events from all temples and creators
-    return const EventCalendarWidget(organizerId: null);
+    // Pass templeId to show only events from this temple
+    return EventCalendarWidget(organizerId: templeId);
   }
 }

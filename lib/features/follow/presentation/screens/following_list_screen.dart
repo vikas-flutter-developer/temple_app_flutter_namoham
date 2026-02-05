@@ -34,7 +34,8 @@ class _FollowingListView extends StatelessWidget {
       ),
       body: Consumer<FollowProvider>(
         builder: (context, provider, child) {
-          if (provider.userType != null && provider.userType != 'User') {
+          final type = provider.userType?.toLowerCase();
+          if (provider.userType != null && type != 'user' && type != 'creator') {
             return Center(child: Text(AppLocalizations.of(context)!.onlyUsersHaveFollowingList));
           }
 

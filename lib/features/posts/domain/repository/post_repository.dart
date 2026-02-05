@@ -18,4 +18,7 @@ abstract class PostRepository {
 
   // View Count
   Future<void> incrementPostView(String postId);
+  
+  // Get posts by user
+  Future<Either<Exception, List<PostEntity>>> getPostsByUser(String userId);
 }

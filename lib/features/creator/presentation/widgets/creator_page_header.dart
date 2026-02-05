@@ -57,6 +57,19 @@ class CreatorProfileHeader extends StatelessWidget {
                           color: theme.colorScheme.outline,
                         ),
                       ),
+                      if (profile.bio.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          profile.bio,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
                   ),
                 ],

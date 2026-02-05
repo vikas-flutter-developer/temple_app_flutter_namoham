@@ -36,16 +36,47 @@ class PostModel {
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
+    // Helper to extract data from populated objects or fallback to top-level
+    dynamic extractField(String key, {Map<String, dynamic>? source}) {
+      if (source != null && source[key] != null) return source[key];
+      return json[key];
+    }
+
+    // 0. Detect Populated Objects
+    Map<String, dynamic>? userObj;
+    if (json['userId'] is Map) userObj = json['userId'];
+    else if (json['creatorId'] is Map) userObj = json['creatorId'];
+    else if (json['templeId'] is Map) userObj = json['templeId'];
+
     // 1. Infer user type
     String type = json['userType'] ?? 'User';
+    if (userObj != null) {
+       // If we have a populated object, try to infer type from it or the key used
+       if (json['templeId'] is Map) type = 'Temple';
+       else if (json['creatorId'] is Map) type = 'Creator';
+       else if (userObj['userType'] != null) type = userObj['userType'];
+       else if (userObj['accountType'] != null) type = userObj['accountType'];
+    }
+
+    // Normalize type string
     if (type.toLowerCase() == 'temple') type = 'Temple';
     if (type.toLowerCase() == 'creator') type = 'Creator';
     
-    if (json['templeId'] != null) type = 'Temple';
-    if (json['creatorId'] != null) type = 'Creator';
+    // Also check keys if simple string ID
+    if (json['templeId'] != null && json['templeId'] is String) type = 'Temple';
+    if (json['creatorId'] != null && json['creatorId'] is String) type = 'Creator';
 
     // 2. Infer username
     String name = json['username'] ?? '';
+    
+    // Check populated object first
+    if (userObj != null) {
+      if (type == 'Temple') name = userObj['templeName'] ?? userObj['name'] ?? name;
+      else if (type == 'Creator') name = userObj['creatorName'] ?? userObj['name'] ?? name;
+      else name = userObj['username'] ?? userObj['fullName'] ?? userObj['name'] ?? name;
+    }
+    
+    // Fallback to top-level if still empty
     if (name.isEmpty) {
       if (type == 'Temple') name = json['templeName'] ?? '';
       if (type == 'Creator') name = json['creatorName'] ?? '';
@@ -53,14 +84,42 @@ class PostModel {
 
     // 3. Infer user image
     String image = json['userImage'] ?? '';
+    
+    // Check populated object first
+    if (userObj != null) {
+       if (type == 'Temple') {
+          image = userObj['templeImage'] ?? '';
+          if (image.isEmpty && userObj['templePics'] != null && (userObj['templePics'] as List).isNotEmpty) {
+             image = userObj['templePics'][0].toString();
+          }
+           // Fallback to profilePic if uniform field used
+          if (image.isEmpty) image = userObj['profilePic'] ?? '';
+       } else if (type == 'Creator') {
+          image = userObj['profilePic'] ?? userObj['creatorImage'] ?? '';
+          if (image.isEmpty && userObj['creatorPics'] != null && (userObj['creatorPics'] as List).isNotEmpty) {
+             image = userObj['creatorPics'][0].toString();
+          }
+       } else {
+          image = userObj['profilePic'] ?? userObj['userImage'] ?? '';
+       }
+    }
+
+    // Fallback to top-level if still empty
     if (image.isEmpty) {
       if (type == 'Temple') {
         image = json['templeImage'] ?? '';
         if (image.isEmpty && json['templePics'] != null && (json['templePics'] as List).isNotEmpty) {
              image = json['templePics'][0].toString();
         }
-      } 
-      if (type == 'Creator') image = json['profilePic'] ?? '';
+        if (image.isEmpty) image = json['profilePic'] ?? '';
+      } else if (type == 'Creator') {
+          image = json['profilePic'] ?? '';
+          if (image.isEmpty && json['creatorPics'] != null && (json['creatorPics'] as List).isNotEmpty) {
+             image = json['creatorPics'][0].toString();
+          }
+      } else {
+          image = json['profilePic'] ?? '';
+      }
     }
     
     // 4. Handle likedBy parsing (support both IDs and Objects)
@@ -91,14 +150,27 @@ class PostModel {
       rawLikedByNames.add(json['lastLikerName'].toString());
     }
 
+    // Extract ID safely from top level or object
+    String finalId = json['id'] ?? json['_id'] ?? '';
+    
+    // Extract UserID safely
+    String finalUserId = '';
+    if (userObj != null) {
+       finalUserId = userObj['id'] ?? userObj['_id'] ?? '';
+    } else {
+       finalUserId = json['userId'] ?? json['creatorId'] ?? json['templeId'] ?? '';
+    }
+    // If still map (edge case where userId was map but didn't have id field?), convert to string or empty
+    if (finalUserId is Map) finalUserId = ''; 
+
     return PostModel(
-      id: json['id'] ?? json['_id'] ?? '',
-      userId: json['userId'] ?? json['creatorId'] ?? json['templeId'] ?? '',
+      id: finalId,
+      userId: finalUserId is String ? finalUserId : finalUserId.toString(),
       username: name,
       userImage: image,
       userType: type,
       caption: json['caption'] ?? '',
-      location: json['location'] ?? '',
+      location: json['location'] ?? json['place'] ?? '',
       imageUrls: (json['imageUrls'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

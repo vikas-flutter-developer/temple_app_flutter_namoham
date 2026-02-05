@@ -5,6 +5,8 @@ import '../../../posts/data/models/post_model.dart';
 import '../../../posts/presentation/screens/post_detail_screen.dart';
 import '../../../reels/data/models/reel_model.dart';
 import '../../../reels/presentation/screens/video_screen.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
+import 'dart:typed_data';
 
 class GalleryTab extends StatefulWidget {
   final String templeId;
@@ -235,35 +237,126 @@ class GalleryTabState extends State<GalleryTab> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: Icon(
-                      Icons.play_circle_outline,
-                      size: 48,
-                      color: theme.colorScheme.primary,
+                  // Thumbnail Image Logic
+                  if (reel.thumbnailUrl.isNotEmpty)
+                    Image.network(
+                      reel.thumbnailUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(color: Colors.black26); 
+                      },
+                    )
+                  else
+                    // Generate thumbnail from video URL if backend thumb is missing
+                    FutureBuilder<Uint8List?>(
+                      future: VideoThumbnail.thumbnailData(
+                        video: reel.fullVideoUrl,
+                        imageFormat: ImageFormat.JPEG,
+                        maxWidth: 256, // reduced quality for list view
+                        quality: 75,
+                      ),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.done && 
+                            snapshot.data != null) {
+                          return Image.memory(
+                            snapshot.data!,
+                            fit: BoxFit.cover,
+                          );
+                        }
+                        // Loading or Error placeholder
+                        return Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: const Center(
+                            child: Icon(Icons.video_library, color: Colors.grey),
+                          ),
+                        );
+                      },
+                    ),
+
+                  // Overlay gradient for text readability
+                  IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.3),
+                          ],
+                          stops: const [0.7, 1.0],
+                        ),
+                      ),
                     ),
                   ),
-                  // Play icon overlay
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
+
+                  // Play Icon (Center - Semi-transparent)
+                  Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(4),
+                        color: Colors.black26,
+                        shape: BoxShape.circle,
                       ),
-                      child: Row(
+                      child: Icon(
+                        Icons.play_arrow,
+                        size: 32,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+
+                  // View count and Caption overlay
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(8.0),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.8),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.play_arrow, color: Colors.white, size: 14),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${reel.views}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
+                          // Caption Snippet
+                          if (reel.caption.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4.0),
+                              child: Text(
+                                reel.caption,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
                             ),
+                          // View Count
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.play_arrow, color: Colors.white, size: 10),
+                              const SizedBox(width: 4),
+                              Text(
+                                convertToCompactString(reel.views),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -302,5 +395,15 @@ class GalleryTabState extends State<GalleryTab> {
         ),
       ),
     );
+  }
+
+  String convertToCompactString(int number) {
+    if (number < 1000) {
+      return number.toString();
+    } else if (number < 1000000) {
+      return '${(number / 1000).toStringAsFixed(1)}k';
+    } else {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    }
   }
 }

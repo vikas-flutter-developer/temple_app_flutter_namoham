@@ -16,6 +16,7 @@ import 'package:flutter_user_app/features/home/presentation/screens/home_page.da
 import 'core/config/app_config.dart';
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 import 'package:flutter_user_app/core/deep_links/deep_link_handler.dart';
+import 'package:flutter_user_app/features/events/presentation/providers/events_provider.dart';
 
 void main() async {
   // Ensure Flutter is initialized and preserve splash screen
@@ -59,6 +60,13 @@ void main() async {
           ),
           update: (context, apiService, previous) =>
               previous ?? FollowProvider(apiService),
+        ),
+        ChangeNotifierProxyProvider<ApiService, EventsProvider>(
+          create: (context) => EventsProvider(
+            Provider.of<ApiService>(context, listen: false),
+          ),
+          update: (context, apiService, previous) =>
+              previous ?? EventsProvider(apiService),
         ),
       ],
       child: const MainApp(),

@@ -115,4 +115,18 @@ class PostRepositoryImpl implements PostRepository {
       print('Failed to increment view: $e');
     }
   }
+
+  @override
+  Future<Either<Exception, List<PostEntity>>> getPostsByUser(String userId) async {
+    try {
+      final postsData = await apiService.getPostsByUser(userId);
+      final posts = postsData.map((json) {
+        final model = PostModel.fromJson(json);
+        return model.toEntity();
+      }).toList();
+      return Right(posts);
+    } catch (e) {
+      return Left(Exception('Failed to fetch user posts: $e'));
+    }
+  }
 }

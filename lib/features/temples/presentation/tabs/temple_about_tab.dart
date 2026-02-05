@@ -16,52 +16,76 @@ class AboutTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Description',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(left: 15.0, right: 15),
-            child: Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 2,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(16.0),
-              child: ReadMoreText(
-                profile.description,
-                style: const TextStyle(fontSize: 16),
-                trimMode: TrimMode.Line,
-                trimLines: 8,
-                trimCollapsedText: 'Read More',
-                trimExpandedText: 'Read Less',
-                moreStyle: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-                lessStyle: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
+          _buildSection(theme, 'Description', profile.description),
+          const SizedBox(height: 16),
+          if (profile.location.isNotEmpty) ...[
+            _buildSection(theme, 'Location', profile.location),
+            const SizedBox(height: 16),
+          ],
+          if (profile.openTime.isNotEmpty || profile.closeTime.isNotEmpty) ...[
+             _buildSection(theme, 'Timings', '${profile.openTime} - ${profile.closeTime}'),
+             const SizedBox(height: 16),
+          ],
+          if (profile.website.isNotEmpty) ...[
+            _buildSection(theme, 'Website', profile.website, isLink: true),
+            const SizedBox(height: 16),
+          ],
+          if (profile.phoneNumber.isNotEmpty) ...[
+            _buildSection(theme, 'Contact', profile.phoneNumber),
+             const SizedBox(height: 16),
+          ],
+           if (profile.email.isNotEmpty) ...[
+            _buildSection(theme, 'Email', profile.email),
+             const SizedBox(height: 16),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildSection(ThemeData theme, String title, String content, {bool isLink = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+          padding: const EdgeInsets.all(16.0),
+          child: isLink 
+            ? Text(
+                content,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: theme.colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
+              )
+            : ReadMoreText(
+                content,
+                style: TextStyle(
+                  fontSize: 16,
+                   color: theme.colorScheme.onSurfaceVariant,
+                ),
+                trimMode: TrimMode.Line,
+                trimLines: 4,
+                colorClickableText: theme.colorScheme.primary,
+                trimCollapsedText: 'Read More',
+                trimExpandedText: 'Read Less',
+              ),
+        ),
+      ],
     );
   }
 }

@@ -7,6 +7,8 @@ import '../providers/events_provider.dart';
 import 'event_detail_screen.dart';
 import 'create_event_screen.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 class EventsScreen extends StatelessWidget {
   const EventsScreen({super.key});
 
@@ -32,6 +34,27 @@ class _EventsViewState extends State<_EventsView> {
   // Sorting state
   String _sortBy = 'date'; // 'date' or 'time'
   bool _sortAscending = true;
+
+  // User state
+  String? _currentUserId;
+  String? _currentUserType;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _currentUserId = prefs.getString('user_id');
+        // Standardize type to lowercase for comparison
+        _currentUserType = prefs.getString('user_type')?.toLowerCase();
+      });
+    }
+  }
 
   List<dynamic> _sortEvents(List<dynamic> events) {
     final sorted = List.from(events);
@@ -292,27 +315,33 @@ class _EventsViewState extends State<_EventsView> {
           );
         },
       ),
-      floatingActionButton: Consumer<EventsProvider>(
-        builder: (context, provider, child) {
-          if (!provider.canCreateEvent) return const SizedBox.shrink();
-
-          return FloatingActionButton(
-            onPressed: () {
-              // EventsProvider is scoped to this route, so pass it to the next route.
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChangeNotifierProvider.value(
-                    value: provider,
-                    child: const CreateEventScreen(),
-                  ),
-                ),
-              );
-            },
-            child: const Icon(Icons.add),
-          );
-        },
-      ),
+      floatingActionButton: (_currentUserType == 'temple' || _currentUserType == 'creator') && _currentUserId != null
+          ? Consumer<EventsProvider>(
+              builder: (context, provider, child) {
+                return FloatingActionButton.extended(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CreateEventScreen(
+                          organizerId: _currentUserId!,
+                          organizerType: _currentUserType!, // Already lowercased in _loadCurrentUser
+                        ),
+                      ),
+                    ).then((value) {
+                      if (value == true) {
+                        provider.fetchEvents();
+                      }
+                    });
+                  },
+                  label: const Text('Create Event'),
+                  icon: const Icon(Icons.add),
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                );
+              },
+            )
+          : null,
     );
   }
 }

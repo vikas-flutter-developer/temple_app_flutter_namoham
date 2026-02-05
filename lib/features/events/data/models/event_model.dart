@@ -1,33 +1,27 @@
-class EventModel {
+import 'package:equatable/equatable.dart';
+
+class EventModel extends Equatable {
   final String id;
   final String eventName;
   final String description;
-
   final String organizerId;
   final String organizerType;
   final String organizerName;
   final String organizerImage;
-
-  final DateTime? eventDate;
+  final DateTime eventDate;
   final String eventTime;
-
   final String location;
-  final String address;
-  final String city;
-  final String state;
-
   final List<String> eventImage;
   final int capacity;
   final int registeredCount;
   final String eventType;
-  final num price;
+  final double price;
   final bool isActive;
+  final List<Attendee> attendees;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
-  final List<dynamic> attendees;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-
-  EventModel({
+  const EventModel({
     required this.id,
     required this.eventName,
     required this.description,
@@ -38,9 +32,6 @@ class EventModel {
     required this.eventDate,
     required this.eventTime,
     required this.location,
-    required this.address,
-    required this.city,
-    required this.state,
     required this.eventImage,
     required this.capacity,
     required this.registeredCount,
@@ -53,62 +44,110 @@ class EventModel {
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
-    DateTime? parseDate(dynamic value) {
-      if (value == null) return null;
-      if (value is DateTime) return value;
-      final s = value.toString();
-      if (s.isEmpty) return null;
-      return DateTime.tryParse(s);
-    }
-
     return EventModel(
-      id: (json['_id'] ?? json['id'] ?? '').toString(),
-      eventName: (json['eventName'] ?? '').toString(),
-      description: (json['description'] ?? '').toString(),
-      organizerId: (json['organizerId'] ?? '').toString(),
-      organizerType: (json['organizerType'] ?? '').toString(),
-      organizerName: (json['organizerName'] ?? '').toString(),
-      organizerImage: (json['organizerImage'] ?? '').toString(),
-      eventDate: parseDate(json['eventDate']),
-      eventTime: (json['eventTime'] ?? '').toString(),
-      location: (json['location'] ?? '').toString(),
-      address: (json['address'] ?? '').toString(),
-      city: (json['city'] ?? '').toString(),
-      state: (json['state'] ?? '').toString(),
-      eventImage: (json['eventImage'] as List<dynamic>?)
-              ?.map((e) => e.toString())
+      id: json['_id'] ?? '',
+      eventName: json['eventName'] ?? '',
+      description: json['description'] ?? '',
+      organizerId: json['organizerId'] ?? '',
+      organizerType: json['organizerType'] ?? '',
+      organizerName: json['organizerName'] ?? '',
+      organizerImage: json['organizerImage'] ?? '',
+      eventDate: DateTime.parse(json['eventDate'] ?? DateTime.now().toIso8601String()),
+      eventTime: json['eventTime'] ?? '',
+      location: json['location'] ?? '',
+      eventImage: List<String>.from(json['eventImage'] ?? []),
+      capacity: json['capacity'] ?? 0,
+      registeredCount: json['registeredCount'] ?? 0,
+      eventType: json['eventType'] ?? 'other',
+      price: (json['price'] ?? 0).toDouble(),
+      isActive: json['isActive'] ?? false,
+      attendees: (json['attendees'] as List<dynamic>?)
+              ?.map((e) => Attendee.fromJson(e))
               .toList() ??
-          const [],
-      capacity: (json['capacity'] is num) ? (json['capacity'] as num).toInt() : 0,
-      registeredCount: (json['registeredCount'] is num)
-          ? (json['registeredCount'] as num).toInt()
-          : 0,
-      eventType: (json['eventType'] ?? '').toString(),
-      price: (json['price'] is num) ? (json['price'] as num) : 0,
-      isActive: json['isActive'] == true,
-      attendees: (json['attendees'] as List<dynamic>?) ?? const [],
-      createdAt: parseDate(json['createdAt']),
-      updatedAt: parseDate(json['updatedAt']),
+          [],
+      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      updatedAt: DateTime.parse(json['updatedAt'] ?? DateTime.now().toIso8601String()),
     );
   }
 
-  Map<String, dynamic> toCreateJson() {
+  Map<String, dynamic> toJson() {
     return {
+      '_id': id,
       'eventName': eventName,
       'description': description,
-      'eventDate': eventDate?.toUtc().toIso8601String(),
+      'organizerId': organizerId,
+      'organizerType': organizerType,
+      'organizerName': organizerName,
+      'organizerImage': organizerImage,
+      'eventDate': eventDate.toIso8601String(),
       'eventTime': eventTime,
       'location': location,
-      'address': address,
-      'city': city,
-      'state': state,
       'eventImage': eventImage,
       'capacity': capacity,
+      'registeredCount': registeredCount,
       'eventType': eventType,
       'price': price,
+      'isActive': isActive,
+      'attendees': attendees.map((e) => e.toJson()).toList(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
-  bool get isFree => (price == 0);
-  bool get isFull => capacity > 0 && registeredCount >= capacity;
+  // Getters for missed fields or logic
+  String get address => location; // Treating location as full address for now
+  String get city => ''; // Not in API response yet
+  String get state => ''; // Not in API response yet
+  bool get isFree => price == 0;
+  bool get isFull => registeredCount >= capacity;
+
+  @override
+  List<Object?> get props => [
+        id,
+        eventName,
+        organizerId,
+        eventDate,
+        eventTime,
+        location,
+        updatedAt,
+      ];
+}
+
+class Attendee extends Equatable {
+  final String userId;
+  final String username;
+  final String userType;
+  final String id;
+  final DateTime registeredAt;
+
+  const Attendee({
+    required this.userId,
+    required this.username,
+    required this.userType,
+    required this.id,
+    required this.registeredAt,
+  });
+
+  factory Attendee.fromJson(Map<String, dynamic> json) {
+    return Attendee(
+      userId: json['userId'] ?? '',
+      username: json['username'] ?? '',
+      userType: json['userType'] ?? '',
+      id: json['_id'] ?? '',
+      registeredAt: DateTime.parse(json['registeredAt'] ?? DateTime.now().toIso8601String()),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'userId': userId,
+      'username': username,
+      'userType': userType,
+      '_id': id,
+      'registeredAt': registeredAt.toIso8601String(),
+    };
+  }
+
+  @override
+  List<Object?> get props => [userId, id, registeredAt];
 }

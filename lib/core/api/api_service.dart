@@ -803,7 +803,7 @@ class ApiService {
       headers: await _getHeaders(),
     );
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to unsave post: ${response.statusCode}');
+      throw Exception('Failed to save post');
     }
   }
 
@@ -1033,86 +1033,7 @@ class ApiService {
     }
   }
 
-  // ============== EVENTS ==============
 
-  Future<List<Map<String, dynamic>>> getEvents() async {
-    final response = await client.get(
-      Uri.parse('$baseUrl/events'),
-      headers: await _getHeaders(),
-    );
-
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      return data.cast<Map<String, dynamic>>();
-    } else {
-      throw Exception('Failed to fetch events: ${response.statusCode}');
-    }
-  }
-
-  Future<Map<String, dynamic>> getEventById(String eventId) async {
-    final response = await client.get(
-      Uri.parse('$baseUrl/events/$eventId'),
-      headers: await _getHeaders(),
-    );
-    if (response.statusCode == 200) {
-      return json.decode(response.body) as Map<String, dynamic>;
-    } else {
-      throw Exception('Failed to fetch event: ${response.statusCode}');
-    }
-  }
-
-  /// Create event (Temple/Creator only)
-  Future<Map<String, dynamic>> createEvent(Map<String, dynamic> eventData) async {
-    final response = await client.post(
-      Uri.parse('$baseUrl/events'),
-      headers: await _getHeaders(),
-      body: json.encode(eventData),
-    );
-
-    // Backend may return 200/201 for success
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return json.decode(response.body) as Map<String, dynamic>;
-    } else {
-      // Keep server message if present
-      try {
-        final decoded = json.decode(response.body);
-        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
-        }
-      } catch (_) {}
-
-      throw Exception('Failed to create event: ${response.statusCode}');
-    }
-  }
-
-  /// Attend event (User)
-  Future<Map<String, dynamic>> attendEvent({
-    required String eventId,
-    required String userId,
-    required String userType,
-  }) async {
-    final response = await client.post(
-      Uri.parse('$baseUrl/events/$eventId/attend'),
-      headers: await _getHeaders(),
-      body: json.encode({
-        'userId': userId,
-        'userType': userType,
-      }),
-    );
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return json.decode(response.body) as Map<String, dynamic>;
-    } else {
-      try {
-        final decoded = json.decode(response.body);
-        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
-        }
-      } catch (_) {}
-
-      throw Exception('Failed to attend event: ${response.statusCode}');
-    }
-  }
 
   // ============== COMMENTS (Existing) ==============
 
@@ -1305,6 +1226,130 @@ class ApiService {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
       throw Exception('Failed to get payment history: ${response.statusCode}');
+    }
+  }
+
+  // ============== EVENTS ==============
+
+  /// Get all events
+  Future<List<Map<String, dynamic>>> getEvents() async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/events'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception('Failed to fetch events: ${response.statusCode}');
+    }
+  }
+
+  /// Get event by ID
+  Future<Map<String, dynamic>> getEventById(String eventId) async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/events/$eventId'),
+      headers: await _getHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to fetch event: ${response.statusCode}');
+    }
+  }
+
+  /// Create event (Temple/Creator only)
+  Future<Map<String, dynamic>> createEvent(Map<String, dynamic> eventData) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/events'),
+      headers: await _getHeaders(),
+      body: json.encode(eventData),
+    );
+
+    // Backend may return 200/201 for success
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      // Keep server message if present
+      try {
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+
+      throw Exception('Failed to create event: ${response.statusCode}');
+    }
+  }
+
+  /// Update event (Organizer only)
+  Future<Map<String, dynamic>> updateEvent(String eventId, Map<String, dynamic> eventData) async {
+    final response = await client.put(
+      Uri.parse('$baseUrl/events/$eventId'),
+      headers: await _getHeaders(),
+      body: json.encode(eventData),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      try {
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+      throw Exception('Failed to update event: ${response.statusCode}');
+    }
+  }
+
+  /// Delete event (Organizer only)
+  Future<void> deleteEvent(String eventId) async {
+    final response = await client.delete(
+      Uri.parse('$baseUrl/events/$eventId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    } else {
+      try {
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+      throw Exception('Failed to delete event: ${response.statusCode}');
+    }
+  }
+
+  /// Attend event (User)
+  Future<Map<String, dynamic>> attendEvent({
+    required String eventId,
+    required String userId,
+    required String userType,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/events/$eventId/attend'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'userId': userId,
+        'userType': userType,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      try {
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+
+      throw Exception('Failed to attend event: ${response.statusCode}');
     }
   }
 

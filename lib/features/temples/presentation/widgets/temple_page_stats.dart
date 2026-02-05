@@ -1,9 +1,11 @@
-// widgets/profile_stats.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:flutter_user_app/features/temples/data/models/temple_model.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
+import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
 
-class ProfileStats extends StatelessWidget {
+class ProfileStats extends StatefulWidget {
   final TempleModel profile;
   final VoidCallback? onFollowersTap;
   final int? followersOverride;
@@ -16,6 +18,25 @@ class ProfileStats extends StatelessWidget {
   });
 
   @override
+  State<ProfileStats> createState() => _ProfileStatsState();
+}
+
+class _ProfileStatsState extends State<ProfileStats> {
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final followProvider = Provider.of<FollowProvider>(context, listen: false);
+      final postProvider = Provider.of<PostsProvider>(context, listen: false);
+      
+      followProvider.loadFollowers(widget.profile.id);
+      followProvider.loadFollowing(widget.profile.id);
+      postProvider.loadUserPostCount(widget.profile.id);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Container(
@@ -23,14 +44,42 @@ class ProfileStats extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildStat('${profile.posts}', l10n.posts, context),
-          _buildStat(
-            '${followersOverride ?? profile.followers}',
-            l10n.followers,
-            context,
-            onTap: onFollowersTap,
+          // Live Post Count
+          Consumer<PostsProvider>(
+            builder: (context, postsProvider, child) {
+              final count = postsProvider.userPostCount;
+              return _buildStat(
+                '${postsProvider.isLoadingPostCount ? "..." : count}', 
+                l10n.posts, 
+                context
+              );
+            },
           ),
-          _buildStat('${profile.following}', l10n.following, context),
+          
+          // Live Follower Count
+          Consumer<FollowProvider>(
+            builder: (context, followProvider, child) {
+               final count = followProvider.followersCount;
+               return _buildStat(
+                '${followProvider.isLoadingFollowers ? "..." : count}', 
+                l10n.followers, 
+                context, 
+                onTap: widget.onFollowersTap
+              );
+            },
+          ),
+          
+          // Live Following Count
+          Consumer<FollowProvider>(
+            builder: (context, followProvider, child) {
+               final count = followProvider.viewedFollowingCount;
+               return _buildStat(
+                '${followProvider.isLoadingFollowing ? "..." : count}', 
+                l10n.following, 
+                context
+              );
+            },
+          ),
         ],
       ),
     );

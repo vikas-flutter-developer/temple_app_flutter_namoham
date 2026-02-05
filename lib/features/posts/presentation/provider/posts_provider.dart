@@ -217,4 +217,30 @@ class PostsProvider extends ChangeNotifier {
       await postRepository.incrementPostView(postId);
     } catch (_) {}
   }
+
+  // Live Post Count for Profile Stats
+  int _userPostCount = 0;
+  bool _isLoadingPostCount = false;
+  int get userPostCount => _userPostCount;
+  bool get isLoadingPostCount => _isLoadingPostCount;
+
+  Future<void> loadUserPostCount(String userId) async {
+    _isLoadingPostCount = true;
+    notifyListeners();
+     try {
+       // We use existing getPostsByUser and count the length
+       // Ideally we'd have a lightweight /count endpoint, but this works for now
+       // as per the requirement "real data from backend"
+       final result = await getPostsUsecase.getUserPosts(userId);
+       result.fold(
+         (error) => print('Error loading post count: $error'),
+         (posts) => _userPostCount = posts.length,
+       );
+     } catch (e) {
+       print('Error loading post count: $e');
+     } finally {
+       _isLoadingPostCount = false;
+       notifyListeners();
+     }
+  }
 }

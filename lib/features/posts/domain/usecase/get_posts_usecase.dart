@@ -16,4 +16,8 @@ class GetPostsUsecase {
   Future<Either<Exception, List<PostEntity>>> call() {
     return postRepository.getPost();
   }
+
+  Future<Either<Exception, List<PostEntity>>> getUserPosts(String userId) async {
+    return await postRepository.getPostsByUser(userId);
+  }
 }

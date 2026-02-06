@@ -16,6 +16,7 @@ class PostModel {
   final String timestamp;
   final String createdAt;
   final bool? isLikedByMe;
+  final bool? isSaved; // Added field
 
   PostModel({
     required this.id,
@@ -33,6 +34,7 @@ class PostModel {
     required this.timestamp,
     required this.createdAt,
     this.isLikedByMe,
+    this.isSaved,
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
@@ -182,6 +184,7 @@ class PostModel {
       timestamp: json['timestamp'] ?? json['createdAt'] ?? '',
       createdAt: json['createdAt'] ?? '',
       isLikedByMe: json['isLikedByMe'],
+      isSaved: json['isSaved'],
     );
   }
 
@@ -202,6 +205,7 @@ class PostModel {
       'timestamp': timestamp,
       'createdAt': createdAt,
       if (isLikedByMe != null) 'isLikedByMe': isLikedByMe,
+      if (isSaved != null) 'isSaved': isSaved,
     };
   }
 
@@ -221,6 +225,7 @@ class PostModel {
     String? timestamp,
     String? createdAt,
     bool? isLikedByMe,
+    bool? isSaved,
   }) {
     return PostModel(
       id: id ?? this.id,
@@ -238,6 +243,7 @@ class PostModel {
       timestamp: timestamp ?? this.timestamp,
       createdAt: createdAt ?? this.createdAt,
       isLikedByMe: isLikedByMe ?? this.isLikedByMe,
+      isSaved: isSaved ?? this.isSaved,
     );
   }
 
@@ -255,6 +261,7 @@ class PostModel {
       likes: likes,
       likedBy: likedBy,
       timestamp: timestamp,
+      isSaved: isSaved,
     );
   }
 }

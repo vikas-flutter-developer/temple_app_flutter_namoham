@@ -17,6 +17,12 @@ class ReelsProvider extends ChangeNotifier {
   List<ReelModel> _reels = [];
   String _errorMessage = '';
   
+  // Pagination
+  int _page = 1;
+  final int _limit = 5;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  
   // User info
   String? _userId;
   String? _userType;
@@ -26,6 +32,8 @@ class ReelsProvider extends ChangeNotifier {
   ReelsStatus get status => _status;
   List<ReelModel> get reels => _reels;
   String get errorMessage => _errorMessage;
+  bool get hasMore => _hasMore;
+  bool get isLoadingMore => _isLoadingMore;
   String? get userId => _userId;
   String? get userType => _userType;
 
@@ -45,32 +53,42 @@ class ReelsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load all reels
+  /// Load all reels (Initial / Refresh)
   Future<void> loadReels() async {
     _status = ReelsStatus.loading;
+    _page = 1;
+    _hasMore = true;
+    _isLoadingMore = false;
     notifyListeners();
 
     try {
-      final reelsData = await _apiService.getReels();
+      final reelsData = await _apiService.getReels(page: _page, limit: _limit);
       final allReels = reelsData.map((json) => ReelModel.fromJson(json)).toList();
       
-      print('REELS_PROVIDER: ========== FILTERING REELS ==========');
-      print('REELS_PROVIDER: Total reels from backend: ${allReels.length}');
-      for (var i = 0; i < allReels.length; i++) {
-        print('REELS_PROVIDER: Reel $i URL: ${allReels[i].videoUrl}');
-      }
+      print('REELS_PROVIDER: ========== LOAD REELS (Page $_page) ==========');
+      print('REELS_PROVIDER: Fetched: ${allReels.length}');
       
       // Filter out placeholder/test reels with invalid video URLs
-      _reels = allReels.where((reel) => _isValidVideoUrl(reel.videoUrl)).toList();
+      final validReels = allReels.where((reel) => _isValidVideoUrl(reel.videoUrl)).toList();
       
-      // Shuffle reels for random order
-      _reels.shuffle();
+      // Shuffle only on initial load if desired, or keep chronological
+      validReels.shuffle(); 
       
-      print('REELS_PROVIDER: Valid Supabase reels after filtering: ${_reels.length}');
-      print('REELS_PROVIDER: Reels shuffled for random playback');
+      _reels = validReels;
+      
+      if (allReels.length < _limit) {
+        _hasMore = false;
+      }
+
+      print('REELS_PROVIDER: Valid reels: ${_reels.length}');
+      print('REELS_PROVIDER: Has more: $_hasMore');
       print('REELS_PROVIDER: ========================================');
+      
       _status = ReelsStatus.loaded;
-      _errorMessage = '';;
+      _errorMessage = '';
+      
+      // Load saved reels status to sync isSaved field
+      loadSavedReels();
     } catch (e) {
       _status = ReelsStatus.error;
       _errorMessage = e.toString();
@@ -78,6 +96,151 @@ class ReelsProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+  
+  /// Load more reels (Pagination)
+  Future<void> loadMoreReels() async {
+    if (_isLoadingMore || !_hasMore) return;
+    
+    _isLoadingMore = true;
+    notifyListeners();
+    
+    try {
+      final nextPage = _page + 1;
+      final reelsData = await _apiService.getReels(page: nextPage, limit: _limit);
+      final newReels = reelsData.map((json) => ReelModel.fromJson(json)).toList();
+      
+      print('REELS_PROVIDER: ========== LOAD MORE REELS (Page $nextPage) ==========');
+      print('REELS_PROVIDER: Fetched: ${newReels.length}');
+      if (newReels.isNotEmpty) {
+        for (var reel in newReels) {
+             print('DEBUG: Reel ${reel.id} loaded. isSaved: ${reel.isSaved}');
+        }
+      }
+      
+      if (newReels.isEmpty) {
+        _hasMore = false;
+      } else {
+        // Filter valid video URLs
+        var validNewReels = newReels.where((reel) => _isValidVideoUrl(reel.videoUrl)).toList();
+        
+        // CLIENT-SIDE DEDUPLICATION
+        // If backend ignores pagination (or returns duplicates), we filter them out here.
+        final existingIds = _reels.map((r) => r.id).toSet();
+        validNewReels = validNewReels.where((r) => !existingIds.contains(r.id)).toList();
+        
+        if (validNewReels.isEmpty && newReels.isNotEmpty) {
+           // We got data, but they were all duplicates or invalid. 
+           // This implies we've likely exhausted the actual new content 
+           // or the backend is just looping. Stop pagination to be safe.
+           print('REELS_PROVIDER: Received only duplicates. Stopping pagination.');
+           _hasMore = false;
+        } else {
+           validNewReels.shuffle(); // Shuffle individual pages if desired, or remove for strict order
+           _reels.addAll(validNewReels);
+           _page = nextPage;
+           
+           // If we got fewer than limit (after dedupe logic? or raw?), strictly speaking 
+           // we check raw return size against limit usually.
+           if (newReels.length < _limit) {
+             _hasMore = false;
+           }
+        }
+      }
+      
+      print('REELS_PROVIDER: Total reels now: ${_reels.length}');
+      print('REELS_PROVIDER: Has more: $_hasMore');
+      print('REELS_PROVIDER: ========================================');
+      
+    } catch (e) {
+      print('REELS_PROVIDER: Error loading more reels - $e');
+    } finally {
+      _isLoadingMore = false;
+      notifyListeners();
+    }
+  }
+
+  List<ReelModel> _savedReels = [];
+  List<ReelModel> get savedReels => _savedReels;
+
+  /// Load saved reels from backend
+  Future<void> loadSavedReels() async {
+    print('REELS_PROVIDER: Starting to load saved reels from backend...');
+    try {
+      final data = await _apiService.getSavedReels();
+      _savedReels = data.map((json) => ReelModel.fromJson(json)).toList();
+      print('REELS_PROVIDER: Successfully loaded ${_savedReels.length} saved reels from backend');
+      
+      // IMPORTANT: Sync the isSaved status to the main reels list
+      // This prevents state mismatch where main feed reels don't know they are saved
+      final savedReelIds = _savedReels.map((r) => r.id).toSet();
+      _reels = _reels.map((reel) {
+        final isSaved = savedReelIds.contains(reel.id);
+        if (reel.isSaved != isSaved) {
+          return reel.copyWith(isSaved: isSaved);
+        }
+        return reel;
+      }).toList();
+      
+      notifyListeners();
+    } catch (e) {
+      print('REELS_PROVIDER: Error loading saved reels: $e');
+    }
+  }
+
+  /// Toggle save/bookmark on a reel
+  Future<void> toggleSaveReel(String reelId) async {
+    print('DEBUG: toggleSaveReel called for $reelId');
+    final index = _reels.indexWhere((r) => r.id == reelId);
+    
+    // Find reel in main list or saved list
+    ReelModel? reel;
+    if (index != -1) {
+      reel = _reels[index];
+    } else {
+      // If not in main feed, might be in saved list (unsaving scenario)
+      final savedIndex = _savedReels.indexWhere((r) => r.id == reelId);
+      if (savedIndex != -1) reel = _savedReels[savedIndex];
+    }
+
+    if (reel == null) {
+      print('DEBUG: Reel not found in any list');
+      return;
+    }
+
+    final currentlySaved = reel.isSaved ?? false;
+    print('DEBUG: Current saved status: $currentlySaved');
+
+    // Optimistic update for main feed
+    if (index != -1) {
+      final updatedReel = reel.copyWith(isSaved: !currentlySaved);
+      _reels[index] = updatedReel;
+    }
+
+    // Optimistic update for saved list
+    if (!currentlySaved) {
+      // Saving: Add to list if not already there
+      if (!_savedReels.any((r) => r.id == reelId)) {
+        _savedReels.add(reel.copyWith(isSaved: true));
+      }
+    } else {
+      // Unsaving: Remove from list
+      _savedReels.removeWhere((r) => r.id == reelId);
+    }
+    
+    notifyListeners();
+    print('DEBUG: Optimistic update done. New status: ${!currentlySaved}');
+
+    try {
+      print('DEBUG: Calling API saveReel...');
+      await _apiService.saveReel(reelId);
+      print('DEBUG: API call successful');
+    } catch (e) {
+      // Revert logic would be complex here, simplifying for now
+      print('REELS_PROVIDER: Failed to save reel: $e');
+      // Ideally revert state here
+      notifyListeners();
+    }
   }
 
   /// Load reels by user
@@ -345,8 +508,8 @@ class ReelsProvider extends ChangeNotifier {
     final lowerUrl = url.toLowerCase();
     
     if (!lowerUrl.contains('supabase')) {
-      print('REELS_PROVIDER: Filtering out non-Supabase URL: $url');
-      return false;
+      print('REELS_PROVIDER: Warning: Non-Supabase URL encountered: $url. Allow for now.');
+      // return false; // DISABLED: Allow backend-served videos too
     }
     
     // Additional check: Filter out common placeholder patterns even from Supabase

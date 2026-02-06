@@ -37,10 +37,19 @@ class PostRepositoryImpl implements PostRepository {
       return Right(posts);
     } catch (e) {
       print('POST_REPO ERROR: $e'); // Debug
+      
+      // Check if it's a 401 unauthorized error
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      
       // Left is basically a failure response i.e Exception
-      return Left(Exception('Failed to Load Posts: ${e.toString()}'));
+      return Left(Exception('Failed to load posts. Please try again later.'));
     }
   }
+
+
 
   @override
   Future<Either<Exception, void>> deletePost(String postId) async {
@@ -51,7 +60,11 @@ class PostRepositoryImpl implements PostRepository {
       return const Right(null);
     } catch (e) {
       print('POST_REPO ERROR: $e'); // Debug
-      return Left(Exception('Failed to delete post: ${e.toString()}'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Failed to delete post. Please try again.'));
     }
   }
 
@@ -61,7 +74,11 @@ class PostRepositoryImpl implements PostRepository {
       await apiService.savePost(postId);
       return const Right(null);
     } catch (e) {
-      return Left(Exception('Failed to save post: $e'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Failed to save post. Please try again.'));
     }
   }
 
@@ -71,7 +88,11 @@ class PostRepositoryImpl implements PostRepository {
       await apiService.unsavePost(postId);
       return const Right(null);
     } catch (e) {
-      return Left(Exception('Failed to unsave post: $e'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Failed to unsave post. Please try again.'));
     }
   }
 
@@ -85,7 +106,11 @@ class PostRepositoryImpl implements PostRepository {
       }).toList();
       return Right(posts);
     } catch (e) {
-      return Left(Exception('Failed to fetch saved posts: $e'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Failed to fetch saved posts. Please try again.'));
     }
   }
   @override
@@ -103,7 +128,11 @@ class PostRepositoryImpl implements PostRepository {
       await apiService.toggleLikePost(postId, userId);
       return const Right(null);
     } catch (e) {
-      return Left(Exception('Failed to toggle like: $e'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Failed to like post. Please try again.'));
     }
   }
 
@@ -126,7 +155,11 @@ class PostRepositoryImpl implements PostRepository {
       }).toList();
       return Right(posts);
     } catch (e) {
-      return Left(Exception('Failed to fetch user posts: $e'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Failed to fetch posts. Please try again.'));
     }
   }
 }

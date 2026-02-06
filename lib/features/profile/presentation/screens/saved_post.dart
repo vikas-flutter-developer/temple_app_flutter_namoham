@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_appbar.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_text_widget.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
+import 'package:flutter_user_app/features/reels/presentation/providers/reels_provider.dart';
+import 'package:flutter_user_app/features/reels/presentation/screens/video_screen.dart';
 
 class SavedPostScreen extends StatefulWidget {
   const SavedPostScreen({super.key});
@@ -17,8 +19,11 @@ class _SavedPostScreenState extends State<SavedPostScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() =>
-        Provider.of<PostsProvider>(context, listen: false).loadSavedPosts());
+    // Fetch fresh data from backend on screen load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PostsProvider>().loadSavedPosts();
+      context.read<ReelsProvider>().loadSavedReels();
+    });
   }
 
   @override
@@ -31,8 +36,8 @@ class _SavedPostScreenState extends State<SavedPostScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CustomTextWidget(
-            title: "Saved Post",
-            subtitle: "The posted pictures and videos are available here",
+            title: "Saved Items",
+            subtitle: "Your bookmarked posts and videos",
           ),
           const SizedBox(height: 8),
           Padding(
@@ -47,183 +52,239 @@ class _SavedPostScreenState extends State<SavedPostScreen> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: Consumer<PostsProvider>(
-              builder: (context, provider, child) {
-                final posts = provider.savedPosts;
-                
-                if (posts.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No saved posts yet',
-                      style: TextStyle(color: theme.colorScheme.outline),
-                    ),
-                  );
-                }
+            child: selectedTab == 'Post' 
+                ? _buildPostsGrid(theme) 
+                : _buildVideosGrid(theme),
+          ),
+        ],
+      ),
+    );
+  }
 
-                return GridView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: posts.length,
-                  itemBuilder: (context, index) {
-                    final post = posts[index];
-                    final imageUrl = post.imageUrls.isNotEmpty ? post.imageUrls.first : '';
-                    
-                    return GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => Dialog(
-                            backgroundColor: Colors.transparent,
-                            insetPadding: EdgeInsets.zero,
-                            child: Stack(
+  Widget _buildPostsGrid(ThemeData theme) {
+    return Consumer<PostsProvider>(
+      builder: (context, provider, child) {
+        final posts = provider.savedPosts; // Uses backend list if available
+        
+        if (posts.isEmpty) {
+          return Center(
+            child: Text(
+              'No saved posts found',
+              style: TextStyle(color: theme.colorScheme.outline),
+            ),
+          );
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+          ),
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            final imageUrl = post.imageUrls.isNotEmpty ? post.imageUrls.first : '';
+            
+            return GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => Dialog(
+                    backgroundColor: Colors.transparent,
+                    insetPadding: EdgeInsets.zero,
+                    child: Stack(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(color: Colors.black87),
+                        ),
+                        Center(
+                          child: Container(
+                            margin: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Blurred background
-                                GestureDetector(
-                                  onTap: () => Navigator.pop(context),
-                                  child: Container(
-                                    color: Colors.black87,
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundImage: post.userImage.isNotEmpty
+                                            ? NetworkImage(post.userImage)
+                                            : null,
+                                        child: post.userImage.isEmpty ? const Icon(Icons.person) : null,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              post.username,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                            ),
+                                            Text(
+                                              post.location,
+                                              style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close),
+                                        onPressed: () => Navigator.pop(context),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                // Full post content
-                                Center(
-                                  child: Container(
-                                    margin: const EdgeInsets.all(20),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.surface,
-                                      borderRadius: BorderRadius.circular(20),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    imageUrl,
+                                    fit: BoxFit.contain,
+                                    height: 400,
+                                    width: double.infinity,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      height: 400,
+                                      color: theme.colorScheme.surfaceContainerHighest,
+                                      child: const Icon(Icons.broken_image),
                                     ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Post header
-                                        Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Row(
-                                            children: [
-                                              CircleAvatar(
-                                                backgroundImage: post.userImage.isNotEmpty
-                                                    ? NetworkImage(post.userImage)
-                                                    : null,
-                                                child: post.userImage.isEmpty
-                                                    ? Icon(Icons.person)
-                                                    : null,
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      post.username,
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 16,
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      post.location,
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: theme.colorScheme.outline,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: Icon(Icons.close),
-                                                onPressed: () => Navigator.pop(context),
-                                              ),
-                                            ],
-                                          ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(post.caption, style: const TextStyle(fontSize: 14)),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        post.timestamp,
+                                        style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      // Unsave Button
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                            context.read<PostsProvider>().toggleSavePost(post.id);
+                                          }, 
+                                          icon: const Icon(Icons.bookmark_remove),
+                                          label: const Text('Remove from Saved'),
                                         ),
-                                        // Image
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: Image.network(
-                                            imageUrl,
-                                            fit: BoxFit.contain,
-                                            height: 400,
-                                            width: double.infinity,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Container(
-                                                height: 400,
-                                                color: theme.colorScheme.surfaceContainerHighest,
-                                                child: Icon(Icons.broken_image, color: theme.colorScheme.outline),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        // Caption
-                                        Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                post.caption,
-                                                style: TextStyle(fontSize: 14),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                post.timestamp,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: theme.colorScheme.outline,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                      )
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        );
-                      },
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          imageUrl,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                                ),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              child: Icon(Icons.broken_image, color: theme.colorScheme.outline),
-                            );
-                          },
                         ),
-                      ),
-                    );
-                  },
+                      ],
+                    ),
+                  ),
                 );
               },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: const Icon(Icons.broken_image),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildVideosGrid(ThemeData theme) {
+    return Consumer<ReelsProvider>(
+      builder: (context, provider, child) {
+        final reels = provider.savedReels;
+
+        if (reels.isEmpty) {
+          return Center(
+            child: Text(
+              'No saved videos found',
+              style: TextStyle(color: theme.colorScheme.outline),
             ),
+          );
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 0.56, // 9:16 aspect ratio roughly
           ),
-        ],
-      ),
+          itemCount: reels.length,
+          itemBuilder: (context, index) {
+            final reel = reels[index];
+            // Since we don't have thumbnails easily available on the model, 
+            // we'll try to use a placeholder or check if thumbnail url exists.
+            // Assuming thumbnail logic might be missing, we use a colored box or icon for now.
+            // Ideally backend provides thumbnail.
+            
+            return GestureDetector(
+              onTap: () {
+                // Navigate to feed starting at this reel
+                // We need to pass this list to VideoScreen
+                 Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VideosScreen(
+                      initialReels: reels,
+                      initialIndex: index,
+                    ),
+                  ),
+                );
+              },
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.play_circle_outline, color: Colors.white, size: 32),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 4,
+                    left: 4,
+                     right: 4,
+                    child: Text(
+                      reel.caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

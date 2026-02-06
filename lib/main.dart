@@ -7,6 +7,9 @@ import 'package:flutter_user_app/core/providers/locale_provider.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
 import 'package:flutter_user_app/features/posts/presentation/providers/post_provider.dart';
+import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
+import 'package:flutter_user_app/features/posts/data/repository/post_repository_impl.dart';
+import 'package:flutter_user_app/features/posts/domain/usecase/get_posts_usecase.dart';
 import 'package:flutter_user_app/core/util/theme_scheme.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +20,9 @@ import 'core/config/app_config.dart';
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 import 'package:flutter_user_app/core/deep_links/deep_link_handler.dart';
 import 'package:flutter_user_app/features/events/presentation/providers/events_provider.dart';
+import 'package:flutter_user_app/features/reels/presentation/providers/reels_provider.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   // Ensure Flutter is initialized and preserve splash screen
@@ -38,7 +44,22 @@ void main() async {
       providers: [
         // ApiService - shared instance
         Provider<ApiService>(
-          create: (_) => ApiService.create(),
+          create: (_) {
+            final service = ApiService.create();
+            // Configure 401 Unauthorized handling
+            service.onTokenExpired = () async {
+              print('AUTH: Session expired. Logging out...');
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear(); // Clear all data
+              
+              // Navigate to login using global key
+              navigatorKey.currentState?.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            };
+            return service;
+          },
           dispose: (_, apiService) => apiService.client.close(),
         ),
         ChangeNotifierProvider<ThemeProvider>.value(
@@ -67,6 +88,27 @@ void main() async {
           ),
           update: (context, apiService, previous) =>
               previous ?? EventsProvider(apiService),
+        ),
+        ChangeNotifierProxyProvider<ApiService, ReelsProvider>(
+          create: (context) => ReelsProvider(
+            Provider.of<ApiService>(context, listen: false),
+          ),
+          update: (context, apiService, previous) =>
+              previous ?? ReelsProvider(apiService),
+        ),
+        ChangeNotifierProxyProvider<ApiService, PostsProvider>(
+          create: (context) {
+            final apiService = Provider.of<ApiService>(context, listen: false);
+            final repository = PostRepositoryImpl(apiService: apiService);
+            final usecase = GetPostsUsecase(repository);
+            return PostsProvider(usecase, repository);
+          },
+          update: (context, apiService, previous) {
+            if (previous != null) return previous;
+            final repository = PostRepositoryImpl(apiService: apiService);
+            final usecase = GetPostsUsecase(repository);
+            return PostsProvider(usecase, repository);
+          }
         ),
       ],
       child: const MainApp(),
@@ -152,6 +194,7 @@ class _MainAppState extends State<MainApp> {
         });
 
         return MaterialApp(
+          navigatorKey: navigatorKey,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,

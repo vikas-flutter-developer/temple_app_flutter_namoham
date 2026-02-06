@@ -57,6 +57,27 @@ class _VideosViewState extends State<_VideosView> {
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
     _loadUserType();
+    
+    // Auto-play initial video after frame build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final provider = context.read<ReelsProvider>();
+        // Wait for provider to have data if needed (though usually it's sync if passed in)
+        if (provider.reels.isNotEmpty && widget.initialIndex < provider.reels.length) {
+            final reel = provider.reels[widget.initialIndex];
+            _currentIndex = widget.initialIndex;
+            _currentlyPlayingId = reel.id;
+            
+            // Initialize and play
+            _getController(reel).then((controller) {
+              if (mounted) {
+                 controller.play();
+                 provider.incrementView(reel.id);
+              }
+            });
+        }
+      }
+    });
   }
 
   Future<void> _loadUserType() async {
@@ -83,12 +104,24 @@ class _VideosViewState extends State<_VideosView> {
       return _controllers[reel.id]!;
     }
 
+    print('VIDEO_SCREEN: Initializing controller for ${reel.id} URL: ${reel.fullVideoUrl}');
+    
+    // Get headers for potential protected content
+    final apiService = Provider.of<ApiService>(context, listen: false);
+    final headers = await apiService.getAuthHeaders();
+    
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(reel.fullVideoUrl),
+      httpHeaders: headers,
     );
     
     await controller.initialize();
     controller.setLooping(true);
+    
+    // Web requires mute for autoplay
+    if (kIsWeb) {
+      await controller.setVolume(0);
+    }
     _controllers[reel.id] = controller;
     
     return controller;
@@ -117,7 +150,18 @@ class _VideosViewState extends State<_VideosView> {
       }
 
       // Increment view count
-      context.read<ReelsProvider>().incrementView(reel.id);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+           context.read<ReelsProvider>().incrementView(reel.id);
+        }
+      });
+      
+      // Pagination Trigger: Load more when within 3 items of the end
+      final provider = context.read<ReelsProvider>();
+      if (provider.hasMore && !provider.isLoadingMore && index >= reels.length - 3) {
+        print('REELS_SCREEN: Triggering loadMoreReels at index $index (total ${reels.length})');
+        provider.loadMoreReels();
+      }
     }
   }
 
@@ -128,17 +172,27 @@ class _VideosViewState extends State<_VideosView> {
   void _cleanupOldControllers(int currentIndex, List<ReelModel> reels) {
     if (reels.isEmpty || _controllers.length <= 3) return;
 
-    // Calculate indices with modulo for circular pagination
-    final actualCurrentIndex = currentIndex % reels.length;
-    final previousIndex = (actualCurrentIndex - 1 + reels.length) % reels.length;
-    final nextIndex = (actualCurrentIndex + 1) % reels.length;
+    // Standard pagination logic (no modulo)
+    final previousIndex = currentIndex - 1;
+    final nextIndex = currentIndex + 1;
 
     // Get IDs to keep
-    final idsToKeep = {
-      reels[actualCurrentIndex].id,
-      reels[previousIndex].id,
-      reels[nextIndex].id,
-    };
+    final idsToKeep = <String>{};
+    
+    // Keep current
+    if (currentIndex >= 0 && currentIndex < reels.length) {
+      idsToKeep.add(reels[currentIndex].id);
+    }
+    
+    // Keep previous
+    if (previousIndex >= 0 && previousIndex < reels.length) {
+      idsToKeep.add(reels[previousIndex].id);
+    }
+    
+    // Keep next
+    if (nextIndex >= 0 && nextIndex < reels.length) {
+      idsToKeep.add(reels[nextIndex].id);
+    }
 
     // Dispose controllers not in the keep list
     final controllersToRemove = <String>[];
@@ -152,10 +206,6 @@ class _VideosViewState extends State<_VideosView> {
     // Remove disposed controllers from map
     for (final id in controllersToRemove) {
       _controllers.remove(id);
-    }
-
-    if (controllersToRemove.isNotEmpty) {
-      print('REELS_SCREEN: Cleaned up ${controllersToRemove.length} old controllers. Active: ${_controllers.length}');
     }
   }
 @override
@@ -190,18 +240,16 @@ class _VideosViewState extends State<_VideosView> {
             return const Center(child: Text('No reels available'));
           }
 
-          return RefreshIndicator(
+            return RefreshIndicator(
             onRefresh: () => provider.loadReels(),
             child: PageView.builder(
               controller: _pageController,
               scrollDirection: Axis.vertical,
               onPageChanged: (index) => _onPageChanged(index, provider.reels),
-              // Use a very large itemCount for infinite scrolling
-              itemCount: provider.reels.isEmpty ? 0 : 999999,
+              // Use actual length for standard pagination
+              itemCount: provider.reels.length,
               itemBuilder: (context, index) {
-                // Transform index using modulo for circular pagination
-                final actualIndex = index % provider.reels.length;
-                final reel = provider.reels[actualIndex];
+                final reel = provider.reels[index];
                 
                 return FutureBuilder<VideoPlayerController>(
                   future: _getController(reel),
@@ -265,15 +313,32 @@ class _VideosViewState extends State<_VideosView> {
                     if (index == _currentIndex && _currentlyPlayingId != reel.id) {
                       _currentlyPlayingId = reel.id;
                       controller.play();
-                      provider.incrementView(reel.id);
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (context.mounted) {
+                          provider.incrementView(reel.id);
+                        }
+                      });
                     }
 
                     return ReelVideoWidget(
                       reel: reel,
                       controller: controller,
                       isLiked: reel.isLikedBy(provider.userId),
+                      isSaved: reel.isSaved ?? false,
                       onLikePressed: () => provider.toggleLike(reel.id),
                       onCommentPressed: () => _showCommentsSheet(context, reel),
+                      onSavePressed: () {
+                        provider.toggleSaveReel(reel.id);
+                        ScaffoldMessenger.of(context).clearSnackBars();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              (reel.isSaved ?? false) ? 'Reel removed from saved' : 'Reel saved',
+                            ),
+                            duration: const Duration(seconds: 1),
+                          ),
+                        );
+                      },
                       onDeletePressed: provider.userId == reel.userId
                           ? () => _confirmDelete(context, provider, reel)
                           : null,

@@ -18,6 +18,15 @@ class CommentProvider extends ChangeNotifier {
   List<PostCommentEntity> get comments => _comments;
   String get errorMessage => _errorMessage;
 
+  // Helper to clean error messages
+  String _cleanErrorMessage(String error) {
+    String cleaned = error.toString();
+    if (cleaned.startsWith('Exception: ')) {
+      cleaned = cleaned.substring(11);
+    }
+    return cleaned;
+  }
+
   /// Load comments for a post
   Future<void> loadComments(String postId, {bool initiallyExpanded = false}) async {
     _status = CommentStatus.loading;
@@ -28,7 +37,7 @@ class CommentProvider extends ChangeNotifier {
     result.fold(
       (error) {
         _status = CommentStatus.error;
-        _errorMessage = error.toString();
+        _errorMessage = _cleanErrorMessage(error.toString());
       },
       (comments) {
         _status = CommentStatus.loaded;
@@ -55,7 +64,7 @@ class CommentProvider extends ChangeNotifier {
       await result.fold(
         (error) async {
           _status = CommentStatus.error;
-          _errorMessage = error.toString();
+          _errorMessage = _cleanErrorMessage(error.toString());
           notifyListeners();
           // Return to previous state
           _status = CommentStatus.loaded;
@@ -69,7 +78,7 @@ class CommentProvider extends ChangeNotifier {
           await updatedResult.fold(
             (error) async {
               _status = CommentStatus.error;
-              _errorMessage = error.toString();
+              _errorMessage = _cleanErrorMessage(error.toString());
               notifyListeners();
               // Fall back to simple append
               _status = CommentStatus.loaded;
@@ -86,7 +95,7 @@ class CommentProvider extends ChangeNotifier {
       );
     } catch (e) {
       _status = CommentStatus.error;
-      _errorMessage = e.toString();
+      _errorMessage = _cleanErrorMessage(e.toString());
       notifyListeners();
       // Return to previous state
       _status = CommentStatus.loaded;
@@ -113,7 +122,7 @@ class CommentProvider extends ChangeNotifier {
       await result.fold(
         (error) async {
           _status = CommentStatus.error;
-          _errorMessage = error.toString();
+          _errorMessage = _cleanErrorMessage(error.toString());
           notifyListeners();
         },
         (replyResult) async {
@@ -123,7 +132,7 @@ class CommentProvider extends ChangeNotifier {
           await updatedResult.fold(
             (error) async {
               _status = CommentStatus.error;
-              _errorMessage = error.toString();
+              _errorMessage = _cleanErrorMessage(error.toString());
               notifyListeners();
             },
             (updatedComments) async {
@@ -136,7 +145,7 @@ class CommentProvider extends ChangeNotifier {
       );
     } catch (e) {
       _status = CommentStatus.error;
-      _errorMessage = e.toString();
+      _errorMessage = _cleanErrorMessage(e.toString());
       notifyListeners();
     }
   }
@@ -157,7 +166,7 @@ class CommentProvider extends ChangeNotifier {
     result.fold(
       (error) {
         _status = CommentStatus.error;
-        _errorMessage = error.toString();
+        _errorMessage = _cleanErrorMessage(error.toString());
         notifyListeners();
         // Revert on error
         _status = CommentStatus.loaded;
@@ -186,7 +195,7 @@ class CommentProvider extends ChangeNotifier {
     result.fold(
       (error) {
         _status = CommentStatus.error;
-        _errorMessage = error.toString();
+        _errorMessage = _cleanErrorMessage(error.toString());
         notifyListeners();
         // Revert on error
         _status = CommentStatus.loaded;

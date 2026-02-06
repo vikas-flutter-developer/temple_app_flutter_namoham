@@ -65,7 +65,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to pick video: $e';
+        _errorMessage = 'Unable to select video. Please try again.';
       });
     }
   }
@@ -103,7 +103,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to record video: $e';
+        _errorMessage = 'Unable to record video. Please try again.';
       });
     }
   }
@@ -140,7 +140,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       final videoUrl = await _videoUploadService.uploadVideo(_videoFile!);
 
       if (videoUrl == null) {
-        throw Exception('Failed to upload video');
+        throw Exception('Unable to upload video. Please check your internet connection.');
       }
 
       print('CREATE_REEL: Video uploaded to: $videoUrl');
@@ -180,7 +180,17 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
         if (errorMsg.startsWith('Exception: ')) {
           errorMsg = errorMsg.substring(11);
         }
-        _errorMessage = errorMsg;
+        
+        // Check for specific error types
+        if (errorMsg.contains('401')) {
+          _errorMessage = 'Your session has expired. Please logout and login again.';
+        } else if (errorMsg.contains('internet') || errorMsg.contains('network') || errorMsg.contains('upload')) {
+          _errorMessage = 'Please check your internet connection and try again.';
+        } else if (errorMsg.contains('login')) {
+          _errorMessage = 'Please login to create reel.';
+        } else {
+          _errorMessage = 'Unable to create reel. Please try again.';
+        }
         _isUploading = false;
       });
       

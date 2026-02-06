@@ -71,11 +71,10 @@ class _OtpPaswdPageState extends State<OtpPaswdPage> {
         _startTimer();
       }
     } catch (e) {
-      if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('Error: $cleanError')),
         );
-      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -125,11 +124,10 @@ class _OtpPaswdPageState extends State<OtpPaswdPage> {
         );
       }
     } catch (e) {
-      if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('Error: $cleanError')),
         );
-      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

@@ -39,7 +39,11 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
       
       return Right(comments);
     } catch (e) {
-      return Left(Exception('Failed to fetch the comments: ${e.toString()}'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Unable to load comments. Please try again.'));
     }
   }
 
@@ -71,7 +75,11 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
 
       return Right(newComment);
     } catch (e) {
-      return Left(Exception('Failed to add the comment: ${e.toString()}'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Unable to add comment. Please try again.'));
     }
   }
 
@@ -109,7 +117,11 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
 
       return Right(newReply);
     } catch (e) {
-      return Left(Exception('Failed to add reply: ${e.toString()}'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Unable to add reply. Please try again.'));
     }
   }
 
@@ -161,7 +173,11 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
       ));
       
     } catch (e) {
-      return Left(Exception('Failed to toggle like: ${e.toString()}'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Unable to like comment. Please try again.'));
     }
   }
 
@@ -178,7 +194,11 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
 
       return const Right(true);
     } catch (e) {
-      return Left(Exception('Failed to delete comment: ${e.toString()}'));
+      final errorMessage = e.toString();
+      if (errorMessage.contains('401')) {
+        return Left(Exception('Your session has expired. Please logout and login again.'));
+      }
+      return Left(Exception('Unable to delete comment. Please try again.'));
     }
   }
 }

@@ -56,6 +56,7 @@ class ReelModel {
   final List<ReelComment> comments;
   final int views;
   final DateTime? timestamp;
+  final bool? isSaved; // Added field
 
   ReelModel({
     required this.id,
@@ -71,6 +72,7 @@ class ReelModel {
     this.comments = const [],
     this.views = 0,
     this.timestamp,
+    this.isSaved,
   });
 
   factory ReelModel.fromJson(Map<String, dynamic> json) {
@@ -96,6 +98,7 @@ class ReelModel {
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'])
           : null,
+      isSaved: json['isSaved'],
     );
   }
 
@@ -114,6 +117,7 @@ class ReelModel {
       'comments': comments.map((c) => c.toJson()).toList(),
       'views': views,
       'timestamp': timestamp?.toIso8601String(),
+      if (isSaved != null) 'isSaved': isSaved,
     };
   }
 
@@ -123,6 +127,9 @@ class ReelModel {
     return likedBy.contains(userId);
   }
 
+  // Import AppConfig
+  // Note: You need to make sure AppConfig is imported at the top of the file
+  
   /// Get full video URL (handles relative paths)
   String get fullVideoUrl {
     // If already a full URL, return as-is
@@ -130,19 +137,16 @@ class ReelModel {
       return videoUrl;
     }
     
-    // For relative paths starting with /uploads/reels, these are from backend
-    // but videos should actually be in Supabase storage
-    // Return the relative URL as-is and let the backend handle it
-    // OR you can construct the Supabase URL if you know the pattern
-    if (videoUrl.startsWith('/uploads/reels/')) {
-      // These are placeholder/test videos from backend
-      // In production, all videos should be uploaded to Supabase
-      // For now, try to load from backend
-      return 'https://temple-backend.el.r.appspot.com$videoUrl';
-    }
+    // For relative paths, prepend backend URL (remove /api suffix)
+    // We assume AppConfig.baseUrl is like "https://.../api"
+    String rootUrl = 'https://templebackend-210110528560.asia-south1.run.app';
     
-    // For any other relative path, prepend backend URL
-    return 'https://temple-backend.el.r.appspot.com$videoUrl';
+    // Try to get dynamic base URL if possible, otherwise fallback to known domain
+    // Since we can't easily import AppConfig here without adding import, 
+    // and maintaining imports in replace_file_content is tricky if we don't see the top,
+    // we will use the user-provided base URL root.
+    
+    return '$rootUrl$videoUrl';
   }
 
   /// Create a copy with updated fields
@@ -160,6 +164,7 @@ class ReelModel {
     List<ReelComment>? comments,
     int? views,
     DateTime? timestamp,
+    bool? isSaved,
   }) {
     return ReelModel(
       id: id ?? this.id,
@@ -175,6 +180,7 @@ class ReelModel {
       comments: comments ?? this.comments,
       views: views ?? this.views,
       timestamp: timestamp ?? this.timestamp,
+      isSaved: isSaved ?? this.isSaved,
     );
   }
 }

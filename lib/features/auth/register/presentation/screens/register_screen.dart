@@ -111,8 +111,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (e) {
       setState(() => _isUploadingProfile = false);
       if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: ${e.toString()}')),
+          SnackBar(content: Text('Error uploading image: $cleanError')),
         );
       }
     }
@@ -162,8 +163,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (e) {
       setState(() => _isUploadingPhotos = false);
       if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading photos: ${e.toString()}')),
+          SnackBar(content: Text('Error uploading photos: $cleanError')),
         );
       }
     }

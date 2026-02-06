@@ -106,7 +106,7 @@ class _PostsScreenState extends State<PostsScreen> {
                                   }
                                 } catch (e) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Failed to pick image: $e')),
+                                    const SnackBar(content: Text('Unable to select image. Please try again.')),
                                   );
                                 }
                               },
@@ -130,7 +130,7 @@ class _PostsScreenState extends State<PostsScreen> {
                                   }
                                 } catch (e) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Failed to capture image: $e')),
+                                    const SnackBar(content: Text('Unable to capture image. Please try again.')),
                                   );
                                 }
                               },
@@ -304,7 +304,7 @@ class _PostsScreenState extends State<PostsScreen> {
                   }
                   
                   if (allImageUrls.isEmpty) {
-                    throw Exception('Failed to upload images');
+                    throw Exception('Unable to upload images. Please check your internet connection.');
                   }
 
                   final apiService = ApiService.create();
@@ -325,8 +325,17 @@ class _PostsScreenState extends State<PostsScreen> {
                 } catch (e) {
                   setDialogState(() => isUploading = false);
                   if (context.mounted) {
+                    final errorMsg = e.toString();
+                    String userMessage;
+                    if (errorMsg.contains('401')) {
+                      userMessage = 'Your session has expired. Please logout and login again.';
+                    } else if (errorMsg.contains('internet') || errorMsg.contains('network')) {
+                      userMessage = 'Please check your internet connection.';
+                    } else {
+                      userMessage = 'Unable to create post. Please try again.';
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to create post: $e')),
+                      SnackBar(content: Text(userMessage)),
                     );
                   }
                 }
@@ -346,7 +355,27 @@ class _PostsScreenState extends State<PostsScreen> {
         builder: (context, postsProvider, _) {
           switch (postsProvider.status) {
             case PostsStatus.loading:
-              return const Center(child: CircularProgressIndicator());
+              // Only show loading indicator if we have no posts yet
+              // This prevents posts from disappearing during refresh
+              if (postsProvider.posts.isEmpty) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              // If we have posts, show them with refresh indicator
+              return Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: RefreshIndicator(
+                    onRefresh: () => postsProvider.loadPosts(),
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: postsProvider.posts.length,
+                      itemBuilder: (context, index) {
+                        return PostWidget(postModel: postsProvider.posts[index]);
+                      },
+                    ),
+                  ),
+                ),
+              );
             case PostsStatus.loaded:
               return Center(
                 child: Container(

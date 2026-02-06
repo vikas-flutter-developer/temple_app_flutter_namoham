@@ -134,8 +134,9 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
       await _loadMessages(_selectedConversation!['id']);
     } catch (e) {
       if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send message: $e')),
+          SnackBar(content: Text('Failed to send message: $cleanError')),
         );
       }
     } finally {

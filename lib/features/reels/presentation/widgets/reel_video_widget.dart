@@ -8,8 +8,10 @@ class ReelVideoWidget extends StatelessWidget {
   final ReelModel reel;
   final VideoPlayerController controller;
   final bool isLiked;
+  final bool isSaved;
   final VoidCallback onLikePressed;
   final VoidCallback onCommentPressed;
+  final VoidCallback onSavePressed;
   final VoidCallback? onDeletePressed;
 
   const ReelVideoWidget({
@@ -17,8 +19,10 @@ class ReelVideoWidget extends StatelessWidget {
     required this.reel,
     required this.controller,
     required this.isLiked,
+    required this.isSaved,
     required this.onLikePressed,
     required this.onCommentPressed,
+    required this.onSavePressed,
     this.onDeletePressed,
   });
 
@@ -90,6 +94,13 @@ class ReelVideoWidget extends StatelessWidget {
                   iconColor: Colors.white,
                   label: reel.comments.length.toString(),
                   onPressed: onCommentPressed,
+                ),
+                const SizedBox(height: 18),
+                _ActionButton(
+                  icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
+                  iconColor: Colors.white,
+                  label: 'Save',
+                  onPressed: onSavePressed,
                 ),
                 const SizedBox(height: 18),
                 _ActionButton(

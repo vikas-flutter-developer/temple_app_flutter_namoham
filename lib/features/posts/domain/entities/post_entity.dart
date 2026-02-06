@@ -11,6 +11,7 @@ class PostEntity {
   final List<String>? likedByNames; // Made optional as it might be null for entities
   final String userType;
   final String timestamp;
+  final bool? isSaved; // Added
 
   PostEntity({
     required this.id,
@@ -25,6 +26,7 @@ class PostEntity {
     required this.likedBy,
     this.likedByNames,
     required this.timestamp,
+    this.isSaved,
   });
 
   PostEntity copyWith({
@@ -40,6 +42,7 @@ class PostEntity {
     List<String>? likedBy,
     List<String>? likedByNames,
     String? timestamp,
+    bool? isSaved, 
   }) {
     return PostEntity(
       id: id ?? this.id,
@@ -54,6 +57,7 @@ class PostEntity {
       likedBy: likedBy ?? this.likedBy,
       likedByNames: likedByNames ?? this.likedByNames,
       timestamp: timestamp ?? this.timestamp,
+      isSaved: isSaved ?? this.isSaved,
     );
   }
 }

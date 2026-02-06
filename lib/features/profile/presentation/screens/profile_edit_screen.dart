@@ -128,8 +128,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       print('EDIT_PROFILE: Stack trace: $stackTrace');
       
       if (mounted) {
+        final errorMsg = e.toString();
+        String userMessage;
+        if (errorMsg.contains('401')) {
+          userMessage = 'Your session has expired. Please logout and login again.';
+        } else {
+          userMessage = 'Unable to load profile. Please check your internet connection.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text('Failed to load profile. Please check internet.'), backgroundColor: Colors.red),
+           SnackBar(content: Text(userMessage), backgroundColor: Colors.red),
         );
       }
     }
@@ -365,8 +372,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
              } catch (e) {
                debugPrint('Error saving photo to backend: $e');
                if (mounted) {
+                 final errorMsg = e.toString();
+                 String userMessage;
+                 if (errorMsg.contains('401')) {
+                   userMessage = 'Your session has expired. Please logout and login again.';
+                 } else {
+                   userMessage = 'Unable to save photo. Please try again.';
+                 }
                  ScaffoldMessenger.of(context).showSnackBar(
-                   SnackBar(content: Text('Failed to update photo on server: $e'), backgroundColor: Colors.red),
+                   SnackBar(content: Text(userMessage), backgroundColor: Colors.red),
                  );
                }
              }
@@ -374,14 +388,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             throw Exception('User ID not found for photo update.');
           }
         } else {
-          throw Exception('Failed to upload photo to storage.');
+          throw Exception('Unable to upload photo. Please try again.');
         }
       }
     } catch (e) {
       debugPrint('Error picking/uploading image: $e');
       if (mounted) {
+        final errorMsg = e.toString();
+        String userMessage;
+        if (errorMsg.contains('401')) {
+          userMessage = 'Your session has expired. Please logout and login again.';
+        } else {
+          userMessage = 'Unable to update photo. Please try again.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update photo: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(userMessage), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -483,8 +504,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final errorMsg = e.toString();
+        String userMessage;
+        if (errorMsg.contains('401')) {
+          userMessage = 'Your session has expired. Please logout and login again.';
+        } else if (errorMsg.contains('User ID not found')) {
+          userMessage = 'Please login again to continue.';
+        } else {
+          userMessage = 'Unable to save profile. Please try again.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(userMessage), backgroundColor: Colors.red),
         );
       }
     } finally {

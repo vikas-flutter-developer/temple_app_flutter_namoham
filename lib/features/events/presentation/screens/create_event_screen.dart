@@ -182,11 +182,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       }
     } catch (e) {
       print('CREATE_EVENT_ERROR: $e');
-      if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving event: $e')),
+          SnackBar(content: Text('Error saving event: $cleanError')),
         );
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

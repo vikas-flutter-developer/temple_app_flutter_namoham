@@ -74,8 +74,9 @@ class _OtpPageState extends State<OtpPage> {
       }
     } catch (e) {
       if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('Error: $cleanError')),
         );
       }
     } finally {
@@ -167,8 +168,9 @@ class _OtpPageState extends State<OtpPage> {
       }
     } catch (e) {
       if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('Error: $cleanError')),
         );
       }
     } finally {

@@ -84,8 +84,9 @@ class _MobileNumState extends State<MobileNum> {
     } catch (e) {
       print('OTP_SEND_ERROR: $e');
       if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('Error: $cleanError')),
         );
       }
     } finally {

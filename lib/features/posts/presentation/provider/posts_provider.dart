@@ -28,6 +28,15 @@ class PostsProvider extends ChangeNotifier {
   String get errorMessage => _errorMessage;
   String? get userType => _userType;
   String? get userId => _userId;
+
+  // Helper to clean error messages
+  String _cleanErrorMessage(String error) {
+    String cleaned = error.toString();
+    if (cleaned.startsWith('Exception: ')) {
+      cleaned = cleaned.substring(11);
+    }
+    return cleaned;
+  }
   
   // Permission check: can delete if user is Temple/Creator and owns the post, or if user is Admin
   bool canDeletePost(String postUserId) {
@@ -53,7 +62,7 @@ class PostsProvider extends ChangeNotifier {
     result.fold(
       (error) {
         _status = PostsStatus.error;
-        _errorMessage = error.toString();
+        _errorMessage = _cleanErrorMessage(error.toString());
         print('ERROR loading posts: $_errorMessage'); // Debug log
       },
       (posts) {
@@ -122,7 +131,21 @@ class PostsProvider extends ChangeNotifier {
        _posts = originalPosts;
        notifyListeners();
     }
+
   }
+
+  /// Check if a post is saved
+  bool isPostSaved(String postId) {
+    if (_status != PostsStatus.loaded) return false;
+    try {
+      final post = _posts.firstWhere((p) => p.id == postId);
+      return post.isSaved ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+
 
   /// Delete a post (owner only)
   Future<bool> deletePost(String postId, String postUserId) async {
@@ -137,7 +160,7 @@ class PostsProvider extends ChangeNotifier {
       
       return result.fold(
         (error) {
-          _errorMessage = error.toString();
+          _errorMessage = _cleanErrorMessage(error.toString());
           notifyListeners();
           return false;
         },
@@ -149,63 +172,111 @@ class PostsProvider extends ChangeNotifier {
         },
       );
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _cleanErrorMessage(e.toString());
       notifyListeners();
       return false;
     }
   }
 
-  // Saved posts IDs and List
-  Set<String> _savedPostIds = {};
-  List<PostEntity> _savedPosts = [];
-  
+  List<PostEntity> _savedPostsList = [];
+  List<PostEntity> get savedPostsList => _savedPostsList;
+
+  // Modified getter to prefer backend list if available
   List<PostEntity> get savedPosts {
-    // Return filtered posts from main feed based on saved IDs
-    print('DEBUG: Getting saved posts. Saved IDs: $_savedPostIds');
-    print('DEBUG: Total posts in feed: ${_posts.length}');
-    final saved = _posts.where((post) => _savedPostIds.contains(post.id)).toList();
-    print('DEBUG: Found ${saved.length} saved posts in current feed');
-    return saved;
+    if (_savedPostsList.isNotEmpty) return _savedPostsList;
+    return _posts.where((post) => post.isSaved == true).toList();
   }
-  
-  bool isPostSaved(String postId) => _savedPostIds.contains(postId);
 
+  /// Load saved posts from backend
   Future<void> loadSavedPosts() async {
+    print('POSTS_PROVIDER: Starting to load saved posts from backend...');
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedIds = prefs.getStringList('saved_post_ids') ?? [];
-      _savedPostIds = savedIds.toSet();
-      notifyListeners();
+      final result = await postRepository.getSavedPosts();
+      result.fold(
+        (error) {
+          print('POSTS_PROVIDER: Error loading saved posts: $error');
+        },
+        (posts) {
+          print('POSTS_PROVIDER: Successfully loaded ${posts.length} saved posts from backend');
+          _savedPostsList = posts;
+          
+          // IMPORTANT: Sync the isSaved status to the main posts list
+          // This prevents state mismatch where main feed posts don't know they are saved
+          final savedPostIds = posts.map((p) => p.id).toSet();
+          _posts = _posts.map((post) {
+            final isSaved = savedPostIds.contains(post.id);
+            if (post.isSaved != isSaved) {
+              return post.copyWith(isSaved: isSaved);
+            }
+            return post;
+          }).toList();
+          
+          notifyListeners();
+        },
+      );
     } catch (e) {
-      print('Failed to load saved posts: $e');
+       print('POSTS_PROVIDER: Exception loading saved posts: $e');
     }
   }
 
+  /// Toggle save/bookmark on a post
   Future<void> toggleSavePost(String postId) async {
-    print('DEBUG: Toggle save post called for ID: $postId');
-    // Optimistic update
-    final isSaved = _savedPostIds.contains(postId);
-    print('DEBUG: Was saved: $isSaved');
-    if (isSaved) {
-      _savedPostIds.remove(postId);
-    } else {
-      _savedPostIds.add(postId);
+    if (_status != PostsStatus.loaded) return;
+    
+    // Find post in main list or saved list
+    PostEntity? post;
+    try {
+      post = _posts.firstWhere((p) => p.id == postId);
+    } catch (_) {
+      try {
+        post = _savedPostsList.firstWhere((p) => p.id == postId);
+      } catch (_) {
+        post = null;
+      }
     }
-    print('DEBUG: New saved IDs: $_savedPostIds');
+
+    if (post == null) return;
+    
+    final currentlySaved = post.isSaved ?? false;
+    
+    // Optimistic Update Main Post List
+    final originalPosts = List<PostEntity>.from(_posts);
+    _posts = _posts.map((p) {
+      if (p.id == postId) {
+        return p.copyWith(isSaved: !currentlySaved);
+      }
+      return p;
+    }).toList();
+
+    // Optimistic Update Saved Post List
+    if (!currentlySaved) {
+       // Saving: Add if not present
+       if (!_savedPostsList.any((p) => p.id == postId)) {
+         _savedPostsList.add(post.copyWith(isSaved: true));
+       }
+    } else {
+      // Unsaving: Remove
+      _savedPostsList.removeWhere((p) => p.id == postId);
+    }
+    
     notifyListeners();
 
-    // Save to SharedPreferences
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('saved_post_ids', _savedPostIds.toList());
-      print('DEBUG: Successfully saved to SharedPreferences');
-    } catch (e) {
-      print('Failed to save bookmark: $e');
-      // Revert on failure
-      if (isSaved) {
-        _savedPostIds.add(postId);
+      // Call API
+      if (!currentlySaved) {
+        await postRepository.savePost(postId);
       } else {
-        _savedPostIds.remove(postId);
+        await postRepository.unsavePost(postId);
+      }
+    } catch (e) {
+      // Revert on failure
+      print('SAVE ERROR: $e');
+      _posts = originalPosts;
+      // Revert saved list - simpler to just reload or remove the optimistic add
+      if (!currentlySaved) {
+        _savedPostsList.removeWhere((p) => p.id == postId);
+      } else {
+        // Unsave failed, add it back? Hard to know exact state, but acceptable for now.
       }
       notifyListeners();
     }

@@ -19,7 +19,6 @@ import 'package:flutter_user_app/features/profile/presentation/widgets/profile_i
 
 import 'package:provider/provider.dart';
 import 'package:flutter_user_app/features/follow/presentation/screens/following_list_screen.dart';
-import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'profile_edit_screen.dart';
 
@@ -292,12 +291,6 @@ class _ProfilePageState extends State<ProfilePage> {
                         builder: (context) => const ProfileEditScreen(),
                       ),
                     );
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProfileEditScreen(),
-                      ),
-                    );
                     // Reload profile when returning from edit screen
                     _loadProfileData();
                   },
@@ -346,14 +339,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     title: l10n.savedPost,
                     subtitle: l10n.savedPhotosVideos,
                     onTap: () {
-                      final postsProvider = Provider.of<PostsProvider>(context, listen: false);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ChangeNotifierProvider.value(
-                            value: postsProvider,
-                            child: const SavedPostScreen(),
-                          ),
+                          builder: (_) => const SavedPostScreen(),
                         ),
                       );
                     },

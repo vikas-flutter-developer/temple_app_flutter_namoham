@@ -208,11 +208,10 @@ class _LoginPageState extends State<LoginPage> {
         navigateToPageAndRemoveUntil(context, HomePage());
       }
     } catch (e) {
-      if (mounted) {
+        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login Failed: ${e.toString()}')),
+          SnackBar(content: Text('Login Failed: $cleanError')),
         );
-      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

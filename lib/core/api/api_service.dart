@@ -33,6 +33,9 @@ class ApiService {
     };
   }
 
+  /// Public getter for headers (used by video player etc)
+  Future<Map<String, String>> getAuthHeaders() => _getHeaders();
+
   // ============== SHARE ==============
 
   /// Share a post
@@ -798,14 +801,48 @@ class ApiService {
 
   // Save/Bookmark Post
   Future<void> savePost(String postId) async {
+    print('API_SERVICE: Saving post $postId to $baseUrl/posts/$postId/save');
     final response = await client.post(
-      Uri.parse('$baseUrl/posts/save/$postId'),
+      Uri.parse('$baseUrl/posts/$postId/save'),
+      headers: await _getHeaders(),
+    );
+    print('API_SERVICE: savePost response status: ${response.statusCode}, body: ${response.body}');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to save post: ${response.statusCode}');
+    }
+    print('API_SERVICE: Post $postId saved successfully');
+  }
+
+  // Save/Bookmark Reel
+  Future<void> saveReel(String reelId) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/reels/$reelId/save'),
       headers: await _getHeaders(),
     );
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to save post');
+      throw Exception('Failed to save reel: ${response.statusCode}');
     }
   }
+
+  Future<List<Map<String, dynamic>>> getSavedReels() async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/reels/saved'),
+      headers: await _getHeaders(),
+    );
+    
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      if (decoded is List) {
+        return decoded.cast<Map<String, dynamic>>();
+      } else if (decoded is Map<String, dynamic> && decoded['data'] is List) {
+        return (decoded['data'] as List).cast<Map<String, dynamic>>();
+      }
+      return [];
+    } else {
+      throw Exception('Failed to fetch saved reels: ${response.statusCode}');
+    }
+  }
+
 
 
 
@@ -835,19 +872,26 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> getSavedPosts() async {
+    print('API_SERVICE: Fetching saved posts from $baseUrl/posts/saved');
     final response = await client.get(
       Uri.parse('$baseUrl/posts/saved'),
       headers: await _getHeaders(),
     );
+    print('API_SERVICE: getSavedPosts response status: ${response.statusCode}');
     if (response.statusCode == 200) {
       final decoded = json.decode(response.body);
+      print('API_SERVICE: getSavedPosts decoded response type: ${decoded.runtimeType}');
       if (decoded is List) {
+        print('API_SERVICE: getSavedPosts returning ${decoded.length} posts');
         return decoded.cast<Map<String, dynamic>>();
       } else if (decoded is Map<String, dynamic> && decoded['data'] is List) {
+        print('API_SERVICE: getSavedPosts returning ${(decoded['data'] as List).length} posts from data key');
         return (decoded['data'] as List).cast<Map<String, dynamic>>();
       }
+      print('API_SERVICE: getSavedPosts returning empty list');
       return [];
     } else {
+      print('API_SERVICE: getSavedPosts FAILED with status ${response.statusCode}: ${response.body}');
       throw Exception('Failed to fetch saved posts: ${response.statusCode}');
     }
   }
@@ -890,7 +934,7 @@ class ApiService {
 
   Future<void> incrementPostView(String postId) async {
     // Fire and forget or simple await without return
-    final response = await client.post(
+    await client.post(
       Uri.parse('$baseUrl/posts/$postId/view'),
       headers: await _getHeaders(),
     );
@@ -1385,16 +1429,45 @@ class ApiService {
   }
 
   /// Get all reels
-  Future<List<Map<String, dynamic>>> getReels() async {
+  Future<List<Map<String, dynamic>>> getReels({int page = 1, int limit = 5}) async {
     final response = await client.get(
-      Uri.parse('$baseUrl/reels'),
+      Uri.parse('$baseUrl/reels?page=$page&limit=$limit'),
       headers: await _getHeaders(),
     );
     if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      return data.cast<Map<String, dynamic>>();
+      final dynamic decoded = json.decode(response.body);
+      
+      // Handle { success: true, reels: [], ... }
+      if (decoded is Map<String, dynamic> && decoded.containsKey('reels')) {
+        final reels = decoded['reels'];
+        if (reels is List) return reels.cast<Map<String, dynamic>>();
+      }
+      
+      // Handle direct list
+      if (decoded is List) {
+        return decoded.cast<Map<String, dynamic>>();
+      }
+      
+      return [];
     } else {
       throw Exception('Failed to fetch reels: ${response.statusCode}');
+    }
+  }
+
+  /// Get a single reel by ID
+  Future<Map<String, dynamic>> getReelById(String reelId) async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/reels/$reelId'),
+      headers: await _getHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic> && decoded['success'] == true) {
+        return decoded['data'] ?? decoded['reel'] ?? decoded;
+      }
+      return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    } else {
+      throw Exception('Failed to fetch reel: ${response.statusCode}');
     }
   }
 
@@ -1657,34 +1730,6 @@ class ApiService {
       throw Exception('Failed to fetch donation leaderboard: ${response.statusCode}');
     }
   }
-  // ============== NOTIFICATIONS ==============
-
-  Future<List<NotificationModel>> getNotifications({int page = 1, int limit = 20}) async {
-    final response = await client.get(
-      Uri.parse('$baseUrl/notifications?page=$page&limit=$limit'),
-      headers: await _getHeaders(),
-    );
-
-    if (response.statusCode == 200) {
-      final jsonResponse = json.decode(response.body);
-      // Wrapper check
-      final List<dynamic> data = (jsonResponse is Map && jsonResponse.containsKey('data')) 
-          ? jsonResponse['data'] 
-          : (jsonResponse is List ? jsonResponse : []);
-      
-      return data.map((json) => NotificationModel.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to fetch notifications: ${response.statusCode}');
-    }
-  }
-
-  Future<void> markNotificationAsRead(String notificationId) async {
-    await client.post(
-      Uri.parse('$baseUrl/notifications/$notificationId/read'),
-      headers: await _getHeaders(),
-    );
-  }
-
   // ============== ADMIN ==============
 
   /// Admin login
@@ -1959,5 +2004,69 @@ class ApiService {
     } else {
       throw Exception('Failed to fetch recent activity: ${response.statusCode}');
     }
+  }
+
+  // ============== NOTIFICATIONS API ==============
+
+  // Callback for token expiration (401)
+  Function()? onTokenExpired;
+
+  /// Get user notifications
+  Future<List<NotificationModel>> getNotifications({int page = 1, int limit = 20}) async {
+    print('API_SERVICE: Fetching notifications from $baseUrl/notifications');
+    final response = await client.get(
+      Uri.parse('$baseUrl/notifications?page=$page&limit=$limit'),
+      headers: await _getHeaders(),
+    );
+
+    print('API_SERVICE: getNotifications response status: ${response.statusCode}');
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      
+      if (decoded is Map<String, dynamic> && decoded['success'] == true) {
+        final data = decoded['data'];
+        if (data is List) {
+          print('API_SERVICE: Parsed ${data.length} notifications');
+          return data.map((json) => NotificationModel.fromJson(json)).toList();
+        }
+      }
+      return [];
+    } else if (response.statusCode == 401) {
+      print('API_SERVICE: 401 Unauthorized in getNotifications - Token expired');
+      if (onTokenExpired != null) {
+        onTokenExpired!();
+      }
+      throw Exception('Failed to fetch notifications: 401');
+    } else {
+      throw Exception('Failed to fetch notifications: ${response.statusCode}');
+    }
+  }
+
+  /// Mark a single notification as read
+  Future<void> markNotificationRead(String notificationId) async {
+    print('API_SERVICE: Marking notification $notificationId as read');
+    final response = await client.put(
+      Uri.parse('$baseUrl/notifications/mark-read/$notificationId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to mark notification as read: ${response.statusCode}');
+    }
+    print('API_SERVICE: Notification marked as read');
+  }
+
+  /// Mark all notifications as read
+  Future<void> markAllNotificationsRead() async {
+    print('API_SERVICE: Marking all notifications as read');
+    final response = await client.put(
+      Uri.parse('$baseUrl/notifications/mark-all-read'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to mark all notifications as read: ${response.statusCode}');
+    }
+    print('API_SERVICE: All notifications marked as read');
   }
 }

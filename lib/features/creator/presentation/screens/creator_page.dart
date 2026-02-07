@@ -11,11 +11,16 @@ import 'package:flutter_user_app/features/creator/presentation/widgets/creator_p
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_user_app/features/events/presentation/screens/create_event_screen.dart';
 import 'package:flutter_user_app/features/creator/presentation/widgets/creator_page_stats.dart';
-import 'package:flutter_user_app/features/creator/presentation/widgets/creator_page_tabs.dart';
+import 'package:flutter_user_app/features/creator/presentation/tabs/creator_about_tab.dart';
+import 'package:flutter_user_app/features/creator/presentation/tabs/creator_gallery_tab.dart';
+import 'package:flutter_user_app/features/creator/presentation/tabs/creator_calender_tab.dart';
+import 'package:flutter_user_app/features/creator/presentation/tabs/creator_review_tab.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
 import 'package:flutter_user_app/features/posts/domain/usecase/get_posts_usecase.dart';
 import 'package:flutter_user_app/features/posts/data/repository/post_repository_impl.dart';
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CreatorPage extends StatefulWidget {
   final CreatorModel creator;
@@ -35,7 +40,7 @@ class _CreatorPageState extends State<CreatorPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _checkOwnership();
     _fetchCreatorDetails();
   }
@@ -87,6 +92,7 @@ class _CreatorPageState extends State<CreatorPage>
         ),
       ],
       child: Scaffold(
+        backgroundColor: Colors.white,
         floatingActionButton: _isOwner
             ? Builder(
                 builder: (fabContext) => FloatingActionButton.extended(
@@ -114,7 +120,7 @@ class _CreatorPageState extends State<CreatorPage>
               )
             : null,
         body: DefaultTabController(
-          length: 3,
+          length: 4,
           child: Builder(
             builder: (innerContext) {
               return RefreshIndicator(
@@ -151,63 +157,60 @@ class _CreatorPageState extends State<CreatorPage>
                     SliverAppBar(
                       expandedHeight: 280,
                       pinned: true,
-                      stretch: true,
-                      flexibleSpace: FlexibleSpaceBar(
-                        title: Padding(
-                          padding: const EdgeInsets.only(right: 30.0),
-                          child: Text(
-                            creator.creatorName,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
+                      backgroundColor: Colors.white,
+                      leading: Container(
+                        margin: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: Colors.black26,
+                          shape: BoxShape.circle,
                         ),
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                          padding: EdgeInsets.zero,
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                      flexibleSpace: FlexibleSpaceBar(
                         background: Stack(
                           fit: StackFit.expand,
                           children: [
+                            // Main Image
                             Hero(
                               tag: creator.id,
                               child: Image.network(
                                 creator.displayImage,
                                 fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey.shade300,
+                                    child: const Icon(Icons.person, size: 64, color: Colors.grey),
+                                  );
+                                },
                               ),
                             ),
-                            // Overlay gradient for better readability
-                            DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    theme.colorScheme.surface.withAlpha(130)
-                                  ],
-                                ),
-                              ),
-                            ),
- 
-                            // Profile Avatar Overlay
+
+                            // Share Button (Floating on bottom right of image)
                             Positioned(
-                              bottom: 70, // Adjust based on title height
-                              left: 20,
-                              child: Container(
-                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: theme.colorScheme.surface, width: 3),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black26,
-                                      blurRadius: 8,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: CircleAvatar(
-                                  radius: 40,
-                                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                                  backgroundImage: NetworkImage(creator.profilePic.isNotEmpty ? creator.profilePic : creator.displayImage),
-                                  onBackgroundImageError: (_, __) {},
-                                  child: (creator.profilePic.isEmpty && creator.displayImage.contains('placeholder'))
-                                      ? Icon(Icons.person, size: 40, color: theme.colorScheme.onSurfaceVariant)
-                                      : null,
+                              bottom: 16,
+                              right: 16,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Share.share('Check out ${creator.creatorName} on Temple App!${creator.website.isNotEmpty ? '\n\n${creator.website}' : ''}'); 
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(Icons.share, color: Colors.black87),
                                 ),
                               ),
                             ),
@@ -215,36 +218,116 @@ class _CreatorPageState extends State<CreatorPage>
                         ),
                       ),
                     ),
+                    
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Title and Website Row (matching Temple UI)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    creator.creatorName,
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                                if (creator.website.isNotEmpty)
+                                  TextButton(
+                                    onPressed: () async {
+                                      final url = Uri.parse(creator.website);
+                                      if (await canLaunchUrl(url)) {
+                                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                                      } else {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Could not launch website')),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    child: const Text(
+                                      'Website',
+                                      style: TextStyle(
+                                        color: Color(0xFF29D0FF),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            
+                            const SizedBox(height: 20),
+                            
+                            // Stats
+                            CreatorProfileStats(
+                              profile: creator,
+                              onFollowersTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FollowersScreen(
+                                      entityId: creator.id,
+                                      title: '${creator.creatorName} ${AppLocalizations.of(context)!.followers}',
+                                    ),
+                                  ),
+                                );
+                              },
+                              onFollowingTap: _isOwner ? () {
+                                 Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FollowingListScreen(),
+                                  ),
+                                );
+                              } : null,
+                            ),
+                            
+                            // Actions
+                            CreatorProfileActions(profile: creator),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Tab Bar (Sticky) - 4 tabs matching Temple
+                    SliverPersistentHeader(
+                      delegate: _SliverAppBarDelegate(
+                        TabBar(
+                          controller: _tabController,
+                          labelColor: const Color(0xFF29D0FF),
+                          unselectedLabelColor: Colors.grey,
+                          indicatorColor: const Color(0xFF29D0FF),
+                          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                          tabs: [
+                            Tab(text: AppLocalizations.of(context)!.about),
+                            Tab(text: AppLocalizations.of(context)!.review),
+                            Tab(text: AppLocalizations.of(context)!.gallery),
+                            Tab(text: AppLocalizations.of(context)!.calendar),
+                          ],
+                        ),
+                      ),
+                      pinned: true,
+                    ),
                   ],
-                  body: Column(
+                  body: TabBarView(
+                    controller: _tabController,
                     children: [
-                      CreatorProfileStats(
-                        profile: creator,
-                        onFollowersTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => FollowersScreen(
-                                entityId: creator.id,
-                                title: '${creator.creatorName} ${AppLocalizations.of(context)!.followers}',
-                              ),
-                            ),
-                          );
-                        },
-                        onFollowingTap: _isOwner ? () {
-                           Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => FollowingListScreen(),
-                            ),
-                          );
-                        } : null,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: CreatorAboutTab(profile: creator),
                       ),
-                      CreatorProfileActions(profile: creator),
-                      CreatorProfileTabs(
-                        tabController: _tabController,
-                        profile: creator,
-                      ),
+                      CreatorReviewTab(creator: creator),
+                      CreatorGalleryTab(creatorId: creator.id),
+                      CreatorCalendarTab(creatorId: creator.id),
                     ],
                   ),
                 ),
@@ -254,5 +337,46 @@ class _CreatorPageState extends State<CreatorPage>
         ),
       ),
     );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar _tabBar;
+
+  _SliverAppBarDelegate(this._tabBar);
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height + 1;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height + 1;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: shrinkOffset > 0 // Only show shadow when stuck/scrolled
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Column(
+        children: [
+          _tabBar,
+          if (shrinkOffset == 0) const Divider(height: 1), // Only show divider when expanded
+        ],
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }

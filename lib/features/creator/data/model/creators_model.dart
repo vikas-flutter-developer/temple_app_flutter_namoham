@@ -19,6 +19,7 @@ class CreatorModel {
   final String zipCode;
   final String dob;
   final String bio;
+  final String website;
 
   CreatorModel({
     required this.id,
@@ -41,6 +42,7 @@ class CreatorModel {
     this.zipCode = '',
     this.dob = '',
     this.bio = '',
+    this.website = '',
   });
 
   factory CreatorModel.fromJson(Map<String, dynamic> json) {
@@ -70,6 +72,7 @@ class CreatorModel {
       zipCode: json['zipCode'] ?? '',
       dob: json['dob'] ?? '',
       bio: json['bio'] ?? '',
+      website: json['website'] ?? '',
     );
   }
 
@@ -95,6 +98,7 @@ class CreatorModel {
       'zipCode': zipCode,
       'dob': dob,
       'bio': bio,
+      'website': website,
     };
   }
 

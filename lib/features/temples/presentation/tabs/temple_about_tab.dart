@@ -52,39 +52,33 @@ class AboutTab extends StatelessWidget {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
+            color: Colors.black87,
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12.0),
-          ),
-          padding: const EdgeInsets.all(16.0),
-          child: isLink 
-            ? Text(
-                content,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: theme.colorScheme.primary,
-                  decoration: TextDecoration.underline,
-                ),
-              )
-            : ReadMoreText(
-                content,
-                style: TextStyle(
-                  fontSize: 16,
-                   color: theme.colorScheme.onSurfaceVariant,
-                ),
-                trimMode: TrimMode.Line,
-                trimLines: 4,
-                colorClickableText: theme.colorScheme.primary,
-                trimCollapsedText: 'Read More',
-                trimExpandedText: 'Read Less',
+        isLink 
+          ? Text(
+              content,
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF29D0FF),
+                decoration: TextDecoration.underline,
               ),
-        ),
+            )
+          : ReadMoreText(
+              content,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey.shade600,
+                height: 1.5,
+              ),
+              trimMode: TrimMode.Line,
+              trimLines: 4,
+              colorClickableText: const Color(0xFF29D0FF),
+              trimCollapsedText: 'Read more...',
+              trimExpandedText: 'Read less',
+              moreStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF29D0FF)),
+            ),
       ],
     );
   }

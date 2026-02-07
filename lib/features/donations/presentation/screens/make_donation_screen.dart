@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
 import 'package:flutter_user_app/features/donations/presentation/screens/donation_success_screen.dart';
 import '../../../../core/api/api_service.dart';
@@ -27,6 +27,8 @@ class _MakeDonationScreenState extends State<MakeDonationScreen> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _apiService = ApiService.create();
+  
+  late Razorpay _razorpay;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -36,7 +38,17 @@ class _MakeDonationScreenState extends State<MakeDonationScreen> {
   double? _selectedAmount;
 
   @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  @override
   void dispose() {
+    _razorpay.clear();
     _amountController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -49,11 +61,78 @@ class _MakeDonationScreenState extends State<MakeDonationScreen> {
     });
   }
 
+  Future<void> _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    print('DONATION: Payment Success: ${response.paymentId}');
+    
+    // Verify Payment on Backend
+    try {
+      final verifiedData = await _apiService.verifyPayment(
+        razorpayOrderId: response.orderId ?? '',
+        razorpayPaymentId: response.paymentId ?? '',
+        razorpaySignature: response.signature ?? '',
+      );
+      
+      print('DONATION: Verification Success: $verifiedData');
+
+      if (!mounted) return;
+
+      // Navigate to Success Screen
+       final amount = double.tryParse(_amountController.text) ?? 0;
+       final description = _descriptionController.text.isEmpty
+          ? 'Donation to ${widget.recipientName}'
+          : _descriptionController.text;
+
+      navigateToPage(
+        context,
+        DonationSuccessScreen(
+          amount: amount,
+          templeName: widget.recipientName,
+          transactionId: response.paymentId ?? 'TXN${DateTime.now().millisecondsSinceEpoch}',
+          referenceId: response.orderId ?? 'REF${DateTime.now().millisecondsSinceEpoch}',
+          date: DateTime.now(),
+          notes: description,
+        ),
+      );
+
+    } catch (e) {
+      print('DONATION: Verification Failed: $e');
+      if (mounted) {
+        setState(() {
+            _isLoading = false;
+            _errorMessage = 'Payment verified failed: $e';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment verification failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    print('DONATION: Payment Error: ${response.code} - ${response.message}');
+     if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Payment failed: ${response.message}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment failed: ${response.message}'), backgroundColor: Colors.red),
+        );
+      }
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+     if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('External Wallet: ${response.walletName}')),
+        );
+      }
+  }
+
   Future<void> _processDonation() async {
     print('DONATION: Starting donation process');
     
     if (!_formKey.currentState!.validate()) {
-      print('DONATION: Form validation failed');
       return;
     }
 
@@ -69,83 +148,53 @@ class _MakeDonationScreenState extends State<MakeDonationScreen> {
           : _descriptionController.text;
 
       print('DONATION: Amount: ₹$amount');
-      print('DONATION: Recipient: ${widget.recipientName} (${widget.recipientType})');
-      print('DONATION: Creating payment link...');
 
-      // Create payment link
-      final response = await _apiService.createPaymentLink(
+      // Create payment order (Native Flow)
+      final response = await _apiService.createPaymentOrder(
         recipientId: widget.recipientId,
         recipientType: widget.recipientType,
         amount: amount,
         description: description,
       );
 
-      print('DONATION: API Response: $response');
+      print('DONATION: Order Created: $response');
 
-      // Get payment URL
-      final paymentUrl = response['short_url'] as String?;
-      print('DONATION: Payment URL: $paymentUrl');
-
-      if (paymentUrl != null && paymentUrl.isNotEmpty) {
-        // Open Razorpay payment link
-        final uri = Uri.parse(paymentUrl);
-        print('DONATION: Attempting to launch URL: $uri');
-        
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-          
-          if (mounted) {
-            // Show payment confirmation dialog
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => AlertDialog(
-                title: Text('Payment in Progress'),
-                content: Text('Please complete the payment in the browser. Once done, click "I have Paid".'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('Cancel'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context); // Close dialog
-                      // Navigate to Success Screen
-                      navigateToPage(
-                        context,
-                        DonationSuccessScreen(
-                          amount: amount,
-                          templeName: widget.recipientName,
-                          transactionId: response['id'] ?? 'TXN${DateTime.now().millisecondsSinceEpoch}',
-                          referenceId: 'REF${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-                          date: DateTime.now(),
-                          notes: description,
-                        ),
-                      );
-                    },
-                    child: Text('I have Paid'),
-                  ),
-                ],
-              ),
-            );
-          }
-        } else {
-          throw Exception('Could not open payment link');
-        }
-      } else {
-        throw Exception('Payment link not received');
+      // Backend returns orderId (not id)
+      final orderId = response['orderId'];
+      final razorpayKey = response['key'] ?? 'rzp_live_RmgNgMehnBgdUh';
+      final prefill = response['prefill'] as Map<String, dynamic>? ?? {};
+      
+      if (orderId == null) {
+          throw Exception('Failed to get Order ID from backend');
       }
+
+      // Open Razorpay Checkout
+      var options = {
+        'key': razorpayKey,
+        'amount': response['amountInPaise'] ?? (amount * 100).toInt(), // Use amountInPaise from response
+        'name': widget.recipientName,
+        'description': description,
+        'order_id': orderId,
+        'prefill': {
+          'name': prefill['name'] ?? '',
+          'contact': prefill['contact'] ?? '',
+          'email': prefill['email'] ?? '',
+        },
+        'theme': {
+           'color': '#29D0FF' // Cyan theme matching app
+        }
+      };
+
+      _razorpay.open(options);
+      
+      // Loading remains true until success/error callback handles it
+
     } catch (e) {
       print('DONATION: Error occurred: $e');
       setState(() {
         _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false; 
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 
@@ -392,14 +441,14 @@ class _MakeDonationScreenState extends State<MakeDonationScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.info_outline,
+                      Icons.security,
                       size: 20,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'You will be redirected to Razorpay for secure payment',
+                        'Secure payment via Razorpay. No card details are stored.', // Updated text since it's native now
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),

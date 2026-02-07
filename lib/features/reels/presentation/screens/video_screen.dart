@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -212,9 +213,7 @@ class _VideosViewState extends State<_VideosView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const CustomPageBar(title: 'Reels'),
-      body: Stack(
-        children: [
-          Consumer<ReelsProvider>(
+      body: Consumer<ReelsProvider>(
         builder: (context, provider, child) {
           if (provider.status == ReelsStatus.loading && provider.reels.isEmpty) {
             return const Center(child: CircularProgressIndicator());
@@ -349,24 +348,6 @@ class _VideosViewState extends State<_VideosView> {
             ),
           );
         },
-      ),
-          // Debug overlay to show user type
-          Positioned(
-            top: 10,
-            right: 10,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Type: ${_userType ?? "loading..."}\nCan create: ${_canCreateReel()}',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-              ),
-            ),
-          ),
-        ],
       ),
       floatingActionButton: _canCreateReel()
           ? FloatingActionButton(

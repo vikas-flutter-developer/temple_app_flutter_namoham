@@ -19,7 +19,7 @@ class ReelsProvider extends ChangeNotifier {
   
   // Pagination
   int _page = 1;
-  final int _limit = 5;
+  final int _limit = 2;
   bool _hasMore = true;
   bool _isLoadingMore = false;
   

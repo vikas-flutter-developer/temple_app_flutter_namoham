@@ -41,7 +41,7 @@ class _SearchPageState extends State<SearchPage> {
   ];
 
   // Initialize API Service
-  final ApiService _apiService = ApiService.create();
+  late ApiService _apiService;
 
   // Data State
   List<FollowItem> _searchResults = [];
@@ -62,13 +62,19 @@ class _SearchPageState extends State<SearchPage> {
   int _creatorsCount = 0;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _apiService = Provider.of<ApiService>(context, listen: false);
+  }
+
+  @override
   void initState() {
     super.initState();
     // 1. Fetch Popular Temples (All Temples) on Init
-    _loadPopularTemples();
-
-    // 2. Fetch Popular Creators on Init
-    _loadPopularCreators();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadPopularTemples();
+      _loadPopularCreators();
+    });
 
     // 3. User's Following List is handled directly by FollowProvider
     // which should already be initialized if used within the app tree.

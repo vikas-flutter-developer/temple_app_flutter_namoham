@@ -313,6 +313,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         }
         
         if (data['profilePic'] != null) _remotePhotoUrl = data['profilePic'];
+        
+        // Bank details for Creator
+        if (data['bankDetails'] != null && data['bankDetails'] is Map) {
+          final bank = data['bankDetails'] as Map<String, dynamic>;
+          if (bank['bankName'] != null) _bankNameController.text = bank['bankName'];
+          if (bank['accountHolderName'] != null) _bankHolderController.text = bank['accountHolderName'];
+          if (bank['bankAccountNumber'] != null) _bankAcctController.text = bank['bankAccountNumber'];
+          if (bank['ifscCode'] != null) _ifscController.text = bank['ifscCode'];
+        }
       });
     }
   }
@@ -454,7 +463,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         if (_dobController.text.isNotEmpty) profileData['dob'] = _dobController.text.trim();
         
         // Use Creator Name instead of Full Name if required by backend
-        profileData['creatorName'] = _nameController.text.trim(); 
+        profileData['creatorName'] = _nameController.text.trim();
+        
+        // Bank Details for Creator
+        if (_bankAcctController.text.isNotEmpty) {
+          profileData['bankDetails'] = {
+            'accountHolderName': _bankHolderController.text.trim(),
+            'bankAccountNumber': _bankAcctController.text.trim(),
+            'ifscCode': _ifscController.text.trim(),
+            'bankName': _bankNameController.text.trim(),
+          };
+        }
 
         response = await _apiService.updateCreatorProfile(userId, profileData);
 
@@ -666,6 +685,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                    controller: _dobController,
                    isDateField: true,
                  ),
+                const SizedBox(height: 24),
+                
+                // Bank Details for Creator (For Donations)
+                _buildSectionTitle(theme, 'Bank Details (For Donations)'),
+                CustomTextField(labelText: 'Bank Name', controller: _bankNameController),
+                const SizedBox(height: 16),
+                CustomTextField(labelText: 'Account Holder Name', controller: _bankHolderController),
+                const SizedBox(height: 16),
+                CustomTextField(labelText: 'Account Number', controller: _bankAcctController, keyboardType: TextInputType.number),
+                const SizedBox(height: 16),
+                CustomTextField(labelText: 'IFSC Code', controller: _ifscController),
                 const SizedBox(height: 16),
               ],
 

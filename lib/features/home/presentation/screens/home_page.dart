@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
@@ -35,6 +36,11 @@ class _HomePageState extends State<HomePage>
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
+    
+    // Load posts using the global provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<PostsProvider>(context, listen: false).loadPosts();
+    });
   }
 
   @override
@@ -56,7 +62,7 @@ class _HomePageState extends State<HomePage>
     // _controller.forward().then((_) => _controller.reverse());
   }
 
-  Future<bool> _showLogoutDialog() async {
+  Future<bool> _showExitDialog() async {
     final theme = Theme.of(context);
     final result = await showDialog<bool>(
       context: context,
@@ -73,10 +79,10 @@ class _HomePageState extends State<HomePage>
               children: [
                 Row(
                   children: [
-                    Icon(Icons.logout, color: theme.colorScheme.error, size: 28),
+                    Icon(Icons.exit_to_app, color: theme.colorScheme.error, size: 28),
                     const SizedBox(width: 16),
                     Text(
-                      'Logout',
+                      'Close App',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -87,7 +93,7 @@ class _HomePageState extends State<HomePage>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Are you sure you want to logout from this account?',
+                  'Do you want to close the app?',
                   style: TextStyle(
                     fontSize: 16,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -100,7 +106,7 @@ class _HomePageState extends State<HomePage>
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(false),
                       child: Text(
-                        'Cancel',
+                        'No',
                         style: TextStyle(
                           color: theme.colorScheme.secondary,
                           fontWeight: FontWeight.bold,
@@ -112,7 +118,7 @@ class _HomePageState extends State<HomePage>
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(true),
                       child: Text(
-                        'Logout',
+                        'Yes',
                         style: TextStyle(
                           color: theme.colorScheme.error,
                           fontWeight: FontWeight.bold,
@@ -130,14 +136,7 @@ class _HomePageState extends State<HomePage>
     );
 
     if (result == true) {
-      // Clear auth token
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('auth_token');
-
-      // Navigate to login and clear stack
-      if (mounted) {
-        navigateToPageAndRemoveUntil(context, const LoginPage());
-      }
+      SystemNavigator.pop();
     }
 
     return false; // Prevent default back navigation
@@ -145,50 +144,40 @@ class _HomePageState extends State<HomePage>
 
   @override
   Widget build(BuildContext context) {
-    // Create provider instances that will be shared across all tabs
-    final apiService = ApiService.create();
-    final postRepository = PostRepositoryImpl(apiService: apiService);
-    
-    return ChangeNotifierProvider(
-      create: (_) => PostsProvider(
-        GetPostsUsecase(postRepository),
-        postRepository,
-      )..loadPosts(),
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, result) async {
-          if (didPop) return;
-          await _showLogoutDialog();
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _showExitDialog();
+      },
+      child: Scaffold(
+      appBar: _selectedIndex != 0 ? null : CustomPageBar(title: "Explore"),
+      // Replace the direct body with a PageView
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(), // Disable swiping
+        onPageChanged: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
         },
-        child: Scaffold(
-        appBar: _selectedIndex != 0 ? null : CustomPageBar(title: "Explore"),
-        // Replace the direct body with a PageView
-        body: PageView(
-          controller: _pageController,
-          physics: const NeverScrollableScrollPhysics(), // Disable swiping
-          onPageChanged: (index) {
-            setState(() {
-              _selectedIndex = index;
-            });
-          },
-          children: [
-            // Home page content
-            const PostsScreen(),
-            // Search page
-            const SearchPage(),
+        children: [
+          // Home page content
+          const PostsScreen(),
+          // Search page
+          const SearchPage(),
 
-            // Add page
-            const VideosScreen(),
-            // Profile page
-            const ProfilePage(),
-          ],
-        ),
-          // Replace the current bottom navigation bar with CustomBottomNav
-          bottomNavigationBar: CustomBottomNav(
-            selectedIndex: _selectedIndex,
-            onTabChange: _onTabChange,
-            pageController: _pageController,
-          ),
+          // Add page
+          const VideosScreen(),
+          // Profile page
+          const ProfilePage(),
+        ],
+      ),
+        // Replace the current bottom navigation bar with CustomBottomNav
+        bottomNavigationBar: CustomBottomNav(
+          selectedIndex: _selectedIndex,
+          onTabChange: _onTabChange,
+          pageController: _pageController,
         ),
       ),
     );

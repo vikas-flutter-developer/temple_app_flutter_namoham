@@ -36,6 +36,15 @@ class ApiService {
   /// Public getter for headers (used by video player etc)
   Future<Map<String, String>> getAuthHeaders() => _getHeaders();
 
+  void _checkStatus(http.Response response) {
+    if (response.statusCode == 401) {
+      print('API_SERVICE: 401 Unauthorized - Token expired');
+      if (onTokenExpired != null) {
+        onTokenExpired!();
+      }
+    }
+  }
+
   // ============== SHARE ==============
 
   /// Share a post
@@ -766,6 +775,7 @@ class ApiService {
       Uri.parse('$baseUrl/posts'),
       headers: await _getHeaders(),
     );
+    _checkStatus(response);
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       return data.cast<Map<String, dynamic>>();
@@ -1281,7 +1291,7 @@ class ApiService {
       Uri.parse('$baseUrl/events'),
       headers: await _getHeaders(),
     );
-
+    _checkStatus(response);
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       return data.cast<Map<String, dynamic>>();
@@ -1434,6 +1444,7 @@ class ApiService {
       Uri.parse('$baseUrl/reels?page=$page&limit=$limit'),
       headers: await _getHeaders(),
     );
+    _checkStatus(response);
     if (response.statusCode == 200) {
       final dynamic decoded = json.decode(response.body);
       

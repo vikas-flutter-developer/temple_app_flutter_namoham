@@ -30,13 +30,18 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
+    final isReels = widget.selectedIndex == 2;
+    
     return SafeArea(
       child: Material(
+        color: Colors.transparent, // Important for transparency
         child: Container(
           height: 65,
+          margin: isReels ? const EdgeInsets.only(bottom: 10, left: 10, right: 10) : null,
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            border: Border(
+            color: isReels ? Colors.black.withOpacity(0.3) : theme.colorScheme.surface,
+            borderRadius: isReels ? BorderRadius.circular(30) : null,
+            border: isReels ? null : Border(
               top: BorderSide(
                 color: theme.colorScheme.outline,
                 width: 0.1,
@@ -47,17 +52,18 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
             child: GNav(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              rippleColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+              rippleColor: isReels ? Colors.white.withOpacity(0.1) : theme.colorScheme.primary.withOpacity(0.1),
               gap: 8,
-              activeColor: theme.colorScheme.primary,
+              activeColor: isReels ? Colors.white : theme.colorScheme.primary,
               iconSize: 22,
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
               duration: const Duration(milliseconds: 400),
-              tabBackgroundColor:
-                  theme.colorScheme.secondaryContainer.withAlpha(90),
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+              tabBackgroundColor: isReels 
+                  ? Colors.white.withOpacity(0.2) 
+                  : theme.colorScheme.secondaryContainer.withOpacity(0.3),
+              color: isReels ? Colors.white.withOpacity(0.8) : theme.colorScheme.onSurface.withOpacity(0.8),
               textStyle: TextStyle(
-                color: theme.colorScheme.primary,
+                color: isReels ? Colors.white : theme.colorScheme.primary,
                 fontWeight: FontWeight.w500,
               ),
               haptic: true,
@@ -72,8 +78,8 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
                     height: 24,
                     colorFilter: ColorFilter.mode(
                       widget.selectedIndex == 0
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
+                          ? (isReels ? Colors.white : theme.colorScheme.primary)
+                          : (isReels ? Colors.white : theme.colorScheme.onSurface),
                       BlendMode.srcIn,
                     ),
                   ),
@@ -88,8 +94,8 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
                     height: 24,
                     colorFilter: ColorFilter.mode(
                       widget.selectedIndex == 1
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
+                          ? (isReels ? Colors.white : theme.colorScheme.primary)
+                          : (isReels ? Colors.white : theme.colorScheme.onSurface),
                       BlendMode.srcIn,
                     ),
                   ),
@@ -104,8 +110,8 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
                     height: 25,
                     colorFilter: ColorFilter.mode(
                       widget.selectedIndex == 2
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
+                          ? (isReels ? Colors.white : theme.colorScheme.primary)
+                          : (isReels ? Colors.white : theme.colorScheme.onSurface),
                       BlendMode.srcIn,
                     ),
                   ),
@@ -120,8 +126,8 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
                     height: 24,
                     colorFilter: ColorFilter.mode(
                       widget.selectedIndex == 3
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
+                          ? (isReels ? Colors.white : theme.colorScheme.primary)
+                          : (isReels ? Colors.white : theme.colorScheme.onSurface),
                       BlendMode.srcIn,
                     ),
                   ),

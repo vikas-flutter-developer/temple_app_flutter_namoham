@@ -369,7 +369,7 @@ class _PostWidgetState extends State<PostWidget>
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
               child: Row(
                 children: [
                   LikeButton(
@@ -482,11 +482,14 @@ class _PostWidgetState extends State<PostWidget>
                     child: Builder(
                       builder: (context) {
                         // Use a specialized widget to handle name fetching if needed
-                        return LikedByText(
-                          likedBy: widget.postModel.likedBy,
-                          likedByNames: widget.postModel.likedByNames,
-                          totalLikes: widget.postModel.likes,
-                          theme: theme,
+                        return Transform.translate(
+                          offset: const Offset(0, -10), // Move text slightly up to reduce spacing
+                          child: LikedByText(
+                            likedBy: widget.postModel.likedBy,
+                            likedByNames: widget.postModel.likedByNames,
+                            totalLikes: widget.postModel.likes,
+                            theme: theme,
+                          ),
                         );
                       },
                     ),
@@ -517,51 +520,54 @@ class _PostWidgetState extends State<PostWidget>
                 ],
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 0),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2.0, right: 6.0),
-                        child: Icon(Icons.format_quote, size: 20, color: theme.colorScheme.onSurface),
-                      ),
-                      Expanded(
-                        child: ReadMoreText(
-                          widget.postModel.caption,
-                          style: TextStyle(
-                            fontSize: 13, 
-                            color: theme.colorScheme.onSurface,
-                            height: 1.4
-                          ),
-                          trimMode: TrimMode.Line,
-                          trimLines: 2,
-                          trimCollapsedText: ' (More)',
-                          trimExpandedText: ' (Less)',
-                          moreStyle: TextStyle(
-                            color: theme.colorScheme.outline,
-                            fontSize: 13,
-                          ),
-                          lessStyle: TextStyle(
-                            color: theme.colorScheme.outline,
-                            fontSize: 13,
+              child: Transform.translate(
+                offset: const Offset(0, -8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2.0, right: 6.0),
+                          child: Icon(Icons.format_quote, size: 20, color: theme.colorScheme.onSurface),
+                        ),
+                        Expanded(
+                          child: ReadMoreText(
+                            widget.postModel.caption,
+                            style: TextStyle(
+                              fontSize: 13, 
+                              color: theme.colorScheme.onSurface,
+                              height: 1.4
+                            ),
+                            trimMode: TrimMode.Line,
+                            trimLines: 2,
+                            trimCollapsedText: ' (More)',
+                            trimExpandedText: ' (Less)',
+                            moreStyle: TextStyle(
+                              color: theme.colorScheme.outline,
+                              fontSize: 13,
+                            ),
+                            lessStyle: TextStyle(
+                              color: theme.colorScheme.outline,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    _formatDate(widget.postModel.timestamp),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.outline,
+                      ],
                     ),
-                  ),
-                ],
+                    Text(
+                      _formatDate(widget.postModel.timestamp),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),

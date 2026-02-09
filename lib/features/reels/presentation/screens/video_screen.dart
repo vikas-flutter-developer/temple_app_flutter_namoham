@@ -48,9 +48,11 @@ class _VideosView extends StatefulWidget {
 class _VideosViewState extends State<_VideosView> {
   late PageController _pageController;
   final Map<String, VideoPlayerController> _controllers = {};
-  late int _currentIndex;
+  final Map<String, int> _retryCounters = {}; // Track retry attempts per reel
+  int _currentIndex = 0;
   String? _currentlyPlayingId;
-  String? _userType;
+  String _userType = '';
+  int _lastActualIndex = 0; // Track last actual index for loop detection
 
   @override
   void initState() {
@@ -86,7 +88,7 @@ class _VideosViewState extends State<_VideosView> {
     final userType = prefs.getString('user_type');
     print('REELS_SCREEN: User type loaded = $userType');
     setState(() {
-      _userType = userType;
+      _userType = userType ?? '';
     });
   }
 
@@ -117,24 +119,61 @@ class _VideosViewState extends State<_VideosView> {
     );
     
     await controller.initialize();
-    controller.setLooping(true);
+    controller.setLooping(false);
     
     // Web requires mute for autoplay
     if (kIsWeb) {
       await controller.setVolume(0);
     }
+    
+    // Auto-scroll listener
+    controller.addListener(() {
+      if (!mounted) return;
+      
+      final value = controller.value;
+      if (value.duration > Duration.zero && value.position >= value.duration) {
+         // Video finished
+         if (_currentlyPlayingId == reel.id) {
+            final provider = context.read<ReelsProvider>();
+            final currentIndex = provider.reels.indexWhere((r) => r.id == reel.id);
+            
+            if (currentIndex != -1 && currentIndex < provider.reels.length - 1) {
+              // Move to next page
+              _pageController.nextPage(
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOut,
+              );
+            }
+         }
+      }
+    });
+
     _controllers[reel.id] = controller;
     
     return controller;
   }
 
-  void _onPageChanged(int index, List<ReelModel> reels) {
+  void _onPageChanged(int virtualIndex, List<ReelModel> reels) {
+    if (reels.isEmpty) return;
+    
+    // Calculate actual index using modulo for infinite scrolling
+    final actualIndex = virtualIndex % reels.length;
+    
     setState(() {
-      _currentIndex = index;
+      _currentIndex = virtualIndex;
     });
 
+    // Detect loop: if actual index wrapped back to 0-2 and we moved forward
+    if (actualIndex <= 2 && _lastActualIndex > reels.length - 3 && virtualIndex > _lastActualIndex) {
+      print('REELS_SCREEN: Loop detected! Refreshing reels from API...');
+      final provider = context.read<ReelsProvider>();
+      provider.loadReels(); // Refresh reels when looping back
+    }
+    
+    _lastActualIndex = actualIndex;
+
     // Cleanup old controllers to prevent memory leaks
-    _cleanupOldControllers(index, reels);
+    _cleanupOldControllers(actualIndex, reels);
 
     // Pause previous video
     if (_currentlyPlayingId != null && _controllers.containsKey(_currentlyPlayingId)) {
@@ -142,27 +181,25 @@ class _VideosViewState extends State<_VideosView> {
     }
 
     // Play current video and increment view
-    if (index < reels.length) {
-      final reel = reels[index];
-      _currentlyPlayingId = reel.id;
-      
-      if (_controllers.containsKey(reel.id)) {
-        _controllers[reel.id]?.play();
-      }
+    final reel = reels[actualIndex];
+    _currentlyPlayingId = reel.id;
+    
+    if (_controllers.containsKey(reel.id)) {
+      _controllers[reel.id]?.play();
+    }
 
-      // Increment view count
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-           context.read<ReelsProvider>().incrementView(reel.id);
-        }
-      });
-      
-      // Pagination Trigger: Load more when within 3 items of the end
-      final provider = context.read<ReelsProvider>();
-      if (provider.hasMore && !provider.isLoadingMore && index >= reels.length - 3) {
-        print('REELS_SCREEN: Triggering loadMoreReels at index $index (total ${reels.length})');
-        provider.loadMoreReels();
+    // Increment view count
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+         context.read<ReelsProvider>().incrementView(reel.id);
       }
+    });
+    
+    // Standard pagination trigger: Load more when within 3 items of the end
+    final provider = context.read<ReelsProvider>();
+    if (provider.hasMore && !provider.isLoadingMore && actualIndex >= reels.length - 3) {
+      print('REELS_SCREEN: Triggering loadMoreReels at index $actualIndex (total ${reels.length})');
+      provider.loadMoreReels();
     }
   }
 
@@ -212,7 +249,8 @@ class _VideosViewState extends State<_VideosView> {
 @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomPageBar(title: 'Reels'),
+      extendBodyBehindAppBar: true, 
+      backgroundColor: Colors.black,
       body: Consumer<ReelsProvider>(
         builder: (context, provider, child) {
           if (provider.status == ReelsStatus.loading && provider.reels.isEmpty) {
@@ -245,12 +283,15 @@ class _VideosViewState extends State<_VideosView> {
               controller: _pageController,
               scrollDirection: Axis.vertical,
               onPageChanged: (index) => _onPageChanged(index, provider.reels),
-              // Use actual length for standard pagination
-              itemCount: provider.reels.length,
-              itemBuilder: (context, index) {
-                final reel = provider.reels[index];
+              // Use very large count for infinite scrolling
+              itemCount: 1000000,
+              itemBuilder: (context, virtualIndex) {
+                // Calculate actual index using modulo for circular scrolling
+                final actualIndex = virtualIndex % provider.reels.length;
+                final reel = provider.reels[actualIndex];
                 
                 return FutureBuilder<VideoPlayerController>(
+                  key: ValueKey('${reel.id}_${_retryCounters[reel.id] ?? 0}'),
                   future: _getController(reel),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
@@ -266,40 +307,41 @@ class _VideosViewState extends State<_VideosView> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.error, size: 48, color: Colors.red),
-                              const SizedBox(height: 8),
+                              const Icon(Icons.error_outline, size: 48, color: Colors.white),
+                              const SizedBox(height: 16),
                               const Text(
-                                'Failed to load video',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              if (isTestVideo) ...[
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'This is a test video that doesn\'t exist.\nOnly newly uploaded videos from Supabase will work.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.orange),
+                                'Video unavailable',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 16,
                                 ),
-                              ],
+                              ),
                               const SizedBox(height: 8),
                               Text(
-                                'URL: ${reel.fullVideoUrl}',
+                                'Something went wrong while loading this reel.',
                                 textAlign: TextAlign.center,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: Colors.black54),
+                                style: TextStyle(color: Colors.white.withOpacity(0.7)),
                               ),
-                              if (err != null) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Error: ${err.toString()}',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(color: Colors.red),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () {
+                                  // Clear the failed controller from cache
+                                  if (_controllers.containsKey(reel.id)) {
+                                    _controllers[reel.id]?.dispose();
+                                    _controllers.remove(reel.id);
+                                  }
+                                  // Increment retry counter to force FutureBuilder to rebuild
+                                  setState(() {
+                                    _retryCounters[reel.id] = (_retryCounters[reel.id] ?? 0) + 1;
+                                  });
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
                                 ),
-                              ],
+                                child: const Text('Retry'),
+                              ),
                             ],
                           ),
                         ),
@@ -309,7 +351,7 @@ class _VideosViewState extends State<_VideosView> {
                     final controller = snapshot.data!;
                     
                     // Auto-play first video
-                    if (index == _currentIndex && _currentlyPlayingId != reel.id) {
+                    if (virtualIndex == _currentIndex && _currentlyPlayingId != reel.id) {
                       _currentlyPlayingId = reel.id;
                       controller.play();
                       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -349,25 +391,6 @@ class _VideosViewState extends State<_VideosView> {
           );
         },
       ),
-      floatingActionButton: _canCreateReel()
-          ? FloatingActionButton(
-              onPressed: () async {
-                // Navigate to create reel screen
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CreateReelScreen(),
-                  ),
-                );
-                
-                // If reel was created successfully, refresh the list
-                if (result == true && context.mounted) {
-                  context.read<ReelsProvider>().loadReels();
-                }
-              },
-              child: const Icon(Icons.add),
-            )
-          : null,
     );
   }
 

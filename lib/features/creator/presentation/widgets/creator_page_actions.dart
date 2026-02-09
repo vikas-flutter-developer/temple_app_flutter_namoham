@@ -31,7 +31,7 @@ class CreatorProfileActions extends StatelessWidget {
     final buttonColor = const Color(0xFF29D0FF);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [

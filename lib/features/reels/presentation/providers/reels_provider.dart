@@ -19,7 +19,7 @@ class ReelsProvider extends ChangeNotifier {
   
   // Pagination
   int _page = 1;
-  final int _limit = 2;
+  final int _limit = 3;
   bool _hasMore = true;
   bool _isLoadingMore = false;
   
@@ -119,32 +119,40 @@ class ReelsProvider extends ChangeNotifier {
       }
       
       if (newReels.isEmpty) {
-        _hasMore = false;
+        // End of list reached? Loop back to start!
+        print('REELS_PROVIDER: End of list reached. Looping back to Page 1...');
+        _page = 0; // Next load will be Page 1
+        _hasMore = true; // Keep loading infinitely
       } else {
         // Filter valid video URLs
         var validNewReels = newReels.where((reel) => _isValidVideoUrl(reel.videoUrl)).toList();
         
-        // CLIENT-SIDE DEDUPLICATION
-        // If backend ignores pagination (or returns duplicates), we filter them out here.
-        final existingIds = _reels.map((r) => r.id).toSet();
-        validNewReels = validNewReels.where((r) => !existingIds.contains(r.id)).toList();
+        // Remove deduplication to allow infinite looping of same content
+        // final existingIds = _reels.map((r) => r.id).toSet();
+        // validNewReels = validNewReels.where((r) => !existingIds.contains(r.id)).toList();
         
-        if (validNewReels.isEmpty && newReels.isNotEmpty) {
-           // We got data, but they were all duplicates or invalid. 
-           // This implies we've likely exhausted the actual new content 
-           // or the backend is just looping. Stop pagination to be safe.
-           print('REELS_PROVIDER: Received only duplicates. Stopping pagination.');
-           _hasMore = false;
-        } else {
-           validNewReels.shuffle(); // Shuffle individual pages if desired, or remove for strict order
+        if (validNewReels.isNotEmpty) {
+           // Shuffle the new batch of reels before appending
+           validNewReels.shuffle();
+           
+           // Append new reels
            _reels.addAll(validNewReels);
            _page = nextPage;
            
-           // If we got fewer than limit (after dedupe logic? or raw?), strictly speaking 
-           // we check raw return size against limit usually.
+           // If we got fewer than limit, it means we reached the end of available data
+           // So next time we should start from Page 1
            if (newReels.length < _limit) {
-             _hasMore = false;
+             print('REELS_PROVIDER: Partial page received. Next load will loop to Page 1.');
+             _page = 0;
            }
+        } else {
+            // Received data but all were invalid/filtered? 
+            // Better to try next page or reset if we suspect end
+            if (newReels.length < _limit) {
+                _page = 0;
+            } else {
+                _page = nextPage;
+            }
         }
       }
       

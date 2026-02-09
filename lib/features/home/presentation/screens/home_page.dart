@@ -151,6 +151,7 @@ class _HomePageState extends State<HomePage>
         await _showExitDialog();
       },
       child: Scaffold(
+      extendBody: true, // Allow body to extend behind the bottom nav bar
       appBar: _selectedIndex != 0 ? null : CustomPageBar(title: "Explore"),
       // Replace the direct body with a PageView
       body: PageView(

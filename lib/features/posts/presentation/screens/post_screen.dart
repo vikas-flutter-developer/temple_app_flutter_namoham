@@ -400,12 +400,15 @@ class _PostsScreenState extends State<PostsScreen> {
         },
       ),
       floatingActionButton: _canCreatePost
-          ? FloatingActionButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddPostPage()),
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 80.0),
+              child: FloatingActionButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AddPostPage()),
+                ),
+                child: const Icon(Icons.add),
               ),
-              child: const Icon(Icons.add),
             )
           : null,
     );

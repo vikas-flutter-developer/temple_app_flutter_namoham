@@ -55,6 +55,7 @@ class ReelModel {
   final List<String> likedBy;
   final List<ReelComment> comments;
   final int views;
+  final int shareCount;
   final DateTime? timestamp;
   final bool? isSaved; // Added field
 
@@ -71,6 +72,7 @@ class ReelModel {
     this.likedBy = const [],
     this.comments = const [],
     this.views = 0,
+    this.shareCount = 0,
     this.timestamp,
     this.isSaved,
   });
@@ -95,6 +97,7 @@ class ReelModel {
               .toList() ??
           [],
       views: json['views'] ?? 0,
+      shareCount: json['shareCount'] ?? 0,
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'])
           : null,
@@ -116,6 +119,7 @@ class ReelModel {
       'likedBy': likedBy,
       'comments': comments.map((c) => c.toJson()).toList(),
       'views': views,
+      'shareCount': shareCount,
       'timestamp': timestamp?.toIso8601String(),
       if (isSaved != null) 'isSaved': isSaved,
     };
@@ -163,6 +167,7 @@ class ReelModel {
     List<String>? likedBy,
     List<ReelComment>? comments,
     int? views,
+    int? shareCount,
     DateTime? timestamp,
     bool? isSaved,
   }) {
@@ -179,6 +184,7 @@ class ReelModel {
       likedBy: likedBy ?? this.likedBy,
       comments: comments ?? this.comments,
       views: views ?? this.views,
+      shareCount: shareCount ?? this.shareCount,
       timestamp: timestamp ?? this.timestamp,
       isSaved: isSaved ?? this.isSaved,
     );

@@ -11,6 +11,8 @@ import 'package:flutter_user_app/features/settings/presentation/screens/language
 import 'package:flutter_user_app/features/creator/presentation/screens/creator_account_setup_screen.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
 import 'package:flutter_user_app/features/profile/presentation/screens/saved_post.dart';
+import 'package:flutter_user_app/features/profile/presentation/screens/privacy_policy_screen.dart';
+import 'package:flutter_user_app/features/profile/presentation/screens/terms_conditions_screen.dart';
 import 'package:flutter_user_app/features/events/presentation/screens/events_screen.dart';
 import 'package:flutter_user_app/features/messages/presentation/screens/conversations_screen.dart';
 import 'package:flutter_user_app/features/temples/presentation/screens/temple_donation_screen.dart';
@@ -20,6 +22,8 @@ import 'package:flutter_user_app/features/profile/presentation/widgets/profile_i
 import 'package:provider/provider.dart';
 import 'package:flutter_user_app/features/follow/presentation/screens/following_list_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'profile_edit_screen.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -37,12 +41,44 @@ class _ProfilePageState extends State<ProfilePage> {
   String _userType = 'user';
   String _email = '';
   bool _isLoading = true;
+  String _appVersion = '';
   final ApiService _apiService = ApiService.create();
 
   @override
   void initState() {
     super.initState();
     _loadProfileData();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      print('APP_VERSION: ${packageInfo.version}');
+      if (mounted) {
+        setState(() {
+          _appVersion = packageInfo.version.isNotEmpty ? packageInfo.version : '0.1.0';
+        });
+      }
+    } catch (e) {
+      print('Error loading app version: $e');
+      if (mounted) {
+        setState(() {
+          _appVersion = '0.1.0'; // Fallback version
+        });
+      }
+    }
+  }
+
+  void _showComingSoonToast() {
+    Fluttertoast.showToast(
+      msg: "Coming Soon",
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.black87,
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
   }
 
   Future<void> _loadProfileData() async {
@@ -375,6 +411,13 @@ class _ProfilePageState extends State<ProfilePage> {
                     },
                   ),
 
+                  ProfileItemsWidget(
+                    icon: Icons.alarm,
+                    title: 'Event Reminder',
+                    subtitle: 'Saved Events For Reminder',
+                    onTap: _showComingSoonToast,
+                  ),
+
                   if (isTemple || isCreator)
                     ProfileItemsWidget(
                       icon: Icons.credit_card_outlined,
@@ -427,11 +470,121 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
 
                   ProfileItemsWidget(
+                    icon: Icons.delete_forever,
+                    title: 'Delete Account',
+                    subtitle: 'Permanently Delete Your Account',
+                    onTap: _showComingSoonToast,
+                  ),
+
+                  ProfileItemsWidget(
                     icon: Icons.logout,
                     title: l10n.logout,
                     subtitle: l10n.logoutFromCurrentAccount,
                     onTap: _showLogoutDialog,
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Footer section with Share, Rate, Privacy, Terms, and Version
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            TextButton(
+                              onPressed: _showComingSoonToast,
+                              child: Text(
+                                'Share Us',
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              height: 12,
+                              width: 1,
+                              color: theme.colorScheme.outline,
+                            ),
+                            TextButton(
+                              onPressed: _showComingSoonToast,
+                              child: Text(
+                                'Rate Us',
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              height: 12,
+                              width: 1,
+                              color: theme.colorScheme.outline,
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const PrivacyPolicyScreen(),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                'Privacy Policy',
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const TermsAndConditionsScreen(),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                'Terms & Conditions',
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              height: 12,
+                              width: 1,
+                              color: theme.colorScheme.outline,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                              child: Text(
+                                'App Version: $_appVersion',
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
                   ],
                 ),
               ),

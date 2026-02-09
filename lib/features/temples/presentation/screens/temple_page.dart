@@ -261,8 +261,6 @@ class _TemplePageState extends State<TemplePage>
                             
                             // Rating Row Removed as per request
                             
-                            const SizedBox(height: 20),
-                            
                             // Stats
                             ProfileStats(
                               profile: temple,

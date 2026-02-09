@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import 'package:flutter_user_app/core/util/share_helper.dart';
 import 'package:flutter_user_app/features/reels/data/models/reel_model.dart';
 import 'package:flutter_user_app/features/reels/presentation/screens/profile_loader_screen.dart';
+import 'package:flutter_user_app/features/reels/presentation/screens/create_reel_screen.dart';
 
 class ReelVideoWidget extends StatefulWidget {
   final ReelModel reel;
@@ -32,17 +33,16 @@ class ReelVideoWidget extends StatefulWidget {
 }
 
 class _ReelVideoWidgetState extends State<ReelVideoWidget> {
-  bool _showControls = true;
-  bool _isPlaying = false;
+  bool _showControls = false; // Initially false, only show when paused
+  bool _isPlaying = true;
+  bool _hasError = false;
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_videoListener);
     _isPlaying = widget.controller.value.isPlaying;
-    
-    // Auto-hide controls after 3 seconds
-    _startHideControlsTimer();
+    _hasError = widget.controller.value.hasError;
   }
 
   @override
@@ -51,6 +51,9 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_videoListener);
       widget.controller.addListener(_videoListener);
+      _isPlaying = widget.controller.value.isPlaying;
+      _hasError = widget.controller.value.hasError;
+      _showControls = !_isPlaying && !_hasError;
     }
   }
 
@@ -62,68 +65,44 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
 
   void _videoListener() {
     if (mounted) {
-      setState(() {
-        _isPlaying = widget.controller.value.isPlaying;
-      });
-    }
-  }
+      final value = widget.controller.value;
+      final isPlaying = value.isPlaying;
+      final hasError = value.hasError;
 
-  void _startHideControlsTimer() {
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && _showControls) {
+      if (_isPlaying != isPlaying || _hasError != hasError) {
         setState(() {
-          _showControls = false;
+          _isPlaying = isPlaying;
+          _hasError = hasError;
+          if (hasError) {
+            _showControls = false;
+          } else if (_isPlaying != isPlaying) {
+             _showControls = !isPlaying;
+          }
         });
       }
-    });
-  }
-
-  void _toggleControls() {
-    setState(() {
-      _showControls = !_showControls;
-    });
-    if (_showControls) {
-      _startHideControlsTimer();
     }
   }
 
   void _togglePlayPause() {
+    if (_hasError) {
+      // Retry logic could go here, or just try to play
+      widget.controller.initialize().then((_) {
+         widget.controller.play();
+      });
+      return;
+    }
+
     if (widget.controller.value.isPlaying) {
       widget.controller.pause();
+      setState(() {
+        _showControls = true;
+      });
     } else {
       widget.controller.play();
+      setState(() {
+        _showControls = false;
+      });
     }
-    setState(() {
-      _showControls = true;
-    });
-    _startHideControlsTimer();
-  }
-
-  void _seekForward() {
-    final currentPosition = widget.controller.value.position;
-    final duration = widget.controller.value.duration;
-    final newPosition = currentPosition + const Duration(seconds: 10);
-    if (newPosition < duration) {
-      widget.controller.seekTo(newPosition);
-    } else {
-      widget.controller.seekTo(duration);
-    }
-  }
-
-  void _seekBackward() {
-    final currentPosition = widget.controller.value.position;
-    final newPosition = currentPosition - const Duration(seconds: 10);
-    if (newPosition > Duration.zero) {
-      widget.controller.seekTo(newPosition);
-    } else {
-      widget.controller.seekTo(Duration.zero);
-    }
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
   }
 
   @override
@@ -133,19 +112,44 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
     final reel = widget.reel;
 
     return GestureDetector(
-      onTap: _toggleControls,
-      onDoubleTap: _togglePlayPause,
+      onTap: _togglePlayPause,
       child: Stack(
         fit: StackFit.expand,
         children: [
           // Video
-          if (controller.value.isInitialized)
-            Center(
-              child: AspectRatio(
-                aspectRatio: controller.value.aspectRatio,
-                child: VideoPlayer(controller),
+          if (controller.value.isInitialized && !_hasError)
+            SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: controller.value.size.width,
+                  height: controller.value.size.height,
+                  child: VideoPlayer(controller),
+                ),
               ),
             )
+          else if (_hasError)
+             Container(
+                color: Colors.black,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.white, size: 48),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Video could not be played',
+                         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _togglePlayPause,
+                        child: const Text('Tap to retry', style: TextStyle(color: Color(0xFF29D0FF))),
+                      )
+                    ],
+                  ),
+                ),
+             )
           else
             const Center(child: CircularProgressIndicator()),
 
@@ -171,14 +175,21 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
             ),
           ),
 
-          // Center Play/Pause Control (shown on tap)
-          if (_showControls && controller.value.isInitialized)
+          // Center Play/Pause Control (shown when paused and no error)
+          if (_showControls && controller.value.isInitialized && !_hasError)
             Positioned.fill(
               child: Center(
-                child: _ControlButton(
-                  icon: _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                  onPressed: _togglePlayPause,
-                  size: 64,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: const Icon(
+                    Icons.play_arrow,
+                    color: Colors.white,
+                    size: 48,
+                  ),
                 ),
               ),
             ),
@@ -188,7 +199,7 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
             Positioned(
               left: 0,
               right: 0,
-              bottom: 70, // Just above the caption area
+              bottom: 70, // Moved below profile info
               child: ValueListenableBuilder<VideoPlayerValue>(
                 valueListenable: controller,
                 builder: (context, value, child) {
@@ -239,6 +250,7 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                         },
                         child: Container(
                           height: 16, // Larger touch area
+                          color: Colors.transparent, // Hit test for transparent area
                           child: Stack(
                             alignment: Alignment.centerLeft,
                             children: [
@@ -282,120 +294,148 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
               ),
             ),
 
-          // Right-side actions
-          Positioned(
-            right: 12,
-            bottom: 110,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+        // Right-side actions
+        Positioned(
+          right: 12,
+          bottom: 110,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ActionButton(
+                icon: widget.isLiked ? Icons.favorite : Icons.favorite_border,
+                iconColor: widget.isLiked ? Colors.red : Colors.white,
+                label: reel.likes.toString(),
+                onPressed: widget.onLikePressed,
+              ),
+              const SizedBox(height: 18),
+              _ActionButton(
+                icon: Icons.chat_bubble_outline,
+                iconColor: Colors.white,
+                label: reel.comments.length.toString(),
+                onPressed: widget.onCommentPressed,
+              ),
+              const SizedBox(height: 18),
+              _ActionButton(
+                icon: widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
+                iconColor: Colors.white,
+                label: 'Save',
+                onPressed: widget.onSavePressed,
+              ),
+              const SizedBox(height: 18),
+              _ActionButton(
+                icon: Icons.send,
+                iconColor: Colors.white,
+                label: 'Share',
+                onPressed: () {
+                  if (reel.id.isEmpty) return;
+                  ShareHelper.showReelShareSheet(context, reel.id);
+                },
+              ),
+              const SizedBox(height: 18),
                 _ActionButton(
-                  icon: widget.isLiked ? Icons.favorite : Icons.favorite_border,
-                  iconColor: widget.isLiked ? Colors.red : Colors.white,
-                  label: reel.likes.toString(),
-                  onPressed: widget.onLikePressed,
-                ),
-                const SizedBox(height: 18),
-                _ActionButton(
-                  icon: Icons.chat_bubble_outline,
-                  iconColor: Colors.white,
-                  label: reel.comments.length.toString(),
-                  onPressed: widget.onCommentPressed,
-                ),
-                const SizedBox(height: 18),
-                _ActionButton(
-                  icon: widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
-                  iconColor: Colors.white,
-                  label: 'Save',
-                  onPressed: widget.onSavePressed,
-                ),
-                const SizedBox(height: 18),
-                _ActionButton(
-                  icon: Icons.send,
-                  iconColor: Colors.white,
-                  label: 'Share',
-                  onPressed: () {
-                    if (reel.id.isEmpty) return;
-                    ShareHelper.showReelShareSheet(context, reel.id);
-                  },
-                ),
-                const SizedBox(height: 18),
-                 _ActionButton(
-                  icon: Icons.remove_red_eye_outlined,
-                  iconColor: Colors.white,
-                  label: reel.views.toString(),
-                  onPressed: () {},
-                ),
-                 if (widget.onDeletePressed != null) ...[
-                  const SizedBox(height: 18),
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'delete' && widget.onDeletePressed != null) {
-                        widget.onDeletePressed!();
-                      }
-                    },
-                    color: Colors.white,
-                    icon: const Column(
-                      children: [
-                        Icon(Icons.more_vert, color: Colors.white, size: 32),
-                        Text(
-                          'More',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                icon: Icons.remove_red_eye_outlined,
+                iconColor: Colors.white,
+                label: reel.views.toString(),
+                onPressed: () {},
+              ),
+              const SizedBox(height: 18),
+              _ActionButton(
+                icon: Icons.add_circle_outline,
+                iconColor: Colors.white,
+                label: 'Create',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CreateReelScreen(),
                     ),
-                    itemBuilder: (context) => [
-                      const PopupMenuItem<String>(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: Colors.red)),
-                          ],
+                  );
+                },
+              ),
+                if (widget.onDeletePressed != null) ...[
+                const SizedBox(height: 18),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'delete' && widget.onDeletePressed != null) {
+                      widget.onDeletePressed!();
+                    }
+                  },
+                  color: Colors.white,
+                  icon: const Column(
+                    children: [
+                      Icon(Icons.more_vert, color: Colors.white, size: 32),
+                      Text(
+                        'More',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ],
-            ),
-          ),
-
-          // Bottom-left info with profile picture (Instagram style)
-          Positioned(
-            left: 12,
-            right: 80,
-            bottom: 20,
-            child: GestureDetector(
-              onTap: () {
-                // Navigate to the profile using ProfileLoaderScreen
-                if (reel.userId.isNotEmpty && reel.userType.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProfileLoaderScreen(
-                        userId: reel.userId,
-                        userType: reel.userType,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
                       ),
                     ),
-                  );
-                }
-              },
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Profile Picture
-                  Container(
-                    width: 36,
-                    height: 36,
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        // Bottom-left info with profile picture (Instagram style)
+        Positioned(
+          left: 12,
+          right: 80,
+          bottom: 130,
+          child: GestureDetector(
+            onTap: () {
+              // Navigate to the profile using ProfileLoaderScreen
+              if (reel.userId.isNotEmpty && reel.userType.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfileLoaderScreen(
+                      userId: reel.userId,
+                      userType: reel.userType,
+                    ),
+                  ),
+                );
+              }
+            },
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Profile Picture
+                Container(
+                  width: 44,
+                  height: 44,
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.orange,
+                        Colors.pink,
+                        Colors.purple,
+                      ],
+                      begin: Alignment.bottomLeft,
+                      end: Alignment.topRight,
+                    ),
+                  ),
+                  child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
+                      border: Border.all(color: Colors.black, width: 2),
                     ),
                     child: ClipOval(
                       child: reel.userImage.isNotEmpty
@@ -406,7 +446,9 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                                 color: const Color(0xFF29D0FF),
                                 child: Center(
                                   child: Text(
-                                    reel.username.isNotEmpty ? reel.username[0].toUpperCase() : '?',
+                                    reel.username.isNotEmpty
+                                        ? reel.username[0].toUpperCase()
+                                        : '?',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -420,7 +462,9 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                               color: const Color(0xFF29D0FF),
                               child: Center(
                                 child: Text(
-                                  reel.username.isNotEmpty ? reel.username[0].toUpperCase() : '?',
+                                  reel.username.isNotEmpty
+                                      ? reel.username[0].toUpperCase()
+                                      : '?',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -431,75 +475,50 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                             ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  // Username and Caption
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                ),
+                const SizedBox(width: 10),
+                // Username and Caption
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        reel.username,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (reel.caption.trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
                         Text(
-                          reel.username,
-                          maxLines: 1,
+                          reel.caption,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withOpacity(0.95),
                           ),
                         ),
-                        if (reel.caption.trim().isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            reel.caption,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withOpacity(0.95),
-                            ),
-                          ),
-                        ],
                       ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
+      ],
       ),
     );
   }
-}
 
-// Control button for play/pause/seek
-class _ControlButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onPressed;
-  final double size;
-
-  const _ControlButton({
-    required this.icon,
-    required this.onPressed,
-    this.size = 48,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.5),
-          shape: BoxShape.circle,
-        ),
-        padding: const EdgeInsets.all(8),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: size,
-        ),
-      ),
-    );
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 }
 

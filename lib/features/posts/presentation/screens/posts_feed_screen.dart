@@ -74,14 +74,17 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
           // Show FAB only for Temple/Creator
           if (!postProvider.canCreatePost) return const SizedBox.shrink();
           
-          return FloatingActionButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddPostPage()),
-              );
-            },
-            child: const Icon(Icons.add),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 100.0),
+            child: FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AddPostPage()),
+                );
+              },
+              child: const Icon(Icons.add),
+            ),
           );
         },
       ),

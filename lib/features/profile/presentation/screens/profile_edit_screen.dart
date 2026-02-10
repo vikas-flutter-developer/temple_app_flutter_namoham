@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'package:flutter_user_app/core/constants/indian_locations.dart';
+import 'package:flutter_user_app/features/profile/presentation/widgets/change_password_dialog.dart';
 import 'dart:io';
 
 class ProfileEditScreen extends StatefulWidget {
@@ -727,6 +728,42 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               ],
 
               const SizedBox(height: 32),
+              InkWell(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => ChangePasswordDialog(
+                      email: _emailController.text,
+                      userType: _userType,
+                      phoneNumber: '${_countryCode ?? ""} ${_phoneController.text}',
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: theme.colorScheme.outline.withAlpha(0x80)),
+                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.transparent, 
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Change Password',
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios, size: 16, color: theme.colorScheme.onSurface),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               CustomButton(
                 labelText: _isSaving ? 'Saving...' : 'Save Changes', 
                 onPressed: _isSaving ? () {} : _saveProfile

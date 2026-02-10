@@ -12,6 +12,8 @@ class PostEntity {
   final String userType;
   final String timestamp;
   final bool? isSaved; // Added
+  final int commentsCount; // Added for comments count display
+  final int shareCount; // Added for share count display
 
   PostEntity({
     required this.id,
@@ -27,6 +29,8 @@ class PostEntity {
     this.likedByNames,
     required this.timestamp,
     this.isSaved,
+    this.commentsCount = 0,
+    this.shareCount = 0,
   });
 
   PostEntity copyWith({
@@ -42,7 +46,9 @@ class PostEntity {
     List<String>? likedBy,
     List<String>? likedByNames,
     String? timestamp,
-    bool? isSaved, 
+    bool? isSaved,
+    int? commentsCount,
+    int? shareCount,
   }) {
     return PostEntity(
       id: id ?? this.id,
@@ -58,6 +64,8 @@ class PostEntity {
       likedByNames: likedByNames ?? this.likedByNames,
       timestamp: timestamp ?? this.timestamp,
       isSaved: isSaved ?? this.isSaved,
+      commentsCount: commentsCount ?? this.commentsCount,
+      shareCount: shareCount ?? this.shareCount,
     );
   }
 }

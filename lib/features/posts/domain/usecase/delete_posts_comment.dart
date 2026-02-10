@@ -5,7 +5,7 @@ class DeletePostsComment {
   final PostCommentRepository postCommentRepository;
   DeletePostsComment(this.postCommentRepository);
 
-  Future<Either<Exception, bool>> call(String commentId){
-    return postCommentRepository.deleteComment(commentId);
+  Future<Either<Exception, bool>> call(String postId, String commentId, String userId){
+    return postCommentRepository.deleteComment(postId, commentId, userId);
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_user_app/features/posts/domain/entities/post_comment_entity.dart';
 import 'package:flutter_user_app/features/posts/domain/repository/post_comment_repository.dart';
 
@@ -7,7 +8,11 @@ enum CommentStatus { initial, loading, updating, loaded, error }
 class CommentProvider extends ChangeNotifier {
   final PostCommentRepository repository;
 
-  CommentProvider(this.repository);
+  CommentProvider(this.repository) {
+    _loadUserInfo();
+  }
+  
+  String? _userId;
 
   CommentStatus _status = CommentStatus.initial;
   List<PostCommentEntity> _comments = [];
@@ -17,6 +22,7 @@ class CommentProvider extends ChangeNotifier {
   CommentStatus get status => _status;
   List<PostCommentEntity> get comments => _comments;
   String get errorMessage => _errorMessage;
+  String? get userId => _userId;
 
   // Helper to clean error messages
   String _cleanErrorMessage(String error) {
@@ -25,6 +31,12 @@ class CommentProvider extends ChangeNotifier {
       cleaned = cleaned.substring(11);
     }
     return cleaned;
+  }
+
+  Future<void> _loadUserInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    _userId = prefs.getString('user_id');
+    notifyListeners();
   }
 
   /// Load comments for a post
@@ -180,7 +192,7 @@ class CommentProvider extends ChangeNotifier {
   }
 
   /// Delete a comment
-  Future<void> deleteComment(String commentId) async {
+  Future<void> deleteComment(String commentId, String postId, String userId) async {
     if (_status != CommentStatus.loaded) return;
 
     final currentComments = List<PostCommentEntity>.from(_comments);
@@ -190,7 +202,7 @@ class CommentProvider extends ChangeNotifier {
     notifyListeners();
 
     // Perform API call
-    final result = await repository.deleteComment(commentId);
+    final result = await repository.deleteComment(postId, commentId, userId);
 
     result.fold(
       (error) {

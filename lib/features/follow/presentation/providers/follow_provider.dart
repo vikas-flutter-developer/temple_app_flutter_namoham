@@ -38,6 +38,8 @@ class FollowProvider with ChangeNotifier {
 
   bool get canFollow {
     final type = _userType?.toLowerCase();
+    // Allow 'user' and 'creator' to follow
+    // Also handle 'Creator' or 'User' due to login saving variations
     return type == 'user' || type == 'creator';
   }
 
@@ -300,6 +302,11 @@ class FollowProvider with ChangeNotifier {
   }) async {
     if (!canFollow) {
       _setError('Only users and creators can follow');
+      return false;
+    }
+
+    if (_userId == followingId) {
+      _setError('You cannot follow yourself');
       return false;
     }
 

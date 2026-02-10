@@ -131,7 +131,7 @@ class _LoginPageState extends State<LoginPage> {
       final response = await _apiService.login(
         _emailController.text.trim(),
         _passwordController.text.trim(),
-        userType: apiUserType,
+        userType: apiUserType, 
       );
 
       // Save Token, userType, and userId
@@ -145,7 +145,12 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.clear();
 
       await prefs.setString('auth_token', token);
-      await prefs.setString('user_type', apiUserType);
+      // Capitalize first letter for consistency with app logic
+      String savedType = apiUserType;
+      if (apiUserType.isNotEmpty) {
+        savedType = apiUserType[0].toUpperCase() + apiUserType.substring(1);
+      }
+      await prefs.setString('user_type', savedType);
       await prefs.setString('user_id', userId);
 
       // Save Refresh Token

@@ -12,7 +12,8 @@ import 'package:timeago/timeago.dart' as timeago;
 
 class PostCommentsSheet extends StatefulWidget {
   final String postId;
-  const PostCommentsSheet({super.key, required this.postId});
+  final String postOwnerId;
+  const PostCommentsSheet({super.key, required this.postId, required this.postOwnerId});
 
   @override
   State<PostCommentsSheet> createState() => _PostCommentsSheetState();
@@ -96,7 +97,17 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
       commentId: comment.id,
       context: context,
       comment: comment,
+      // Pass real user ID and post owner ID
+      currentUserId: context.read<CommentProvider>().userId ?? '',
+      postOwnerId: widget.postOwnerId,
     );
+    
+    final currentUserId = context.read<CommentProvider>().userId;
+    print('DEBUG: CommentSheet - currentUserId: $currentUserId');
+    print('DEBUG: CommentSheet - postOwnerId: ${widget.postOwnerId}');
+    print('DEBUG: CommentSheet - commentUserId: ${comment.userId}');
+    print('DEBUG: CommentSheet - isAuthor: ${comment.userId == currentUserId}');
+    print('DEBUG: CommentSheet - isPostOwner: ${widget.postOwnerId == currentUserId}');
 
     // Show context menu at current pointer position
     showContextMenu(
@@ -156,6 +167,14 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                           fontSize: 16,
                         ),
                       ),
+                      // DEBUG UI - REMOVE LATER
+                      if (widget.postOwnerId == context.read<CommentProvider>().userId)
+                        Container(
+                           margin: const EdgeInsets.only(top: 4),
+                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                           decoration: BoxDecoration(color: Colors.green.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                           child: Text("You are Post Owner", style: TextStyle(fontSize: 10, color: Colors.green[800])),
+                        ),
                     ],
                   ),
                 ),
@@ -443,6 +462,22 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                               ),
                             ),
                           ),
+                          // Explicit Delete Button
+                          if (comment.userId == context.read<CommentProvider>().userId || 
+                              widget.postOwnerId == context.read<CommentProvider>().userId) ...[
+                            const SizedBox(width: 16),
+                            GestureDetector(
+                              onTap: () => _confirmDelete(comment),
+                              child: Text(
+                                'Delete',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
@@ -654,6 +689,32 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                 },
               ),
             ),
+        ],
+      ),
+    );
+  }
+  void _confirmDelete(PostCommentEntity comment) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<CommentProvider>().deleteComment(
+                    comment.id,
+                    widget.postId,
+                    context.read<CommentProvider>().userId ?? '',
+                  );
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );

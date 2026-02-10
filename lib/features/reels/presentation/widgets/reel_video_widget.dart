@@ -325,7 +325,7 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
               _ActionButton(
                 icon: Icons.send,
                 iconColor: Colors.white,
-                label: 'Share',
+                label: reel.shareCount > 0 ? reel.shareCount.toString() : 'Share',
                 onPressed: () {
                   if (reel.id.isEmpty) return;
                   ShareHelper.showReelShareSheet(context, reel.id);

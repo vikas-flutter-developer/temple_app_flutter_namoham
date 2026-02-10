@@ -182,10 +182,10 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
   }
 
   @override
-  Future<Either<Exception, bool>> deleteComment(String commentId) async {
+  Future<Either<Exception, bool>> deleteComment(String postId, String commentId, String userId) async {
     try {
       // Delete comment via real API
-      await apiService.deleteComment(commentId);
+      await apiService.deletePostComment(postId, commentId, userId);
       
       // Also remove from local replies store if it's a reply
       _repliesStore.forEach((key, replies) {

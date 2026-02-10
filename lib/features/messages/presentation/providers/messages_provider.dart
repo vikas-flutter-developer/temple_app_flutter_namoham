@@ -84,7 +84,7 @@ class MessagesProvider with ChangeNotifier {
     _setError(null);
 
     try {
-      final data = await _apiService.getConversations(_userId!);
+      final data = await _apiService.getConversations(_userId!, chatType: 'direct');
       _conversations = data
           .map((j) => ConversationModel.fromJson(j, myUserId: _userId))
           .where((c) => c.id.isNotEmpty)
@@ -218,5 +218,120 @@ class MessagesProvider with ChangeNotifier {
       conversationId: conversation.id,
     );
     return id != null && id.isNotEmpty;
+  }
+  // ============== CHAT REQUESTS & FLOW ==============
+
+  List<ConversationModel> _pendingRequests = [];
+  List<ConversationModel> get pendingRequests => _pendingRequests;
+
+  Future<void> loadPendingRequests() async {
+    if (_userId == null) return;
+    
+    try {
+      final data = await _apiService.getPendingRequests(_userId!);
+      _pendingRequests = data
+          .map((j) => ConversationModel.fromJson(j, myUserId: _userId))
+          .toList();
+      notifyListeners();
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  Future<bool> acceptRequest(String conversationId) async {
+    if (_userId == null) return false;
+    
+    try {
+      await _apiService.acceptMessageRequest(conversationId, _userId!);
+      // Refresh both lists
+      await loadPendingRequests();
+      await loadConversations();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> rejectRequest(String conversationId) async {
+    if (_userId == null) return false;
+
+    try {
+      await _apiService.rejectMessageRequest(conversationId, _userId!);
+      // Refresh pending list
+      await loadPendingRequests();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    }
+  }
+
+  Future<ConversationModel?> initiateChat({
+    required String otherUserId,
+    required String otherUserType,
+    required String otherUserName,
+  }) async {
+    if (_userId == null) {
+      await _loadUserInfo();
+      if (_userId == null) return null;
+    }
+
+    try {
+      final payload = {
+        'user1': {
+          'userId': _userId,
+          'userType': _userType?.toLowerCase() ?? 'user',
+          'userName': _userName ?? 'User',
+        },
+        'user2': {
+          'userId': otherUserId,
+          'userType': otherUserType.toLowerCase(),
+          'userName': otherUserName,
+        },
+        'chatType': 'direct',
+      };
+
+      debugPrint('MESSAGES_PROVIDER: Initiating chat with payload: $payload');
+      final res = await _apiService.initiateConversation(payload);
+      debugPrint('MESSAGES_PROVIDER: Backend response: $res');
+      
+      // Parse the returned conversation immediately
+      final conversation = ConversationModel.fromJson(res, myUserId: _userId);
+      
+      // IMPORTANT: If backend didn't return the name, use what we passed
+      final fixedConversation = ConversationModel(
+        id: conversation.id,
+        otherUserId: conversation.otherUserId.isNotEmpty ? conversation.otherUserId : otherUserId,
+        otherUserType: conversation.otherUserType.isNotEmpty ? conversation.otherUserType : otherUserType,
+        otherUserName: conversation.otherUserName.isNotEmpty ? conversation.otherUserName : otherUserName,
+        otherUserImage: conversation.otherUserImage,
+        lastMessage: conversation.lastMessage,
+        lastMessageAt: conversation.lastMessageAt,
+        unreadCount: conversation.unreadCount,
+        status: conversation.status,
+        requestSenderId: conversation.requestSenderId,
+        chatType: conversation.chatType,
+      );
+
+      debugPrint('MESSAGES_PROVIDER: Conversation ID: ${fixedConversation.id}');
+      debugPrint('MESSAGES_PROVIDER: Other User Name: ${fixedConversation.otherUserName}');
+      debugPrint('MESSAGES_PROVIDER: Status: ${fixedConversation.status}');
+      
+      // Update local list
+      final index = _conversations.indexWhere((c) => c.id == fixedConversation.id);
+      if (index >= 0) {
+        _conversations[index] = fixedConversation;
+      } else {
+        _conversations.insert(0, fixedConversation);
+      }
+      
+      notifyListeners();
+      
+      return fixedConversation;
+    } catch (e) {
+      _setError(e.toString());
+      return null;
+    }
   }
 }

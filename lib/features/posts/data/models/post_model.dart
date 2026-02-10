@@ -13,6 +13,7 @@ class PostModel {
   final List<String> likedBy;
   final List<String> likedByNames; // Added to store names if available
   final int commentsCount;
+  final int shareCount; // Added for share count display
   final String timestamp;
   final String createdAt;
   final bool? isLikedByMe;
@@ -31,6 +32,7 @@ class PostModel {
     required this.likedBy,
     required this.likedByNames,
     required this.commentsCount,
+    required this.shareCount,
     required this.timestamp,
     required this.createdAt,
     this.isLikedByMe,
@@ -160,7 +162,19 @@ class PostModel {
     if (userObj != null) {
        finalUserId = userObj['id'] ?? userObj['_id'] ?? '';
     } else {
-       finalUserId = json['userId'] ?? json['creatorId'] ?? json['templeId'] ?? '';
+       // Prioritize ID based on user type
+       if (type == 'Temple') {
+          finalUserId = json['templeId'] ?? json['userId'] ?? '';
+       } else if (type == 'Creator') {
+          finalUserId = json['creatorId'] ?? json['userId'] ?? '';
+       } else {
+          finalUserId = json['userId'] ?? '';
+       }
+       
+       // Fallback if specific ID missing
+       if (finalUserId.isEmpty) {
+         finalUserId = json['userId'] ?? json['creatorId'] ?? json['templeId'] ?? '';
+       }
     }
     // If still map (edge case where userId was map but didn't have id field?), convert to string or empty
     if (finalUserId is Map) finalUserId = ''; 
@@ -181,6 +195,7 @@ class PostModel {
       likedBy: rawLikedBy,
       likedByNames: rawLikedByNames,
       commentsCount: json['commentsCount'] ?? 0,
+      shareCount: json['shareCount'] ?? 0,
       timestamp: json['timestamp'] ?? json['createdAt'] ?? '',
       createdAt: json['createdAt'] ?? '',
       isLikedByMe: json['isLikedByMe'],
@@ -202,6 +217,7 @@ class PostModel {
       'likedBy': likedBy,
       'likedByNames': likedByNames,
       'commentsCount': commentsCount,
+      'shareCount': shareCount,
       'timestamp': timestamp,
       'createdAt': createdAt,
       if (isLikedByMe != null) 'isLikedByMe': isLikedByMe,
@@ -222,6 +238,7 @@ class PostModel {
     List<String>? likedBy,
     List<String>? likedByNames, // Added
     int? commentsCount,
+    int? shareCount,
     String? timestamp,
     String? createdAt,
     bool? isLikedByMe,
@@ -240,6 +257,7 @@ class PostModel {
       likedBy: likedBy ?? this.likedBy,
       likedByNames: likedByNames ?? this.likedByNames,
       commentsCount: commentsCount ?? this.commentsCount,
+      shareCount: shareCount ?? this.shareCount,
       timestamp: timestamp ?? this.timestamp,
       createdAt: createdAt ?? this.createdAt,
       isLikedByMe: isLikedByMe ?? this.isLikedByMe,
@@ -262,6 +280,8 @@ class PostModel {
       likedBy: likedBy,
       timestamp: timestamp,
       isSaved: isSaved,
+      commentsCount: commentsCount,
+      shareCount: shareCount,
     );
   }
 }

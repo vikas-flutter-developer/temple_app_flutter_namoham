@@ -10,16 +10,19 @@ class CommentContextMenu {
     required String commentId,
     required BuildContext context,
     required PostCommentEntity comment,
-    String currentUserId = 'currentUser', // Allow passing current user ID
+    String currentUserId = 'currentUser',
+    String? postOwnerId,
   }) {
     final theme = Theme.of(context);
     final isAuthor = comment.userId == currentUserId;
+    final isPostOwner = postOwnerId != null && postOwnerId == currentUserId;
+    final canDelete = isAuthor || isPostOwner;
 
     final entries = <ContextMenuEntry>[
       // Title/Header
 
-      // Delete option (only for comment author)
-      if (isAuthor)
+      // Delete option (for comment author or post owner)
+      if (canDelete)
         MenuItem(
           label: 'Delete comment',
           icon: Icons.delete_outline,
@@ -27,7 +30,7 @@ class CommentContextMenu {
           //textStyle: TextStyle(color: theme.colorScheme.error),
           //iconColor: theme.colorScheme.error,
           onSelected: () {
-            context.read<CommentProvider>().deleteComment(commentId);
+            context.read<CommentProvider>().deleteComment(commentId, comment.postId, currentUserId);
           },
         ),
 

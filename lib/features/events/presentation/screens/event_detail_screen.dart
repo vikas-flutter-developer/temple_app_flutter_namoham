@@ -44,6 +44,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       razorpayOrderId: response.orderId ?? '',
       razorpayPaymentId: response.paymentId ?? '',
       razorpaySignature: response.signature ?? '',
+      eventId: widget.event.id,
     );
 
     if (!mounted) return;
@@ -99,7 +100,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       eventId: widget.event.id,
       description: 'Registration for ${widget.event.eventName}',
       recipientId: widget.event.organizerId,
-      recipientType: widget.event.organizerType,
+      recipientType: widget.event.organizerType.toLowerCase(),
     );
 
     if (!mounted) return;

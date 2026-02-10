@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
 import 'package:flutter_user_app/features/donations/presentation/screens/make_donation_screen.dart';
-import 'package:flutter_user_app/features/messages/presentation/screens/direct_chat_screen.dart';
+import 'package:flutter_user_app/features/messages/presentation/providers/messages_provider.dart';
+import 'package:flutter_user_app/features/messages/presentation/screens/chat_screen.dart';
 
 class CreatorProfileActions extends StatelessWidget {
   final CreatorModel profile;
@@ -46,7 +48,7 @@ class CreatorProfileActions extends StatelessWidget {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Login as User to follow temples/creators'),
+                          content: Text('Login as User or Creator to follow temples/creators'),
                         ),
                       );
                     },
@@ -131,26 +133,85 @@ class CreatorProfileActions extends StatelessWidget {
           
           const SizedBox(width: 8),
 
-          // Message Button
-          Expanded(
-            child: _buildButton(
-              text: l10n.message,
-              color: buttonColor,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DirectChatEntry(
-                      receiverId: profile.id,
-                      receiverType: 'creator',
-                      receiverName: profile.creatorName,
-                      receiverImage: profile.displayImage,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+                // Message Button Logic
+                _buildButton(
+                  text: l10n.message,
+                  color: buttonColor,
+                  onPressed: () async {
+                    // 1. Show loading indicator
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => const Center(child: CircularProgressIndicator()),
+                    );
+
+                    // Create MessagesProvider instance
+                    final provider = MessagesProvider(ApiService.create());
+                    
+                    // 2. Initiate or Find Chat
+                    final conversation = await provider.initiateChat(
+                      otherUserId: profile.id,
+                      otherUserType: 'creator',
+                      otherUserName: profile.creatorName,
+                    );
+
+                    // 3. Dismiss loading
+                    if (context.mounted) Navigator.pop(context);
+
+                    if (conversation == null) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                           SnackBar(content: Text(provider.error ?? 'Failed to start chat')),
+                        );
+                      }
+                      return;
+                    }
+
+                    // DEBUG: Log conversation details
+                    debugPrint('CHAT_DEBUG: Conversation ID: ${conversation.id}');
+                    debugPrint('CHAT_DEBUG: Status: ${conversation.status}');
+                    debugPrint('CHAT_DEBUG: Request Sender ID: ${conversation.requestSenderId}');
+                    debugPrint('CHAT_DEBUG: Current User ID: ${provider.userId}');
+
+                    // 4. Check Status
+                    if (!context.mounted) return;
+
+                    if (conversation.status == 'accepted') {
+                      // Open Chat Screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChangeNotifierProvider.value(
+                            value: provider,
+                            child: ChatScreen(conversation: conversation),
+                          ),
+                        ),
+                      );
+                    } else if (conversation.status == 'pending') {
+                       // Show Confirmation (Instagram Style)
+                       showDialog(
+                         context: context,
+                         builder: (_) => AlertDialog(
+                           title: const Text('Request Sent'),
+                           content: Text(
+                             'You have sent a message request to ${profile.creatorName}. '
+                             'You can chat once they accept your request.'
+                           ),
+                           actions: [
+                             TextButton(
+                               onPressed: () => Navigator.pop(context),
+                               child: const Text('OK'),
+                             ),
+                           ],
+                         ),
+                       );
+                    } else if (conversation.status == 'rejected') {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                         const SnackBar(content: Text('Message request was declined.')),
+                       );
+                    }
+                  },
+                ),
         ],
       ),
     );

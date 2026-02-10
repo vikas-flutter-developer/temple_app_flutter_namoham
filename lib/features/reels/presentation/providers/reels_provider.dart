@@ -432,7 +432,27 @@ class ReelsProvider extends ChangeNotifier {
     }
   }
 
-  /// Get comments for a reel
+  /// Load comments for a reel and update state
+  Future<void> loadComments(String reelId) async {
+    try {
+      final commentsData = await _apiService.getReelComments(reelId);
+      final commentsList = commentsData
+          .map((json) => ReelComment.fromJson(json))
+          .toList();
+          
+      // Update local state
+      final index = _reels.indexWhere((r) => r.id == reelId);
+      if (index != -1) {
+        final reel = _reels[index];
+        _reels[index] = reel.copyWith(comments: commentsList);
+        notifyListeners();
+      }
+    } catch (e) {
+      print('REELS_PROVIDER: Error loading comments - $e');
+    }
+  }
+
+  /// Get comments for a reel (Legacy/Direct)
   Future<List<ReelComment>> getComments(String reelId) async {
     try {
       final commentsData = await _apiService.getReelComments(reelId);
@@ -453,6 +473,7 @@ class ReelsProvider extends ChangeNotifier {
     }
 
     try {
+      // ... (implementation same as before)
       final response = await _apiService.addReelComment(
         reelId: reelId,
         userId: _userId!,
@@ -477,6 +498,36 @@ class ReelsProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       print('REELS_PROVIDER: Error adding comment - $e');
+      return false;
+    }
+  }
+
+  /// Delete a comment from a reel
+  Future<bool> deleteComment(String reelId, String commentId) async {
+    if (_userId == null) {
+      print('REELS_PROVIDER: Cannot delete comment - user not logged in');
+      return false;
+    }
+    
+    // Find reel
+    final index = _reels.indexWhere((r) => r.id == reelId);
+    if (index == -1) return false;
+    
+    final reel = _reels[index];
+    
+    // Optimistic: remove comment from list
+    final updatedComments = reel.comments.where((c) => c.id != commentId).toList();
+    _reels[index] = reel.copyWith(comments: updatedComments);
+    notifyListeners();
+    
+    try {
+      await _apiService.deleteReelComment(reelId, commentId, _userId!);
+      return true;
+    } catch (e) {
+      print('REELS_PROVIDER: Error deleting comment - $e');
+      // Revert local change on error
+      _reels[index] = reel; 
+      notifyListeners();
       return false;
     }
   }

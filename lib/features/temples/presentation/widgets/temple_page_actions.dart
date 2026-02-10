@@ -47,7 +47,7 @@ class ProfileActions extends StatelessWidget {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Login as User to follow temples/creators'),
+                          content: Text('Login as User or Creator to follow temples/creators'),
                         ),
                       );
                     },

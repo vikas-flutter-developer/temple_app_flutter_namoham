@@ -24,6 +24,7 @@ import 'package:flutter_user_app/features/follow/presentation/screens/following_
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter_user_app/features/app_ratings/presentation/screens/app_rating_screen.dart';
 import 'profile_edit_screen.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -509,7 +510,14 @@ class _ProfilePageState extends State<ProfilePage> {
                               color: theme.colorScheme.outline,
                             ),
                             TextButton(
-                              onPressed: _showComingSoonToast,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AppRatingScreen(),
+                                  ),
+                                );
+                              },
                               child: Text(
                                 'Rate Us',
                                 style: TextStyle(

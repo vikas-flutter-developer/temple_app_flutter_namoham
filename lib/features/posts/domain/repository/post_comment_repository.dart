@@ -16,5 +16,5 @@ abstract class PostCommentRepository {
   Future<Either<Exception, PostCommentEntity>> toggleLikeComment(String commentId, String userId);
 
 // Delete a comment
-  Future<Either<Exception, bool>> deleteComment(String commentId);
+  Future<Either<Exception, bool>> deleteComment(String postId, String commentId, String userId);
 }

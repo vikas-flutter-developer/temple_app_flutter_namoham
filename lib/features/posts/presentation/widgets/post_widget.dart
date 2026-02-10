@@ -61,7 +61,10 @@ class _PostWidgetState extends State<PostWidget>
           create: (_) => CommentProvider(
             PostCommentRepositoryImpl(apiService: ApiService.create())
           ),
-          child: PostCommentsSheet(postId: widget.postModel.id),
+          child: PostCommentsSheet(
+            postId: widget.postModel.id,
+            postOwnerId: widget.postModel.userId,
+          ),
         ),
       ),
     );
@@ -422,6 +425,18 @@ class _PostWidgetState extends State<PostWidget>
                     ),
                     onTap: () => _showCommentsSheet(),
                   ),
+                  if (widget.postModel.commentsCount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4.0),
+                      child: Text(
+                        widget.postModel.commentsCount.toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
                   const SizedBox(width: 8),
                   _buildAnimatedButton(
                     icon: SvgPicture.asset(
@@ -436,6 +451,18 @@ class _PostWidgetState extends State<PostWidget>
                       ShareHelper.showPostShareSheet(context, widget.postModel.id);
                     },
                   ),
+                  if (widget.postModel.shareCount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4.0),
+                      child: Text(
+                        widget.postModel.shareCount.toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
                   const SizedBox(width: 8),
                   const Spacer(),
                   // Bookmark Button

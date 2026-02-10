@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_user_app/core/util/share_helper.dart';
 import 'package:flutter_user_app/features/reels/presentation/widgets/comments_sheet.dart';
+import 'package:provider/provider.dart';
+import '../providers/reels_provider.dart';
 
 class VideoReelItem extends StatefulWidget {
   final Map<String, dynamic> videoData;
@@ -64,21 +66,28 @@ class _VideoReelItemState extends State<VideoReelItem>
   }
 
   void _showCommentsSheet() {
+    // Capture provider before opening sheet
+    final reelsProvider = context.read<ReelsProvider>();
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       transitionAnimationController: _animationController,
-      builder: (context) => SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 1),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(
-          parent: _animationController,
-          curve: Curves.easeOut,
-        )),
-        child: CommentsSheet(
-          commentCount: widget.videoData['comments'],
+      builder: (context) => ChangeNotifierProvider.value(
+        value: reelsProvider,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOut,
+          )),
+          child: CommentsSheet(
+            reelId: widget.videoData['id'] ?? widget.videoData['_id'] ?? '',
+            reelOwnerId: widget.videoData['userId'] ?? '',
+          ),
         ),
       ),
     );
@@ -183,7 +192,11 @@ class _VideoReelItemState extends State<VideoReelItem>
                       }
                     },
                   ),
-                  const Text('Share'),
+                  Text(
+                    (widget.videoData['shareCount'] != null && widget.videoData['shareCount'] > 0)
+                        ? widget.videoData['shareCount'].toString()
+                        : 'Share',
+                  ),
                 ],
               ),
             ],

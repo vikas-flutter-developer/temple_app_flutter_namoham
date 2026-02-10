@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/post_provider.dart';
-import '../../data/models/post_model.dart';
+import 'package:flutter_user_app/features/posts/data/models/post_model.dart';
+import 'package:flutter_user_app/core/util/share_helper.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
@@ -118,6 +119,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           },
                         ),
                         Text('${widget.post.likes} likes'),
+                        const SizedBox(width: 16),
+                        // Share button
+                        IconButton(
+                          icon: const Icon(Icons.share),
+                          onPressed: () => ShareHelper.showPostShareSheet(context, widget.post.id), 
+                        ),
+                        if (widget.post.shareCount > 0)
+                          Text('${widget.post.shareCount}'),
                       ],
                     ),
                   ),
@@ -137,11 +146,25 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   // Comments section
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Comments',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Comments',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (widget.post.commentsCount > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Text(
+                              '(${widget.post.commentsCount})',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
 
@@ -169,7 +192,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         itemCount: postProvider.comments.length,
                         itemBuilder: (context, index) {
                           final comment = postProvider.comments[index];
-                          final canDelete = comment.userId == postProvider.userId;
+                          final canDelete = comment.userId == postProvider.userId || widget.post.userId == postProvider.userId;
                           
                           return ListTile(
                             leading: CircleAvatar(

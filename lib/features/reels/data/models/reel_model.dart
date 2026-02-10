@@ -78,10 +78,45 @@ class ReelModel {
   });
 
   factory ReelModel.fromJson(Map<String, dynamic> json) {
+    // 1. Infer user type
+    String type = json['userType'] ?? 'User';
+    if (json['templeId'] != null) type = 'Temple';
+    if (json['creatorId'] != null) type = 'Creator';
+    
+    if (type.toLowerCase() == 'temple') type = 'Temple';
+    if (type.toLowerCase() == 'creator') type = 'Creator';
+
+    // 2. Select UserID based on type
+    dynamic finalUserId; // dynamic to handle potential Map/String before processing
+    
+    if (type == 'Temple') {
+      finalUserId = json['templeId'];
+      // If templeId is missing, fallback to userId
+      if (finalUserId == null) finalUserId = json['userId'];
+    } else if (type == 'Creator') {
+       finalUserId = json['creatorId'];
+       if (finalUserId == null) finalUserId = json['userId'];
+    } else {
+       finalUserId = json['userId'];
+    }
+
+    // Handle populated object case (if ID is a map)
+    String userIdString = '';
+    if (finalUserId is Map) {
+      userIdString = finalUserId['_id'] ?? finalUserId['id'] ?? '';
+    } else {
+      userIdString = finalUserId?.toString() ?? '';
+    }
+    
+    // Final fallback
+    if (userIdString.isEmpty) {
+       userIdString = (json['userId'] is Map ? json['userId']['_id'] : json['userId'])?.toString() ?? '';
+    }
+
     return ReelModel(
       id: json['id'] ?? json['_id'] ?? '',
-      userId: json['userId'] ?? '',
-      userType: json['userType'] ?? '',
+      userId: userIdString,
+      userType: type,
       username: json['username'] ?? '',
       userImage: json['userImage'] ?? '',
       caption: json['caption'] ?? '',

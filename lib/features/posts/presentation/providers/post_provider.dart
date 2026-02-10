@@ -199,22 +199,31 @@ class PostProvider with ChangeNotifier {
     }
   }
 
-  // Delete comment (Owner only)
+  // Delete comment (Owner or Post Owner)
   Future<bool> deleteComment(String postId, String commentId, String commentUserId) async {
-    // Check if user can delete this comment (must be the comment owner)
-    if (commentUserId != _userId) {
-      _setError('You can only delete your own comments');
+    // Find post to check ownership
+    final postIndex = _posts.indexWhere((p) => p.id == postId);
+    String? postOwnerId;
+    if (postIndex != -1) {
+      postOwnerId = _posts[postIndex].userId;
+    }
+
+    // Check if user can delete (comment owner OR post owner)
+    final isCommentOwner = commentUserId == _userId;
+    final isPostOwner = postOwnerId != null && postOwnerId == _userId;
+
+    if (!isCommentOwner && !isPostOwner) {
+      _setError('You do not have permission to delete this comment');
       return false;
     }
 
     _setLoading(true);
     _setError(null);
     try {
-      await _apiService.deleteComment(commentId);
+      await _apiService.deletePostComment(postId, commentId, _userId!);
       _comments.removeWhere((c) => c.id == commentId);
       
       // Update comment count in post
-      final postIndex = _posts.indexWhere((p) => p.id == postId);
       if (postIndex != -1) {
         final post = _posts[postIndex];
         _posts[postIndex] = post.copyWith(

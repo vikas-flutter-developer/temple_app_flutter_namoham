@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_user_app/features/reels/data/models/comment_model.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'package:flutter_user_app/features/reels/presentation/providers/reels_provider.dart';
+import 'package:flutter_user_app/features/reels/data/models/reel_model.dart';
 
 class CommentsSheet extends StatefulWidget {
-  final int commentCount;
+  final String reelId;
+  final String reelOwnerId;
 
   const CommentsSheet({
     super.key,
-    required this.commentCount,
+    required this.reelId,
+    required this.reelOwnerId,
   });
 
   @override
@@ -15,329 +20,246 @@ class CommentsSheet extends StatefulWidget {
 }
 
 class _CommentsSheetState extends State<CommentsSheet> {
-  final commentController = TextEditingController();
-  // Track which comment is being replied to
-  int? replyingToId;
-
-  // Sample data - you would replace this with your actual data
-  late List<CommentData> comments;
+  final _commentController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with sample data
-    comments = List.generate(
-      widget.commentCount < 20 ? widget.commentCount : 20,
-      (index) => CommentData(
-        id: index + 1,
-        userName: 'User ${index + 1}',
-        text: 'This is comment ${index + 1}',
-        replies: index % 3 == 0
-            ? [
-                // Add sample replies to every third comment
-                CommentData(
-                  id: 1000 + index,
-                  userName: 'Reply User 1',
-                  text: 'This is a reply to comment ${index + 1}',
-                ),
-                CommentData(
-                  id: 2000 + index,
-                  userName: 'Reply User 2',
-                  text: 'Another reply to comment ${index + 1}',
-                ),
-                CommentData(
-                  id: 3000 + index,
-                  userName: 'Reply User 3',
-                  text: 'One more reply to comment ${index + 1}',
-                ),
-              ]
-            : [],
-        isExpanded: false,
-      ),
-    );
+    // Load comments when sheet opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ReelsProvider>().loadComments(widget.reelId);
+    });
   }
 
-  // Toggle reply visibility
-  void toggleReplies(int commentId) {
-    setState(() {
-      final index = comments.indexWhere((comment) => comment.id == commentId);
-      if (index != -1) {
-        comments[index].isExpanded = !comments[index].isExpanded;
+  @override
+  void dispose() {
+    _commentController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+    
+    setState(() => _isSubmitting = true);
+    
+    // Unfocus keyboard
+    FocusScope.of(context).unfocus();
+    
+    final provider = context.read<ReelsProvider>();
+    final success = await provider.addComment(widget.reelId, text);
+    
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      if (success) {
+        _commentController.clear();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to add comment')),
+        );
       }
-    });
+    }
+  }
+
+  Future<void> _deleteComment(BuildContext context, ReelsProvider provider, String commentId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), 
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      final success = await provider.deleteComment(widget.reelId, commentId);
+      if (mounted && !success) {
+         ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete comment')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SafeArea(
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.92,
-        minChildSize: 0.86,
-        maxChildSize: 0.92,
-        builder: (context, scrollController) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHigh,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Column(
-              children: [
-                Container(
+    
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      // expand: false, // Make false to respect initialChildSize
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
                   width: 40,
-                  height: 5,
+                  height: 4,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.outline,
-                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '${widget.commentCount} Comments',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: comments.length,
-                    itemBuilder: (context, index) {
-                      final comment = comments[index];
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Main comment
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 8.0, horizontal: 16.0),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: theme.colorScheme.outline,
-                                  child: const Icon(Icons.person),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(comment.userName,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 2),
-                                      Text(comment.text),
-                                      const SizedBox(
-                                          height: 2), // Control spacing here
-                                      Row(
-                                        children: [
-                                          TextButton(
-                                            onPressed: () {/* ... */},
-                                            style: TextButton.styleFrom(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 2),
-                                              minimumSize: const Size(
-                                                  0, 24), // Very compact
-                                            ),
-                                            child: const Text('Reply'),
-                                          ),
-                                          if (comment.replies.isNotEmpty)
-                                            TextButton(
-                                              onPressed: () =>
-                                                  toggleReplies(comment.id),
-                                              child: Text(
-                                                comment.isExpanded
-                                                    ? 'Hide replies'
-                                                    : 'View ${comment.replies.length} ${comment.replies.length == 1 ? 'reply' : 'replies'}',
-                                                style: TextStyle(
-                                                  color: theme
-                                                      .colorScheme.primary
-                                                      .withValues(alpha: .8),
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.favorite_border),
-                                  onPressed: () {},
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Expanded replies section (only visible when expanded)
-                          if (comment.isExpanded && comment.replies.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 56.0),
-                              child: Column(
-                                children: comment.replies.map((reply) {
-                                  return ListTile(
-                                    dense: true,
-                                    leading: CircleAvatar(
-                                      radius: 14,
-                                      backgroundColor:
-                                          theme.colorScheme.outline,
-                                      child: const Icon(Icons.person, size: 16),
-                                    ),
-                                    title: Text(
-                                      reply.userName,
-                                      style:
-                                          theme.textTheme.bodyMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      reply.text,
-                                      style: theme.textTheme.bodyMedium,
-                                    ),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.favorite_border),
-                                      onPressed: () {},
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                        ],
+              ),
+              
+                'Comments',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              // DEBUG UI - REMOVE LATER
+              Consumer<ReelsProvider>(
+                builder: (context, provider, child) {
+                  if (widget.reelOwnerId == provider.userId) {
+                    return Container(
+                       margin: const EdgeInsets.only(top: 4),
+                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                       decoration: BoxDecoration(color: Colors.green.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                       child: Text("You are Reel Owner", style: TextStyle(fontSize: 10, color: Colors.green[800])),
+                    );
+                  }
+                  return const SizedBox();
+                },
+              ),
+              const Divider(),
+              
+              // Comments List
+              Expanded(
+                child: Consumer<ReelsProvider>(
+                  builder: (context, provider, child) {
+                    final reel = provider.getReelById(widget.reelId);
+                    
+                    // If reel is not found (e.g. deleted), show empty
+                    if (reel == null) return const SizedBox();
+                    
+                    final comments = reel.comments;
+                    
+                    if (comments.isEmpty) {
+                      return const Center(
+                        child: Text('No comments yet. Be the first to comment!'),
                       );
-                    },
-                  ),
-                ),
-                // Comment input field - shows who you're replying to if applicable
-                if (replyingToId != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Replying to: User $replyingToId',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w500, fontSize: 14),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          child: const Text('Cancel'),
-                          onPressed: () {
-                            setState(() {
-                              replyingToId = null;
-                              commentController.text = '';
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                // Comment input field
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: theme.colorScheme.outline,
-                        child: const Icon(Icons.person, size: 20),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: commentController,
-                          decoration: InputDecoration(
-                            labelText: replyingToId == null
-                                ? "Write a Comment"
-                                : "Write a Reply",
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(40),
-                              borderSide: BorderSide(
-                                color:
-                                    theme.colorScheme.outline.withAlpha(0x80),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(40),
-                              borderSide: BorderSide(
-                                color:
-                                    theme.colorScheme.outline.withAlpha(0x80),
-                              ),
-                            ),
-                            filled: true,
-                            fillColor:
-                                theme.colorScheme.surfaceContainerHighest,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
+                    }
+
+                    return ListView.builder(
+                      controller: scrollController,
+                      itemCount: comments.length,
+                      itemBuilder: (context, index) {
+                        final comment = comments[index];
+                        // Permission check: Comment Author OR Reel Owner
+                        final canDelete = comment.userId == provider.userId || 
+                                          widget.reelOwnerId == provider.userId;
+                                          
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.grey[200],
+                            backgroundImage: comment.userImage.isNotEmpty
+                                ? NetworkImage(comment.userImage)
+                                : null,
+                             child: comment.userImage.isEmpty 
+                                ? Text(comment.username.isNotEmpty ? comment.username[0].toUpperCase() : '?')
+                                : null,
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () {
-                          // Handle sending the comment or reply
-                          if (commentController.text.isNotEmpty) {
-                            setState(() {
-                              if (replyingToId != null) {
-                                // Add reply to the appropriate comment
-                                final commentIndex = comments
-                                    .indexWhere((c) => c.id == replyingToId);
-                                if (commentIndex >= 0) {
-                                  final newReply = CommentData(
-                                    id: DateTime.now().millisecondsSinceEpoch,
-                                    userName: 'You',
-                                    text: commentController.text,
-                                    isExpanded: false,
-                                  );
-                                  comments[commentIndex].replies.add(newReply);
-                                  // Auto-expand after adding a reply
-                                  comments[commentIndex].isExpanded = true;
-                                }
-                                replyingToId = null;
-                              } else {
-                                // Add new comment
-                                comments.insert(
-                                  0,
-                                  CommentData(
-                                    id: DateTime.now().millisecondsSinceEpoch,
-                                    userName: 'You',
-                                    text: commentController.text,
-                                    isExpanded: false,
+                          title: Row(
+                            children: [
+                              Text(
+                                comment.username,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (comment.timestamp != null)
+                                Text(
+                                  timeago.format(comment.timestamp!, locale: 'en_short'),
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
                                   ),
-                                );
-                              }
-                              commentController.clear();
-                            });
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: SvgPicture.asset(
-                            'assets/icons/send.svg',
-                            width: 27,
-                            height: 27,
-                            colorFilter: ColorFilter.mode(
-                                theme.colorScheme.onSurface, BlendMode.srcIn),
+                                ),
+                            ],
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
+                          subtitle: Text(comment.text),
+                          trailing: canDelete
+                              ? IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                  onPressed: () => _deleteComment(context, provider, comment.id),
+                                )
+                              : null,
+                        );
+                      },
+                    );
+                  },
                 ),
-              ],
-            ),
-          );
-        },
-      ),
+              ),
+              
+              // Input area
+              Padding(
+                padding: EdgeInsets.only(
+                  left: 16, 
+                  right: 16, 
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                  top: 8,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        decoration: InputDecoration(
+                          hintText: 'Add a comment...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                        ),
+                        minLines: 1,
+                        maxLines: 4,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _isSubmitting
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                      : IconButton(
+                          icon: SvgPicture.asset(
+                            'assets/icons/send.svg',
+                            width: 24,
+                            height: 24,
+                            colorFilter: ColorFilter.mode(
+                                theme.colorScheme.primary, BlendMode.srcIn),
+                          ), // Fallback to Icon(Icons.send) if SVG fails
+                          onPressed: _submitComment,
+                        ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

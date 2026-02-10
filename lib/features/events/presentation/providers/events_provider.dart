@@ -17,6 +17,10 @@ class EventsProvider with ChangeNotifier {
 
   String? _userType;
   String? _userId;
+  
+  // Organizer details for creating events
+  String? _organizerName;
+  String? _organizerImage;
 
   // Getters
   List<EventModel> get events => _events;
@@ -24,6 +28,8 @@ class EventsProvider with ChangeNotifier {
   String? get error => _error;
   String? get userType => _userType;
   String? get userId => _userId;
+  String? get organizerName => _organizerName;
+  String? get organizerImage => _organizerImage;
 
   bool get canCreateEvent => _userType?.toLowerCase() == 'temple' || _userType?.toLowerCase() == 'creator';
   
@@ -39,7 +45,51 @@ class EventsProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _userType = prefs.getString('user_type');
     _userId = prefs.getString('user_id');
+    
+    // Fetch detailed profile if we are a Temple or Creator to get name/image for event creation
+    if (_userId != null && (_userType?.toLowerCase() == 'temple' || _userType?.toLowerCase() == 'creator')) {
+       await _fetchOrganizerProfile();
+    }
+    
     notifyListeners();
+  }
+
+  Future<void> _fetchOrganizerProfile() async {
+    try {
+      final profile = await _apiService.getProfile();
+      // Profile structure varies, usually { success: true, user/temple/creator: data } or direct data
+      
+      Map<String, dynamic>? data;
+      
+      if (profile.containsKey('user')) {
+        data = profile['user'];
+      } else if (profile.containsKey('temple')) {
+        data = profile['temple'];
+      } else if (profile.containsKey('creator')) {
+        data = profile['creator'];
+      } else if (profile.containsKey('data')) {
+         data = profile['data'];
+      } else {
+        data = profile;
+      }
+
+      if (data != null) {
+        if (_userType?.toLowerCase() == 'temple') {
+           _organizerName = data['templeName'] ?? data['name'] ?? '';
+           _organizerImage =  (data['templeImages'] is List && (data['templeImages'] as List).isNotEmpty) 
+              ? data['templeImages'][0] 
+              : (data['profileImage'] ?? '');
+              
+        } else if (_userType?.toLowerCase() == 'creator') {
+           _organizerName = data['name'] ?? data['username'] ?? ''; // Creators usually have 'name' or 'username'
+           _organizerImage = data['profileImage'] ?? '';
+        }
+      }
+      notifyListeners();
+      
+    } catch (e) {
+      print('EventsProvider: Failed to fetch organizer profile: $e');
+    }
   }
 
   void _setLoading(bool value) {
@@ -100,7 +150,7 @@ class EventsProvider with ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
-      final order = await _apiService.createPaymentOrder(
+      final order = await _apiService.createEventPaymentOrder(
         recipientId: recipientId,
         recipientType: recipientType,
         amount: amount,
@@ -120,14 +170,16 @@ class EventsProvider with ChangeNotifier {
     required String razorpayOrderId,
     required String razorpayPaymentId,
     required String razorpaySignature,
+    required String eventId,
   }) async {
     _setLoading(true);
     _setError(null);
     try {
-      await _apiService.verifyPayment(
+      await _apiService.verifyEventPayment(
         razorpayOrderId: razorpayOrderId,
         razorpayPaymentId: razorpayPaymentId,
         razorpaySignature: razorpaySignature,
+        eventId: eventId,
       );
       return true;
     } catch (e) {
@@ -142,31 +194,9 @@ class EventsProvider with ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
-      final data = await _apiService.getEventsByOrganizer(organizerId);
+      final data = await _apiService.getEvents();
       var allEvents = data.map((e) => EventModel.fromJson(e)).toList();
-
-      // Filter events based on user type logic
-      if (_userType != null) {
-        final type = _userType!.toLowerCase();
-        
-        if (type == 'user') {
-          // Users see events from Temples and Creators (generally allowed, but safe to filter)
-          allEvents = allEvents.where((e) {
-            final organizerType = e.organizerType.toLowerCase();
-            return organizerType == 'temple' || organizerType == 'creator';
-          }).toList();
-        } else if (type == 'creator') {
-           // Creators can see Temple events OR their own events
-           // If they try to view another creator's events, this should return empty.
-           allEvents = allEvents.where((e) {
-             final organizerType = e.organizerType.toLowerCase();
-             return organizerType == 'temple' || e.organizerId == _userId;
-           }).toList();
-        } else if (type == 'temple') {
-           // Temples only see their own events
-           allEvents = allEvents.where((e) => e.organizerId == _userId).toList();
-        }
-      }
+      allEvents = allEvents.where((e) => e.organizerId == organizerId).toList();
 
       _events = allEvents;
     } catch (e) {
@@ -238,25 +268,30 @@ class EventsProvider with ChangeNotifier {
       _setError('User type not found. Please log in again.');
       return false;
     }
+    
+    // Ensure we have profile details (Name/Image)
+    if (_organizerName == null || _organizerImage == null) {
+       await _fetchOrganizerProfile();
+    }
 
     _setLoading(true);
     _setError(null);
     try {
       await _apiService.createEvent({
-        'organizerId': _userId!, // Required: Temple or Creator ID
-        'organizerType': _userType!.toLowerCase(), // Required: "temple" or "creator"
+        'organizerId': _userId!, 
+        'organizerType': _userType!.toLowerCase(),
+        'organizerName': _organizerName ?? 'Unknown', // Required by API
+        'organizerImage': _organizerImage ?? '',      // Required by API
         'eventName': eventName,
         'description': description,
-        'eventDate': eventDate.toUtc().toIso8601String(),
+        'eventDate': eventDate.toIso8601String().split('T')[0], // YYYY-MM-DD
         'eventTime': eventTime,
         'location': location,
-        'address': address,
-        'city': city,
-        'state': state,
         'eventImage': eventImage,
         'capacity': capacity,
         'eventType': eventType,
         'price': price,
+        'isActive': true, 
       });
 
       // Refresh events after creating
@@ -291,12 +326,9 @@ class EventsProvider with ChangeNotifier {
       await _apiService.updateEvent(eventId, {
         'eventName': eventName,
         'description': description,
-        'eventDate': eventDate.toUtc().toIso8601String(),
+        'eventDate': eventDate.toIso8601String().split('T')[0],
         'eventTime': eventTime,
         'location': location,
-        'address': address,
-        'city': city,
-        'state': state,
         'capacity': capacity,
         'eventType': eventType,
         'price': price,

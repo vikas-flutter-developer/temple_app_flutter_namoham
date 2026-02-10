@@ -153,6 +153,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                  likedBy: [],
                  likedByNames: [],
                  commentsCount: 0,
+                 shareCount: 0,
                  timestamp: 'Just now',
                  createdAt: DateTime.now().toIso8601String(),
              );

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../../core/api/api_service.dart';
+import 'package:provider/provider.dart';
 import '../../../temples/data/models/temple_model.dart';
 import '../../../creator/data/model/creators_model.dart';
 import '../../data/models/event_model.dart';
+import '../providers/events_provider.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final String organizerId;
@@ -137,54 +138,73 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
 
     setState(() => _isLoading = true);
+    
+    final provider = Provider.of<EventsProvider>(context, listen: false);
 
     try {
-      final apiService = ApiService.create();
-      
       // Format time as HH:mm
       final hour = _selectedTime!.hour.toString().padLeft(2, '0');
       final minute = _selectedTime!.minute.toString().padLeft(2, '0');
       final timeString = '$hour:$minute';
-
-
-      final Map<String, dynamic> eventData = {
-        "eventName": _eventNameController.text.trim(),
-        "organizerType": widget.organizerType.toLowerCase(),
-        "organizerId": widget.organizerId,
-        "description": _descriptionController.text.trim(),
-        "eventDate": _selectedDate!.toIso8601String().split('T')[0], // Send only YYYY-MM-DD
-        "eventTime": timeString,
-        "location": _locationController.text.trim(),
-      };
-
-      print('CREATE_EVENT_DEBUG: Sending payload: $eventData');
+      
+      bool success = false;
       
       if (widget.event != null) {
         // UPDATE
-        await apiService.updateEvent(widget.event!.id, eventData);
+        success = await provider.updateEvent(
+          eventId: widget.event!.id,
+          eventName: _eventNameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          eventDate: _selectedDate!, 
+          eventTime: timeString,
+          location: _locationController.text.trim(),
+          capacity: int.tryParse(_capacityController.text.trim()) ?? 100,
+          eventType: _selectedEventType,
+          price: _isFreeEvent ? 0 : (num.tryParse(_priceController.text.trim()) ?? 0),
+        );
+        
         if (mounted) {
+           if (success) {
              ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Event updated successfully!')),
-          );
+               const SnackBar(content: Text('Event updated successfully!')),
+             );
+           }
         }
       } else {
         // CREATE
-        await apiService.createEvent(eventData);
+        success = await provider.createEvent(
+          eventName: _eventNameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          eventDate: _selectedDate!,
+          eventTime: timeString,
+          location: _locationController.text.trim(),
+          capacity: int.tryParse(_capacityController.text.trim()) ?? 100,
+          eventType: _selectedEventType,
+          price: _isFreeEvent ? 0 : (num.tryParse(_priceController.text.trim()) ?? 0),
+        );
+        
         if (mounted) {
+           if (success) {
              ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Event created successfully!')),
-          );
+               const SnackBar(content: Text('Event created successfully!')),
+             );
+           }
         }
       }
 
       if (mounted) {
-        Navigator.pop(context, true); // Return true to indicate success
+        if (success) {
+           Navigator.pop(context, true); 
+        } else {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text(provider.error ?? 'Operation failed')),
+           );
+        }
       }
     } catch (e) {
       print('CREATE_EVENT_ERROR: $e');
-        final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving event: $cleanError')),
+          SnackBar(content: Text('Error saving event: $e')),
         );
     } finally {
       if (mounted) setState(() => _isLoading = false);

@@ -442,17 +442,21 @@ class ApiService {
     required String phoneNumber,
     required String otp,
     required String newPassword,
+    String? sessionId,
   }) async {
+    final body = {
+      'email': email,
+      'userType': userType,
+      'phoneNumber': phoneNumber,
+      'otp': otp,
+      'newPassword': newPassword,
+    };
+    if (sessionId != null) body['sessionId'] = sessionId;
+
     final response = await client.post(
       Uri.parse('$baseUrl/auth/reset-password'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'email': email,
-        'userType': userType,
-        'phoneNumber': phoneNumber,
-        'otp': otp,
-        'newPassword': newPassword,
-      }),
+      body: json.encode(body),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -953,9 +957,15 @@ class ApiService {
 
   // ============== MESSAGES ==============
 
-  Future<List<Map<String, dynamic>>> getConversations(String userId) async {
+  Future<List<Map<String, dynamic>>> getConversations(String userId, {String? chatType}) async {
+    final uri = Uri.parse('$baseUrl/messages/conversations/$userId').replace(
+      queryParameters: {
+        if (chatType != null) 'chatType': chatType,
+      },
+    );
+    
     final response = await client.get(
-      Uri.parse('$baseUrl/messages/conversations/$userId'),
+      uri,
       headers: await _getHeaders(),
     );
 
@@ -1087,6 +1097,73 @@ class ApiService {
     }
   }
 
+  // ============== CHAT REQUESTS & FLOW ==============
+
+  Future<Map<String, dynamic>> initiateConversation(Map<String, dynamic> body) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/messages/conversation'),
+      headers: await _getHeaders(),
+      body: json.encode(body),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to initiate conversation: ${response.statusCode}');
+    }
+  }
+
+  Future<Map<String, dynamic>> acceptMessageRequest(String conversationId, String userId) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/messages/accept'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'conversationId': conversationId,
+        'userId': userId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to accept request: ${response.statusCode}');
+    }
+  }
+
+  Future<Map<String, dynamic>> rejectMessageRequest(String conversationId, String userId) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/messages/reject'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'conversationId': conversationId,
+        'userId': userId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to reject request: ${response.statusCode}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingRequests(String userId) async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/messages/requests/$userId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      if (decoded['requests'] is List) {
+        return (decoded['requests'] as List).cast<Map<String, dynamic>>();
+      }
+      return [];
+    } else {
+      throw Exception('Failed to fetch requests: ${response.statusCode}');
+    }
+  }
+
 
 
   // ============== COMMENTS (Existing) ==============
@@ -1153,6 +1230,52 @@ class ApiService {
     }
   }
 
+  /// Delete post comment
+  Future<void> deletePostComment(String postId, String commentId, String userId) async {
+    try {
+      final response = await client.delete(
+        Uri.parse('$baseUrl/posts/$postId/comments/$commentId'),
+        headers: await _getHeaders(),
+        body: json.encode({'userId': userId}),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        // Try to parse error message
+        String msg = 'Failed to delete comment: ${response.statusCode}';
+        try {
+           final body = json.decode(response.body);
+           if (body['message'] != null) msg = body['message'];
+        } catch (_) {}
+        throw Exception(msg);
+      }
+    } catch (e) {
+      // Fallback to generic delete if specific fails? No, user specified this API.
+      rethrow;
+    }
+  }
+
+  /// Delete reel comment
+  Future<void> deleteReelComment(String reelId, String commentId, String userId) async {
+    try {
+      final response = await client.delete(
+        Uri.parse('$baseUrl/reels/$reelId/comments/$commentId'),
+        headers: await _getHeaders(),
+        body: json.encode({'userId': userId}),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        String msg = 'Failed to delete reel comment: ${response.statusCode}';
+        try {
+           final body = json.decode(response.body);
+           if (body['message'] != null) msg = body['message'];
+        } catch (_) {}
+        throw Exception(msg);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // ============== RAZORPAY PAYMENTS ==============
 
   /// Create payment order
@@ -1184,7 +1307,7 @@ class ApiService {
           throw Exception(decoded['message'].toString());
         }
       } catch (_) {}
-      throw Exception('Failed to create payment order: ${response.statusCode}');
+      throw Exception('Failed to create payment order:  | ');
     }
   }
 
@@ -1404,6 +1527,71 @@ class ApiService {
       } catch (_) {}
 
       throw Exception('Failed to attend event: ${response.statusCode}');
+    }
+  }
+
+  // ============== EVENT PAYMENTS ==============
+
+  /// Create Razorpay order for paid event
+  Future<Map<String, dynamic>> createEventPaymentOrder({
+    required double amount,
+    required String eventId,
+    required String description,
+    required String recipientId,
+    required String recipientType,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/events/$eventId/create-order'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'amount': amount,
+        'description': description,
+        'recipientId': recipientId,
+        'recipientType': recipientType,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      try {
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+      throw Exception('Failed to create payment order:  | ');
+    }
+  }
+
+  /// Verify Razorpay payment and register for event
+  Future<Map<String, dynamic>> verifyEventPayment({
+    required String razorpayOrderId,
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+    required String eventId,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/events/$eventId/verify-payment'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'eventId': eventId,
+        'razorpay_order_id': razorpayOrderId,
+        'razorpay_payment_id': razorpayPaymentId,
+        'razorpay_signature': razorpaySignature,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      try {
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+      throw Exception('Failed to verify payment: ${response.statusCode}');
     }
   }
 
@@ -2079,5 +2267,61 @@ class ApiService {
       throw Exception('Failed to mark all notifications as read: ${response.statusCode}');
     }
     print('API_SERVICE: All notifications marked as read');
+  }
+
+  // ============== APP RATINGS ==============
+
+  /// Submit App Rating
+  /// POST {{baseUrl}}/app-ratings
+  Future<Map<String, dynamic>> submitAppRating(Map<String, dynamic> data) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/app-ratings'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to submit rating: ${response.statusCode}');
+    }
+  }
+
+  /// Get All App Ratings
+  /// GET {{baseUrl}}/app-ratings?page=1&limit=20
+  Future<Map<String, dynamic>> getAppRatings({int page = 1, int limit = 20}) async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/app-ratings?page=$page&limit=$limit'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to fetch ratings: ${response.statusCode}');
+    }
+  }
+
+  /// Get My Application Rating
+  /// GET {{baseUrl}}/app-ratings/me
+  Future<Map<String, dynamic>> getMyAppRating() async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/app-ratings/me'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      // Backend might return null, empty object, or nested data
+      // Adjust based on actual response structure
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      return {}; 
+    } else if (response.statusCode == 404) {
+      return {}; // No rating found
+    } else {
+      throw Exception('Failed to fetch my rating: ${response.statusCode}');
+    }
   }
 }

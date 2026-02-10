@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/api/api_service.dart';
+import '../../data/models/conversation_model.dart';
 import '../providers/messages_provider.dart';
 
 class DirectChatScreen extends StatefulWidget {
@@ -35,17 +36,19 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<MessagesProvider>();
-      await provider.loadConversations();
+      
+      // 1. Try to initiate/find conversation immediately
+      // This will either find existing OR create a new one (pending)
+      final conversation = await provider.initiateChat(
+        otherUserId: widget.receiverId,
+        otherUserType: widget.receiverType,
+        otherUserName: widget.receiverName,
+      );
 
-      // Try to find existing conversation with this receiver
-      final existing = provider.conversations.where((c) {
-        return c.otherUserId == widget.receiverId;
-      }).toList();
-
-      if (existing.isNotEmpty) {
-        setState(() => _conversationId = existing.first.id);
-        await provider.loadMessages(_conversationId!);
-        await provider.markAsRead(_conversationId!);
+      if (conversation != null && mounted) {
+        setState(() => _conversationId = conversation.id);
+        await provider.loadMessages(conversation.id);
+        // await provider.markAsRead(conversation.id); // Optional: mark as read if desired
         _scrollToBottom();
       }
     });
@@ -158,7 +161,52 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
             child: Consumer<MessagesProvider>(
               builder: (context, provider, child) {
                 if (_conversationId == null) {
-                  return const Center(child: Text('Say hi 👋'));
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                // Check conversation status
+                final conversation = provider.conversations.firstWhere(
+                  (c) => c.id == _conversationId,
+                  orElse: () => ConversationModel(
+                    id: '', 
+                    otherUserId: '', 
+                    otherUserType: '', 
+                    otherUserName: '', 
+                    otherUserImage: '', 
+                    lastMessage: '', 
+                    lastMessageAt: null, 
+                    unreadCount: 0,
+                    status: 'accepted', // Default to accepted to avoid blocking if not found
+                  ),
+                );
+
+                if (conversation.status == 'pending' && conversation.requestSenderId == provider.userId) {
+                   return Center(
+                     child: Padding(
+                       padding: const EdgeInsets.all(24.0),
+                       child: Column(
+                         mainAxisAlignment: MainAxisAlignment.center,
+                         children: [
+                           const Icon(Icons.access_time, size: 48, color: Colors.orange),
+                           const SizedBox(height: 16),
+                           Text(
+                             'Message Request Sent',
+                             style: theme.textTheme.titleLarge,
+                           ),
+                           const SizedBox(height: 8),
+                           Text(
+                             'You can chat with ${widget.receiverName} once they accept your request.',
+                             textAlign: TextAlign.center,
+                             style: theme.textTheme.bodyMedium,
+                           ),
+                         ],
+                       ),
+                     ),
+                   );
+                }
+
+                if (conversation.status == 'rejected') {
+                   return const Center(child: Text('Message request was declined.'));
                 }
 
                 final messages = provider.messagesFor(_conversationId!);

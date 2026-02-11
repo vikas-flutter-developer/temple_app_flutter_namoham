@@ -60,15 +60,25 @@ class _AppRatingDialogContentState extends State<_AppRatingDialogContent> {
     }
 
     final provider = Provider.of<AppRatingProvider>(context, listen: false);
+    final isUpdate = provider.myRating != null;
+    
     try {
-      await provider.submitRating(
-        rating: _rating,
-        comment: _commentController.text.trim(),
-      );
+      if (isUpdate) {
+        await provider.updateRating(
+          rating: _rating,
+          comment: _commentController.text.trim(),
+        );
+      } else {
+        await provider.submitRating(
+          rating: _rating,
+          comment: _commentController.text.trim(),
+        );
+      }
+      
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thank you for your rating!')),
+           SnackBar(content: Text(isUpdate ? 'Rating updated successfully!' : 'Thank you for your rating!')),
         );
       }
     } catch (e) {
@@ -82,51 +92,54 @@ class _AppRatingDialogContentState extends State<_AppRatingDialogContent> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Rate Our App'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('How was your experience?'),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                return IconButton(
-                  icon: Icon(
-                    index < _rating ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
-                    size: 32,
+    // Access provider via Consumer or Provider.of to react to changes
+    return Consumer<AppRatingProvider>(
+      builder: (context, provider, child) {
+        final isUpdate = provider.myRating != null;
+        
+        return AlertDialog(
+          title: Text(isUpdate ? 'Update Your Rating' : 'Rate Our App'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('How was your experience?'),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      icon: Icon(
+                        index < _rating ? Icons.star : Icons.star_border,
+                        color: Colors.amber,
+                        size: 32,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _rating = index + 1;
+                        });
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _commentController,
+                  decoration: const InputDecoration(
+                    hintText: 'Leave a comment (optional)',
+                    border: OutlineInputBorder(),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _rating = index + 1;
-                    });
-                  },
-                );
-              }),
+                  maxLines: 3,
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _commentController,
-              decoration: const InputDecoration(
-                hintText: 'Leave a comment (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
             ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        Consumer<AppRatingProvider>(
-          builder: (context, provider, child) {
-            return ElevatedButton(
+            ElevatedButton(
               onPressed: provider.isLoading ? null : () => _submit(context),
               child: provider.isLoading
                   ? const SizedBox(
@@ -134,11 +147,11 @@ class _AppRatingDialogContentState extends State<_AppRatingDialogContent> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Submit'),
-            );
-          },
-        ),
-      ],
+                  : Text(isUpdate ? 'Update' : 'Submit'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 class CustomButton extends StatefulWidget {
   final String labelText;
-  final VoidCallback? onPressed; // Add this parameter
+  final VoidCallback? onPressed; 
+  final Color? backgroundColor;
 
   const CustomButton({
     super.key,
     required this.labelText,
     required this.onPressed,
+    this.backgroundColor,
   });
 
   @override
@@ -23,9 +25,9 @@ class _CustomButtonState extends State<CustomButton> {
         width: double.infinity,
         height: 50,
         child: ElevatedButton(
-          onPressed: widget.onPressed, // Use the provided function
+          onPressed: widget.onPressed, 
           style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
+            backgroundColor: widget.backgroundColor ?? theme.colorScheme.primary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),

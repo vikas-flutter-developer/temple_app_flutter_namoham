@@ -39,15 +39,19 @@ class _AppRatingScreenContentState extends State<_AppRatingScreenContent> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<AppRatingProvider>(context, listen: false);
       provider.fetchMyRating().then((_) {
+        debugPrint("AppRatingScreen: fetchMyRating completed. myRating: ${provider.myRating}");
         if (mounted) {
            final myRating = provider.myRating;
            if (myRating != null) {
+             debugPrint("AppRatingScreen: Updating UI with rating: ${myRating.rating}");
              setState(() {
                _rating = myRating.rating;
                if (myRating.comment != null) {
                  _reviewController.text = myRating.comment!;
                }
              });
+           } else {
+             debugPrint("AppRatingScreen: myRating is null");
            }
         }
       });
@@ -80,15 +84,26 @@ class _AppRatingScreenContentState extends State<_AppRatingScreenContent> {
     }
 
     final provider = Provider.of<AppRatingProvider>(context, listen: false);
+    final isUpdate = provider.myRating != null;
+
     try {
-      await provider.submitRating(
-        rating: _rating,
-        comment: _reviewController.text.trim(),
-      );
+      if (isUpdate) {
+        await provider.updateRating(
+          rating: _rating,
+          comment: _reviewController.text.trim(),
+        );
+      } else {
+        await provider.submitRating(
+          rating: _rating,
+          comment: _reviewController.text.trim(),
+        );
+      }
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thank you for your rating!')),
+          SnackBar(content: Text(isUpdate ? 'Rating updated successfully!' : 'Thank you for your rating!')),
         );
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
@@ -180,32 +195,6 @@ class _AppRatingScreenContentState extends State<_AppRatingScreenContent> {
                     // Check if user has already rated
                     final bool alreadyRated = provider.myRating != null;
                     
-                    if (alreadyRated) {
-                      return ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Update rating coming soon!')),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00C2FF),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                          elevation: 0,
-                          fixedSize: const Size(double.infinity, 56),
-                        ),
-                        child: const Text(
-                          'Update Rating',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      );
-                    }
-
                     return ElevatedButton(
                       onPressed: provider.isLoading 
                           ? null 
@@ -219,7 +208,7 @@ class _AppRatingScreenContentState extends State<_AppRatingScreenContent> {
                           borderRadius: BorderRadius.circular(28),
                         ),
                         elevation: 0,
-                        fixedSize: const Size(double.infinity, 56), // Ensure consistent size
+                        fixedSize: const Size(double.infinity, 56),
                       ),
                       child: provider.isLoading
                           ? const SizedBox(
@@ -227,9 +216,9 @@ class _AppRatingScreenContentState extends State<_AppRatingScreenContent> {
                               height: 24,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
-                          : const Text(
-                              'Done',
-                              style: TextStyle(
+                          : Text(
+                              alreadyRated ? 'Update Rating' : 'Done',
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),

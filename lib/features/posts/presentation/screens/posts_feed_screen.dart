@@ -4,6 +4,7 @@ import '../providers/post_provider.dart';
 import '../../data/models/post_model.dart';
 import 'package:flutter_user_app/features/add_post/presentation/screens/add_post_page.dart';
 import 'post_detail_screen.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class PostsFeedScreen extends StatefulWidget {
   const PostsFeedScreen({Key? key}) : super(key: key);
@@ -109,12 +110,18 @@ class PostCard extends StatelessWidget {
           // User info header
           ListTile(
             leading: CircleAvatar(
-              backgroundImage: post.userImage.isNotEmpty
-                  ? NetworkImage(post.userImage)
-                  : null,
-              child: post.userImage.isEmpty
-                  ? Text(post.username[0].toUpperCase())
-                  : null,
+              backgroundColor: Colors.transparent,
+              child: post.userImage.isNotEmpty
+                  ? ClipOval(
+                      child: CustomNetworkImage(
+                        imageUrl: post.userImage,
+                        fit: BoxFit.cover,
+                        width: 40,
+                        height: 40,
+                        errorWidget: Text(post.username[0].toUpperCase()),
+                      ),
+                    )
+                  : Text(post.username[0].toUpperCase()),
             ),
             title: Text(post.username),
             subtitle: Text(
@@ -170,15 +177,13 @@ class PostCard extends StatelessWidget {
               child: PageView.builder(
                 itemCount: post.imageUrls.length,
                 itemBuilder: (context, index) {
-                  return Image.network(
-                    post.imageUrls[index],
+                  return CustomNetworkImage(
+                    imageUrl: post.imageUrls[index],
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        child: const Icon(Icons.broken_image, size: 64),
-                      );
-                    },
+                    errorWidget: Container(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      child: const Icon(Icons.broken_image, size: 64),
+                    ),
                   );
                 },
               ),

@@ -5,6 +5,7 @@ import 'package:flutter_user_app/core/util/share_helper.dart';
 import 'package:flutter_user_app/features/reels/data/models/reel_model.dart';
 import 'package:flutter_user_app/features/reels/presentation/screens/profile_loader_screen.dart';
 import 'package:flutter_user_app/features/reels/presentation/screens/create_reel_screen.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class ReelVideoWidget extends StatefulWidget {
   final ReelModel reel;
@@ -439,10 +440,10 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                     ),
                     child: ClipOval(
                       child: reel.userImage.isNotEmpty
-                          ? Image.network(
-                              reel.userImage,
+                          ? CustomNetworkImage(
+                              imageUrl: reel.userImage,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              errorWidget: Container(
                                 color: const Color(0xFF29D0FF),
                                 child: Center(
                                   child: Text(

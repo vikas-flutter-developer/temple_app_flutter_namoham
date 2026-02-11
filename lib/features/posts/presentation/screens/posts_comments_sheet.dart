@@ -9,6 +9,7 @@ import 'package:flutter_user_app/features/posts/presentation/widgets/comment_con
 import 'package:like_button/like_button.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class PostCommentsSheet extends StatefulWidget {
   final String postId;
@@ -409,8 +410,16 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundImage: NetworkImage(comment.userImage),
-                  backgroundColor: theme.colorScheme.outline,
+                  backgroundColor: Colors.transparent,
+                  child: ClipOval(
+                    child: CustomNetworkImage(
+                      imageUrl: comment.userImage,
+                      fit: BoxFit.cover,
+                      width: 32,
+                      height: 32,
+                      errorWidget: const Icon(Icons.person, size: 20),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -582,8 +591,16 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                       children: [
                         CircleAvatar(
                           radius: 14,
-                          backgroundImage: NetworkImage(reply.userImage),
-                          backgroundColor: theme.colorScheme.outline,
+                          backgroundColor: Colors.transparent,
+                          child: ClipOval(
+                            child: CustomNetworkImage(
+                              imageUrl: reply.userImage,
+                              fit: BoxFit.cover,
+                              width: 28,
+                              height: 28,
+                              errorWidget: const Icon(Icons.person, size: 16),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(

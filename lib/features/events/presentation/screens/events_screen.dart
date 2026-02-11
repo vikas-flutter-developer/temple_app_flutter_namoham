@@ -6,6 +6,7 @@ import '../../../../core/api/api_service.dart';
 import '../providers/events_provider.dart';
 import 'event_detail_screen.dart';
 import 'create_event_screen.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -232,11 +233,25 @@ class _EventsViewState extends State<_EventsView> {
                           CircleAvatar(
                             radius: 24,
                             backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                            backgroundImage: event.organizerImage.trim().isNotEmpty
-                                ? NetworkImage(event.organizerImage)
-                                : null,
-                            child: event.organizerImage.trim().isEmpty
-                                ? Text(
+                            child: event.organizerImage.trim().isNotEmpty
+                                ? ClipOval(
+                                    child: CustomNetworkImage(
+                                      imageUrl: event.organizerImage,
+                                      fit: BoxFit.cover,
+                                      width: 48,
+                                      height: 48,
+                                      errorWidget: Text(
+                                        event.organizerName.isNotEmpty
+                                            ? event.organizerName[0].toUpperCase()
+                                            : '?',
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Text(
                                     event.organizerName.isNotEmpty
                                         ? event.organizerName[0].toUpperCase()
                                         : '?',
@@ -244,8 +259,7 @@ class _EventsViewState extends State<_EventsView> {
                                       color: theme.colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                  )
-                                : null,
+                                  ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(

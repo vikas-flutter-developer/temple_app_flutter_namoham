@@ -13,6 +13,8 @@ import 'dart:convert';
 import 'package:flutter_user_app/core/constants/indian_locations.dart';
 import 'package:flutter_user_app/features/profile/presentation/widgets/change_password_dialog.dart';
 import 'dart:io';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
+import '../../../add_post/presentation/screens/crop_page.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({Key? key}) : super(key: key);
@@ -337,16 +339,30 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       );
 
       if (pickedFile != null) {
-        setState(() {
-          _selectedImage = File(pickedFile.path);
-          _isSaving = true;
-        });
+        // Navigate to Crop & Filter Page
+        if (!mounted) return;
+        
+        final croppedPath = await Navigator.push<String>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CropPage(
+              imagePath: pickedFile.path,
+              isProfile: true, // Enable profile mode
+            ),
+          ),
+        );
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('profile_photo_path', pickedFile.path);
+        if (croppedPath != null) {
+          setState(() {
+            _selectedImage = File(croppedPath);
+            _isSaving = true;
+          });
 
-        final photoUploadService = PhotoUploadService();
-        final photoUrl = await photoUploadService.uploadProfilePhoto(File(pickedFile.path));
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('profile_photo_path', croppedPath);
+
+          final photoUploadService = PhotoUploadService();
+          final photoUrl = await photoUploadService.uploadProfilePhoto(File(croppedPath));
 
         if (photoUrl != null) {
           if (mounted) {
@@ -401,7 +417,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           throw Exception('Unable to upload photo. Please try again.');
         }
       }
-    } catch (e) {
+    }
+  } catch (e) {
       debugPrint('Error picking/uploading image: $e');
       if (mounted) {
         final errorMsg = e.toString();
@@ -808,7 +825,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   : _savedImagePath != null
                       ? Image.file(File(_savedImagePath!), fit: BoxFit.cover)
                       : _remotePhotoUrl != null && _remotePhotoUrl!.isNotEmpty
-                          ? Image.network(_remotePhotoUrl!, fit: BoxFit.cover)
+                          ? CustomNetworkImage(
+                              imageUrl: _remotePhotoUrl!, 
+                              fit: BoxFit.cover,
+                              errorWidget: Container(color: theme.colorScheme.surfaceContainerHighest, child: Icon(Icons.person, size: 50)),
+                            )
                           : Container(color: theme.colorScheme.surfaceContainerHighest, child: Icon(Icons.person, size: 50)),
             ),
           ),

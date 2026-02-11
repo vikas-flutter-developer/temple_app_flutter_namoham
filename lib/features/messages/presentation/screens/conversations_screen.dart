@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/api/api_service.dart';
 import '../providers/messages_provider.dart';
 import 'chat_screen.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class ConversationsScreen extends StatelessWidget {
   const ConversationsScreen({super.key});
@@ -124,11 +125,25 @@ class _ConversationsView extends StatelessWidget {
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                            backgroundImage: c.otherUserImage.trim().isNotEmpty
-                                ? NetworkImage(c.otherUserImage)
-                                : null,
-                            child: c.otherUserImage.trim().isEmpty
-                                ? Text(
+                            child: c.otherUserImage.trim().isNotEmpty
+                                ? ClipOval(
+                                    child: CustomNetworkImage(
+                                      imageUrl: c.otherUserImage,
+                                      fit: BoxFit.cover,
+                                      width: 40,
+                                      height: 40,
+                                      errorWidget: Text(
+                                        c.otherUserName.isNotEmpty
+                                            ? c.otherUserName[0].toUpperCase()
+                                            : '?',
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Text(
                                     c.otherUserName.isNotEmpty
                                         ? c.otherUserName[0].toUpperCase()
                                         : '?',
@@ -136,8 +151,7 @@ class _ConversationsView extends StatelessWidget {
                                       color: theme.colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                  )
-                                : null,
+                                  ),
                           ),
                           title: Text(
                             c.otherUserName.isNotEmpty ? c.otherUserName : c.otherUserId,
@@ -220,12 +234,18 @@ class _RequestsListState extends State<_RequestsList> {
               return Card(
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundImage: req.otherUserImage.isNotEmpty 
-                        ? NetworkImage(req.otherUserImage) 
-                        : null,
-                    child: req.otherUserImage.isEmpty 
-                        ? const Icon(Icons.person) 
-                        : null,
+                    backgroundColor: Colors.transparent,
+                    child: req.otherUserImage.isNotEmpty
+                        ? ClipOval(
+                            child: CustomNetworkImage(
+                              imageUrl: req.otherUserImage,
+                              fit: BoxFit.cover,
+                              width: 40,
+                              height: 40,
+                              errorWidget: const Icon(Icons.person),
+                            ),
+                          )
+                        : const Icon(Icons.person),
                   ),
                   title: Text(req.otherUserName),
                   subtitle: Text('Wants to chat • ${req.requestSenderId}'),

@@ -4,6 +4,7 @@ import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/a
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_donation_screen.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_reports_screen.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_messages_screen.dart';
+import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_account_management_screen.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
@@ -25,6 +26,7 @@ class _AdminMainLayoutState extends State<AdminMainLayout> {
     const AdminCalendarScreen(),
     const AdminMessagesScreen(),
     const AdminReportsScreen(),
+    const AdminAccountManagementScreen(),
   ];
 
   @override
@@ -67,11 +69,12 @@ class _AdminMainLayoutState extends State<AdminMainLayout> {
                 _buildMenuItem(2, "Calender", Icons.calendar_today_outlined), // Spelling as per Figma "Calender"
                 _buildMenuItem(3, "Messages", Icons.message_outlined),
                 _buildMenuItem(4, "Reports", Icons.receipt_long_outlined),
+                _buildMenuItem(5, "Accounts", Icons.manage_accounts_outlined),
 
                 const Spacer(),
 
                 // Logout
-                _buildMenuItem(5, "Logout", Icons.help_outline, isLogout: true),
+                _buildMenuItem(6, "Logout", Icons.help_outline, isLogout: true),
                 const SizedBox(height: 40),
               ],
             ),

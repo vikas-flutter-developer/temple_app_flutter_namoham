@@ -7,6 +7,7 @@ import '../../../../core/api/api_service.dart';
 import '../../../../widgets/custom_widgets/custom_page_bar.dart';
 import '../../data/models/reel_model.dart';
 import '../providers/reels_provider.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../widgets/reel_video_widget.dart';
 import 'create_reel_screen.dart';
 
@@ -49,6 +50,7 @@ class _VideosViewState extends State<_VideosView> {
   late PageController _pageController;
   final Map<String, VideoPlayerController> _controllers = {};
   final Map<String, int> _retryCounters = {}; // Track retry attempts per reel
+  final Set<String> _hasAutoPlayed = {}; // Track which reels have been auto-played to avoid re-playing on rebuilds
   int _currentIndex = 0;
   String? _currentlyPlayingId;
   String _userType = '';
@@ -74,6 +76,7 @@ class _VideosViewState extends State<_VideosView> {
             // Initialize and play
             _getController(reel).then((controller) {
               if (mounted) {
+                 _hasAutoPlayed.add(reel.id); // Track as auto-played
                  controller.play();
                  provider.incrementView(reel.id);
               }
@@ -112,11 +115,24 @@ class _VideosViewState extends State<_VideosView> {
     // Get headers for potential protected content
     final apiService = Provider.of<ApiService>(context, listen: false);
     final headers = await apiService.getAuthHeaders();
+
+    VideoPlayerController controller;
     
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(reel.fullVideoUrl),
-      httpHeaders: headers,
-    );
+    try {
+      // 1. Check/Download file from cache
+      final file = await DefaultCacheManager().getSingleFile(reel.fullVideoUrl, headers: headers);
+      
+      // 2. Initialize controller with local file
+      controller = VideoPlayerController.file(file);
+      print('VIDEO_SCREEN: Playing from cache: ${file.path}');
+    } catch (e) {
+      print('VIDEO_SCREEN: Cache failed, falling back to network: $e');
+      // Fallback to network if cache fails
+      controller = VideoPlayerController.networkUrl(
+        Uri.parse(reel.fullVideoUrl),
+        httpHeaders: headers,
+      );
+    }
     
     await controller.initialize();
     controller.setLooping(false);
@@ -176,8 +192,11 @@ class _VideosViewState extends State<_VideosView> {
     _cleanupOldControllers(actualIndex, reels);
 
     // Pause previous video
-    if (_currentlyPlayingId != null && _controllers.containsKey(_currentlyPlayingId)) {
-      _controllers[_currentlyPlayingId]?.pause();
+    if (_currentlyPlayingId != null) {
+       _hasAutoPlayed.remove(_currentlyPlayingId);
+       if (_controllers.containsKey(_currentlyPlayingId)) {
+        _controllers[_currentlyPlayingId]?.pause();
+       }
     }
 
     // Play current video and increment view
@@ -185,6 +204,7 @@ class _VideosViewState extends State<_VideosView> {
     _currentlyPlayingId = reel.id;
     
     if (_controllers.containsKey(reel.id)) {
+      _hasAutoPlayed.add(reel.id); // Track as auto-played
       _controllers[reel.id]?.play();
     }
 
@@ -351,7 +371,8 @@ class _VideosViewState extends State<_VideosView> {
                     final controller = snapshot.data!;
                     
                     // Auto-play first video
-                    if (virtualIndex == _currentIndex && _currentlyPlayingId != reel.id) {
+                    if (virtualIndex == _currentIndex && !_hasAutoPlayed.contains(reel.id)) {
+                      _hasAutoPlayed.add(reel.id);
                       _currentlyPlayingId = reel.id;
                       controller.play();
                       WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -94,10 +94,10 @@ class EventModel extends Equatable {
     };
   }
 
-  // Getters for missed fields or logic
-  String get address => location; // Treating location as full address for now
-  String get city => ''; // Not in API response yet
-  String get state => ''; // Not in API response yet
+  // Getters for convenience
+  String get address => location; 
+  String get city => ''; 
+  String get state => ''; 
   bool get isFree => price == 0;
   bool get isFull => registeredCount >= capacity;
 
@@ -107,9 +107,8 @@ class EventModel extends Equatable {
         eventName,
         organizerId,
         eventDate,
-        eventTime,
-        location,
         updatedAt,
+        registeredCount,
       ];
 }
 

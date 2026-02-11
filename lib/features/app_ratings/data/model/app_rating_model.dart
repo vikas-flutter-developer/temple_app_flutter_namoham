@@ -71,6 +71,14 @@ class AppRatingModel {
       debugPrint('AppRatingModel: userId is unexpected type: ${json['userId']}'); // Debug print
     }
 
+    // 2. Check top-level fields (Backend often flattens these)
+    if (uName == null) {
+       uName = json['fullName'] ?? json['name'] ?? json['username'] ?? json['creatorName'] ?? json['templeName'];
+    }
+    if (uImage == null) {
+       uImage = json['profilePic'] ?? json['userImage'] ?? json['image'] ?? json['profileImage'];
+    }
+
     return AppRatingModel(
       id: json['_id'] as String?,
       userId: uId,
@@ -121,6 +129,73 @@ class AppRatingModel {
       platform: platform ?? this.platform,
       appVersion: appVersion ?? this.appVersion,
       createdAt: createdAt ?? this.createdAt,
+    );
+  }
+}
+
+class AppRatingStats {
+  final double averageRating;
+  final int totalRatings;
+
+  AppRatingStats({
+    required this.averageRating,
+    required this.totalRatings,
+  });
+
+  factory AppRatingStats.fromJson(Map<String, dynamic> json) {
+    return AppRatingStats(
+      averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0.0,
+      totalRatings: (json['totalRatings'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class AppRatingsResponse {
+  final List<AppRatingModel> ratings;
+  final AppRatingStats? stats;
+  final PaginationModel? pagination;
+
+  AppRatingsResponse({
+    required this.ratings,
+    this.stats,
+    this.pagination,
+  });
+
+  factory AppRatingsResponse.fromJson(Map<String, dynamic> json) {
+    return AppRatingsResponse(
+      ratings: (json['ratings'] as List<dynamic>?)
+              ?.map((e) => AppRatingModel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      stats: json['stats'] != null
+          ? AppRatingStats.fromJson(json['stats'] as Map<String, dynamic>)
+          : null,
+      pagination: json['pagination'] != null
+          ? PaginationModel.fromJson(json['pagination'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+class PaginationModel {
+  final int total;
+  final int page;
+  final int limit;
+  final int totalPages;
+
+  PaginationModel({
+    required this.total,
+    required this.page,
+    required this.limit,
+    required this.totalPages,
+  });
+
+  factory PaginationModel.fromJson(Map<String, dynamic> json) {
+    return PaginationModel(
+      total: (json['total'] ?? 0) as int,
+      page: (json['page'] ?? 1) as int,
+      limit: (json['limit'] ?? 20) as int,
+      totalPages: (json['totalPages'] ?? 1) as int,
     );
   }
 }

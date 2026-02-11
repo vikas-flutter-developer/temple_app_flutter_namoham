@@ -21,6 +21,7 @@ import 'package:flutter_user_app/features/posts/domain/usecase/get_posts_usecase
 import 'package:flutter_user_app/features/posts/data/repository/post_repository_impl.dart';
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class CreatorPage extends StatefulWidget {
   final CreatorModel creator;
@@ -177,16 +178,14 @@ class _CreatorPageState extends State<CreatorPage>
                             // Main Image
                             Hero(
                               tag: creator.id,
-                              child: Image.network(
-                                creator.displayImage,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
+                                child: CustomNetworkImage(
+                                  imageUrl: creator.displayImage,
+                                  fit: BoxFit.cover,
+                                  errorWidget: Container(
                                     color: Colors.grey.shade300,
                                     child: const Icon(Icons.person, size: 64, color: Colors.grey),
-                                  );
-                                },
-                              ),
+                                  ),
+                                ),
                             ),
 
                             // Share Button (Floating on bottom right of image)

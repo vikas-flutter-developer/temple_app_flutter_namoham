@@ -155,6 +155,7 @@ class ClientModel {
   final String status;
   final String type;
   final DateTime? createdAt;
+  final String? image; // Added image field
 
   ClientModel({
     required this.id,
@@ -166,12 +167,13 @@ class ClientModel {
     required this.status,
     required this.type,
     this.createdAt,
+    this.image,
   });
 
   factory ClientModel.fromJson(Map<String, dynamic> json) {
     return ClientModel(
       id: (json['id'] ?? json['_id'] ?? '').toString(),
-      name: (json['name'] ?? 'Unknown').toString(),
+      name: (json['name'] ?? json['fullName'] ?? json['creatorName'] ?? json['templeName'] ?? 'Unknown').toString(),
       email: (json['email'] ?? '').toString(),
       phone: (json['phone'] ?? '').toString(),
       dateOfBirth: json['dateOfBirth']?.toString(),
@@ -179,6 +181,7 @@ class ClientModel {
       status: (json['status'] ?? 'Offline').toString(),
       type: (json['type'] ?? 'User').toString(),
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
+      image: json['profilePic'] ?? json['image'] ?? json['userImage'] ?? json['imageUrl'],
     );
   }
 }

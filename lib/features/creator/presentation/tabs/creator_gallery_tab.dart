@@ -7,6 +7,7 @@ import '../../../reels/data/models/reel_model.dart';
 import '../../../reels/presentation/screens/video_screen.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'dart:typed_data';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class CreatorGalleryTab extends StatefulWidget {
   final String creatorId;
@@ -174,24 +175,19 @@ class CreatorGalleryTabState extends State<CreatorGalleryTab> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: imageUrl.isNotEmpty
-                  ? Image.network(
-                      imageUrl,
+                  ? CustomNetworkImage(
+                      imageUrl: imageUrl,
                       fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: Icon(Icons.error, color: theme.colorScheme.error),
-                        );
-                      },
+                      placeholder: Container(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      errorWidget: Container(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: Icon(Icons.error, color: theme.colorScheme.error),
+                      ),
                     )
                   : Container(
                       color: theme.colorScheme.surfaceContainerHighest,
@@ -222,12 +218,10 @@ class CreatorGalleryTabState extends State<CreatorGalleryTab> {
                 children: [
                    // Thumbnail Image Logic
                   if (reel.thumbnailUrl.isNotEmpty)
-                    Image.network(
-                      reel.thumbnailUrl,
+                    CustomNetworkImage(
+                      imageUrl: reel.thumbnailUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(color: Colors.black26); 
-                      },
+                      errorWidget: Container(color: Colors.black26),
                     )
                   else
                     // Generate thumbnail from video URL if backend thumb is missing

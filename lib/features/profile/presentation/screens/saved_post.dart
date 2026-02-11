@@ -5,6 +5,7 @@ import 'package:flutter_user_app/widgets/custom_widgets/custom_text_widget.dart'
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
 import 'package:flutter_user_app/features/reels/presentation/providers/reels_provider.dart';
 import 'package:flutter_user_app/features/reels/presentation/screens/video_screen.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class SavedPostScreen extends StatefulWidget {
   const SavedPostScreen({super.key});
@@ -116,10 +117,15 @@ class _SavedPostScreenState extends State<SavedPostScreen> {
                                   child: Row(
                                     children: [
                                       CircleAvatar(
-                                        backgroundImage: post.userImage.isNotEmpty
-                                            ? NetworkImage(post.userImage)
-                                            : null,
-                                        child: post.userImage.isEmpty ? const Icon(Icons.person) : null,
+                                        child: post.userImage.isNotEmpty
+                                            ? ClipOval(
+                                                child: CustomNetworkImage(
+                                                  imageUrl: post.userImage,
+                                                  fit: BoxFit.cover,
+                                                  errorWidget: const Icon(Icons.person),
+                                                ),
+                                              )
+                                            : const Icon(Icons.person),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
@@ -144,20 +150,20 @@ class _SavedPostScreenState extends State<SavedPostScreen> {
                                     ],
                                   ),
                                 ),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    imageUrl,
-                                    fit: BoxFit.contain,
-                                    height: 400,
-                                    width: double.infinity,
-                                    errorBuilder: (_, __, ___) => Container(
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: CustomNetworkImage(
+                                      imageUrl: imageUrl,
+                                      fit: BoxFit.contain,
                                       height: 400,
-                                      color: theme.colorScheme.surfaceContainerHighest,
-                                      child: const Icon(Icons.broken_image),
+                                      width: double.infinity,
+                                      errorWidget: Container(
+                                        height: 400,
+                                        color: theme.colorScheme.surfaceContainerHighest,
+                                        child: const Icon(Icons.broken_image),
+                                      ),
                                     ),
                                   ),
-                                ),
                                 Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
@@ -196,10 +202,10 @@ class _SavedPostScreenState extends State<SavedPostScreen> {
               },
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  imageUrl,
+                child: CustomNetworkImage(
+                  imageUrl: imageUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorWidget: Container(
                     color: theme.colorScheme.surfaceContainerHighest,
                     child: const Icon(Icons.broken_image),
                   ),

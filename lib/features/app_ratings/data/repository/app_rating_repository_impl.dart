@@ -14,6 +14,11 @@ class AppRatingRepositoryImpl implements AppRatingRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> updateRating(Map<String, dynamic> data) async {
+    return await apiService.updateAppRating(data);
+  }
+
+  @override
   Future<List<AppRatingModel>> getRatings({int page = 1, int limit = 20}) async {
     try {
       final response = await apiService.getAppRatings(page: page, limit: limit);
@@ -159,6 +164,14 @@ class AppRatingRepositoryImpl implements AppRatingRepository {
     final response = await apiService.getMyAppRating();
     
     if (response.isEmpty) return null;
+
+    // Handle {hasRated: true/false, rating: {...}} response
+    if (response.containsKey('hasRated')) {
+      if (response['hasRated'] == true && response['rating'] is Map<String, dynamic>) {
+        return AppRatingModel.fromJson(response['rating']);
+      }
+      return null; // hasRated is false
+    }
 
     // Check if wrapped in data
     if (response['data'] is Map<String, dynamic>) {

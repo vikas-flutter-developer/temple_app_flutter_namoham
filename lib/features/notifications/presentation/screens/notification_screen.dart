@@ -10,6 +10,7 @@ import 'package:flutter_user_app/features/events/presentation/screens/event_deta
 import 'package:flutter_user_app/features/temples/presentation/screens/temple_page.dart';
 import 'package:flutter_user_app/features/creator/presentation/screens/creator_page.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -547,10 +548,17 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           child: CircleAvatar(
             backgroundColor: theme.colorScheme.surfaceContainerHighest,
-            backgroundImage: imageUrl != null && imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
-            child: imageUrl == null || imageUrl.isEmpty 
-               ? Icon(Icons.person, color: theme.colorScheme.primary) 
-               : null,
+            child: imageUrl != null && imageUrl.isNotEmpty
+                ? ClipOval(
+                    child: CustomNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      width: 52,
+                      height: 52,
+                      errorWidget: Icon(Icons.person, color: theme.colorScheme.primary),
+                    ),
+                  )
+                : Icon(Icons.person, color: theme.colorScheme.primary),
           ),
         ),
         if (!notification.isRead)
@@ -585,15 +593,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
 
     if (thumbUrl != null && thumbUrl.isNotEmpty) {
-      return Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(100)),
-          image: DecorationImage(
-            image: NetworkImage(thumbUrl),
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(100)),
+          ),
+          child: CustomNetworkImage(
+            imageUrl: thumbUrl,
             fit: BoxFit.cover,
+            errorWidget: Container(color: theme.colorScheme.surfaceContainerHighest),
           ),
         ),
       );

@@ -21,6 +21,7 @@ import 'package:flutter_user_app/features/creator/presentation/screens/creator_p
 import 'package:flutter_user_app/features/temples/data/models/temple_model.dart';
 import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
 import 'liked_by_text.dart'; // Helper widget
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class PostWidget extends StatefulWidget {
   final PostEntity postModel;
@@ -240,18 +241,29 @@ class _PostWidgetState extends State<PostWidget>
                     borderRadius: BorderRadius.circular(50),
                     child: CircleAvatar(
                       backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                      backgroundImage: _isValidHttpUrl(widget.postModel.userImage)
-                          ? NetworkImage(widget.postModel.userImage)
-                          : null,
-                      child: !_isValidHttpUrl(widget.postModel.userImage)
-                          ? Text(
+                      child: _isValidHttpUrl(widget.postModel.userImage)
+                          ? ClipOval(
+                              child: CustomNetworkImage(
+                                imageUrl: widget.postModel.userImage,
+                                fit: BoxFit.cover,
+                                width: 40,
+                                height: 40,
+                                errorWidget: Text(
+                                  _initials(widget.postModel.username),
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Text(
                               _initials(widget.postModel.username),
                               style: TextStyle(
                                 color: theme.colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600,
                               ),
-                            )
-                          : null,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -663,25 +675,14 @@ class _PostWidgetState extends State<PostWidget>
       return _postImagePlaceholder(theme);
     }
 
-    return Image.network(
-      rawUrl,
+    return CustomNetworkImage(
+      imageUrl: rawUrl,
       fit: BoxFit.cover,
       width: double.infinity,
-      errorBuilder: (context, error, stackTrace) {
-        print('IMAGE ERROR: Failed to load $rawUrl');
-        return _postImagePlaceholder(theme);
-      },
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return Center(
-          child: CircularProgressIndicator(
-            value: loadingProgress.expectedTotalBytes != null
-                ? loadingProgress.cumulativeBytesLoaded /
-                    loadingProgress.expectedTotalBytes!
-                : null,
-          ),
-        );
-      },
+      errorWidget: _postImagePlaceholder(theme),
+      placeholder: Center(
+          child: CircularProgressIndicator(),
+      ),
     );
   }
 

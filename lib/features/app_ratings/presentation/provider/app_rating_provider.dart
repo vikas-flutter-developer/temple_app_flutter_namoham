@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/model/app_rating_model.dart';
 import '../../domain/usecase/submit_rating_usecase.dart';
+import '../../domain/usecase/update_rating_usecase.dart';
 import '../../domain/usecase/get_ratings_usecase.dart';
 import '../../domain/usecase/get_my_rating_usecase.dart';
 import '../../data/repository/app_rating_repository_impl.dart';
@@ -8,6 +9,7 @@ import '../../../../core/api/api_service.dart';
 
 class AppRatingProvider with ChangeNotifier {
   final SubmitRatingUseCase submitRatingUseCase;
+  final UpdateRatingUseCase updateRatingUseCase;
   final GetRatingsUseCase getRatingsUseCase;
   final GetMyRatingUseCase getMyRatingUseCase;
 
@@ -32,6 +34,7 @@ class AppRatingProvider with ChangeNotifier {
   // Constructor with dependency injection
   AppRatingProvider({
     required this.submitRatingUseCase,
+    required this.updateRatingUseCase,
     required this.getRatingsUseCase,
     required this.getMyRatingUseCase,
   });
@@ -42,6 +45,7 @@ class AppRatingProvider with ChangeNotifier {
     final repository = AppRatingRepositoryImpl(apiService);
     return AppRatingProvider(
       submitRatingUseCase: SubmitRatingUseCase(repository),
+      updateRatingUseCase: UpdateRatingUseCase(repository),
       getRatingsUseCase: GetRatingsUseCase(repository),
       getMyRatingUseCase: GetMyRatingUseCase(repository),
     );
@@ -73,6 +77,39 @@ class AppRatingProvider with ChangeNotifier {
     } catch (e) {
       _error = e.toString();
       debugPrint('Error submitting rating: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateRating({
+    required int rating,
+    String? comment,
+    String platform = 'android',
+    String appVersion = '1.0.0',
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final data = {
+        'rating': rating,
+        'comment': comment,
+        'platform': platform,
+        'appVersion': appVersion,
+      };
+
+      await updateRatingUseCase(data);
+      // Refresh my rating and all ratings after update
+      await fetchMyRating();
+      _page = 1; // Refresh list to show updated rating
+      await fetchRatings(refresh: true);
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error updating rating: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -118,12 +155,13 @@ class AppRatingProvider with ChangeNotifier {
   Future<void> fetchMyRating() async {
     _isLoading = true;
     notifyListeners();
+    debugPrint("AppRatingProvider: fetchMyRating called");
 
     try {
       _myRating = await getMyRatingUseCase();
+      debugPrint("AppRatingProvider: fetchMyRating success. Result: $_myRating");
     } catch (e) {
-       debugPrint('Error fetching my rating: $e');
-       // Don't set error string as this might be background check
+       debugPrint('AppRatingProvider: Error fetching my rating: $e');
     } finally {
       _isLoading = false;
       notifyListeners();

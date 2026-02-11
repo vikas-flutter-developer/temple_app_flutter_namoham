@@ -14,6 +14,7 @@ import 'package:flutter_user_app/features/profile/presentation/screens/saved_pos
 import 'package:flutter_user_app/features/profile/presentation/screens/privacy_policy_screen.dart';
 import 'package:flutter_user_app/features/profile/presentation/screens/terms_conditions_screen.dart';
 import 'package:flutter_user_app/features/events/presentation/screens/events_screen.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 import 'package:flutter_user_app/features/messages/presentation/screens/conversations_screen.dart';
 import 'package:flutter_user_app/features/temples/presentation/screens/temple_donation_screen.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_page_bar.dart';
@@ -25,6 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_user_app/features/app_ratings/presentation/screens/app_rating_screen.dart';
+import 'package:flutter_user_app/features/profile/presentation/screens/request_delete_account_screen.dart';
 import 'profile_edit_screen.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -268,26 +270,22 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(50),
                     child: _profilePhotoUrl != null
-                        ? Image.network(
-                            _profilePhotoUrl!,
+                        ? CustomNetworkImage(
+                            imageUrl: _profilePhotoUrl!,
                             fit: BoxFit.cover,
                             width: 100,
                             height: 100,
-                            errorBuilder: (context, error, stackTrace) {
-                              // If network image fails, try local file
-                              if (_localPhotoPath != null) {
-                                return Image.file(
-                                  File(_localPhotoPath!),
-                                  fit: BoxFit.cover,
-                                  width: 100,
-                                  height: 100,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return _buildDefaultAvatar(theme);
-                                  },
-                                );
-                              }
-                              return _buildDefaultAvatar(theme);
-                            },
+                            errorWidget: _localPhotoPath != null
+                                ? Image.file(
+                                    File(_localPhotoPath!),
+                                    fit: BoxFit.cover,
+                                    width: 100,
+                                    height: 100,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return _buildDefaultAvatar(theme);
+                                    },
+                                  )
+                                : _buildDefaultAvatar(theme),
                           )
                         : _localPhotoPath != null
                             ? Image.file(
@@ -474,7 +472,14 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.delete_forever,
                     title: 'Delete Account',
                     subtitle: 'Permanently Delete Your Account',
-                    onTap: _showComingSoonToast,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RequestDeleteAccountScreen(),
+                        ),
+                      );
+                    },
                   ),
 
                   ProfileItemsWidget(

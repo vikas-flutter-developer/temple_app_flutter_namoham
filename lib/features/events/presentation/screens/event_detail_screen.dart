@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/models/event_model.dart';
 import '../providers/events_provider.dart';
@@ -50,15 +51,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (!mounted) return;
 
     if (verified) {
-      // Payment successful - complete registration
-      final success = await provider.completeEventRegistration(widget.event.id);
+      // Payment successful and verified
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success
-                ? 'Payment successful! You are registered for ${widget.event.eventName}'
-                : 'Payment successful but registration failed. Please contact support.'),
-            backgroundColor: success ? Colors.green : Colors.orange,
+            content: Text('Payment successful! You are registered for ${widget.event.eventName}'),
+            backgroundColor: Colors.green,
           ),
         );
       }
@@ -94,56 +92,34 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   Future<void> _initiatePayment(double price) async {
     final provider = Provider.of<EventsProvider>(context, listen: false);
     
-    // Create Order on Backend
-    final order = await provider.createPaymentOrder(
-      amount: price,
-      eventId: widget.event.id,
-      description: 'Registration for ${widget.event.eventName}',
-      recipientId: widget.event.organizerId,
-      recipientType: widget.event.organizerType.toLowerCase(),
-    );
+    // Create Payment Link
+    final result = await provider.createPaymentLink(widget.event.id);
 
     if (!mounted) return;
 
-    if (order == null || !order.containsKey('id')) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    if (result == null || !result.containsKey('paymentLink')) {
+       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(provider.error ?? 'Failed to create payment order. Please try again.'),
+          content: Text(provider.error ?? 'Failed to create payment link.'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    final String orderId = order['id'];
+    final String url = result['paymentLink'];
 
-    // Open Razorpay checkout with Order ID
-    final options = {
-      'key': 'rzp_test_1DP5mmOlF5G5ag', // Replace with your Razorpay key from .env
-      'amount': (price * 100).toInt(), // Amount in paise
-      'name': widget.event.organizerName,
-      'description': 'Registration for ${widget.event.eventName}',
-      'order_id': orderId,
-      'prefill': {
-        'contact': '',
-        'email': '',
-      },
-      'theme': {
-        'color': '#FF6B35',
-      },
-    };
-
-    try {
-      _razorpay.open(options);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      // We can't auto-verify with link easily without deep links. 
+      // For now, user returns and we might need a "Verify Payment" button or auto-refresh.
+      // But let's stick to the flow: User pays -> Back to App -> Maybe manual refresh?
+      // Or we can rely on Webhooks (backend side). 
+      // For this step, just opening the link.
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not launch payment link')),
+      );
     }
   }
 
@@ -369,22 +345,27 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     onPressed: provider.isLoading || !event.isActive || event.isFull
                         ? null
                         : () async {
-                            final price = await provider.attendEvent(event);
+
+                            final result = await provider.attendEvent(event);
                             
                             if (context.mounted) {
-                              if (price == null) {
+                              if (result.containsKey('success') && result['success'] == true) {
                                 // Registration successful (free event)
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Registered for event successfully!')),
                                 );
-                              } else if (price > 0) {
+                              } else if (result.containsKey('isPaid') && result['isPaid'] == true) {
                                 // Paid event - initiate Razorpay payment
+                                double price = 0;
+                                if (result['price'] is int) {
+                                   price = (result['price'] as int).toDouble();
+                                } else if (result['price'] is double) {
+                                   price = result['price'];
+                                }
                                 await _initiatePayment(price);
-                              } else if (provider.error != null) {
-                                // Error occurred
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(provider.error!)),
-                                );
+                              } else if (result.containsKey('message') && result['success'] == false) {
+                                // Explicit failure (do nothing as provider.error is set, but prevent success msg)
+                                // Only show snackbar if not already shown via provider updates or needed
                               }
                             }
                           },

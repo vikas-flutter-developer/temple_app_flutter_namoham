@@ -140,24 +140,12 @@ class EventsProvider with ChangeNotifier {
 
   // Payment Methods
 
-  Future<Map<String, dynamic>?> createPaymentOrder({
-    required double amount,
-    required String eventId,
-    required String description,
-    required String recipientId,
-    required String recipientType,
-  }) async {
+  Future<Map<String, dynamic>?> createPaymentLink(String eventId) async {
     _setLoading(true);
     _setError(null);
     try {
-      final order = await _apiService.createEventPaymentOrder(
-        recipientId: recipientId,
-        recipientType: recipientType,
-        amount: amount,
-        description: description,
-        eventId: eventId,
-      );
-      return order;
+      final result = await _apiService.createEventPaymentLink(eventId);
+      return result;
     } catch (e) {
       _setError(e.toString());
       return null;
@@ -181,6 +169,7 @@ class EventsProvider with ChangeNotifier {
         razorpaySignature: razorpaySignature,
         eventId: eventId,
       );
+      await fetchEvents(); // Refresh 
       return true;
     } catch (e) {
       _setError(e.toString());
@@ -263,11 +252,6 @@ class EventsProvider with ChangeNotifier {
       _setError('User ID not found. Please log in again.');
       return false;
     }
-
-    if (_userType == null) {
-      _setError('User type not found. Please log in again.');
-      return false;
-    }
     
     // Ensure we have profile details (Name/Image)
     if (_organizerName == null || _organizerImage == null) {
@@ -277,16 +261,21 @@ class EventsProvider with ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
+      // Construct location string if address components are provided
+      String fullLocation = location;
+      if (address.isNotEmpty && location != address) fullLocation = address;
+      if (city.isNotEmpty) fullLocation += ', $city';
+
       await _apiService.createEvent({
         'organizerId': _userId!, 
         'organizerType': _userType!.toLowerCase(),
-        'organizerName': _organizerName ?? 'Unknown', // Required by API
-        'organizerImage': _organizerImage ?? '',      // Required by API
+        'organizerName': _organizerName ?? 'Unknown',
+        'organizerImage': _organizerImage ?? '',
         'eventName': eventName,
         'description': description,
-        'eventDate': eventDate.toIso8601String().split('T')[0], // YYYY-MM-DD
+        'eventDate': eventDate.toIso8601String().split('T')[0],
         'eventTime': eventTime,
-        'location': location,
+        'location': fullLocation.isNotEmpty ? fullLocation : location,
         'eventImage': eventImage,
         'capacity': capacity,
         'eventType': eventType,
@@ -294,7 +283,6 @@ class EventsProvider with ChangeNotifier {
         'isActive': true, 
       });
 
-      // Refresh events after creating
       await fetchEvents();
       return true;
     } catch (e) {
@@ -360,71 +348,57 @@ class EventsProvider with ChangeNotifier {
     }
   }
 
-  /// Attend event (User and Creator, but not organizers of their own events)
-  /// Returns the event price if payment is required, or null if registration was successful
-  Future<double?> attendEvent(EventModel event) async {
+  /// Attend event (User and Creator)
+  /// Returns Map if payment is required { isPaid: true, price: 100, message: ... }
+  /// Returns null if registration was successful immediately
+  /// Attend event (User and Creator)
+  /// Returns Map { isPaid: true, price: 100 } OR { success: true } OR { success: false, message: ... }
+  Future<Map<String, dynamic>> attendEvent(EventModel event) async {
     if (!canAttendEvent) {
       _setError('Only users and creators can attend events');
-      return null;
+      return {'success': false, 'message': 'Only users and creators can attend events'};
     }
 
     if (_userId == null || _userType == null) {
       _setError('User ID and user type are required');
-      return null;
+      return {'success': false, 'message': 'User ID and user type are required'};
     }
 
-    // Prevent organizers from attending their own events
     if (isOrganizer(event)) {
       _setError('You cannot attend your own event');
-      return null;
+      return {'success': false, 'message': 'You cannot attend your own event'};
     }
 
-    // If event has a price, return the price for payment processing
+    // Check if event is paid (client-side check to invoke payment flow)
     if (event.price > 0) {
-      return event.price;
+      return {
+        'isPaid': true,
+        'price': event.price,
+        'message': 'Payment required to attend this event.',
+      };
     }
 
-    // Free event - register directly
     _setLoading(true);
     _setError(null);
 
     try {
-      await _apiService.attendEvent(
+      final response = await _apiService.attendEvent(
         eventId: event.id,
         userId: _userId!,
         userType: _userType!,
       );
-      await fetchEvents();
-      return null; // null means successful registration
+      
+      // Check if backend also signals payment (redundant safety)
+      if (response != null && response.containsKey('isPaid') && response['isPaid'] == true) {
+         return response;
+      }
+      
+      // Success (free event)
+      await fetchEvents(); 
+      return {'success': true, 'message': 'Registered successfully'}; 
     } catch (e) {
       _setError(e.toString());
-      return null;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// Complete event registration after successful payment
-  Future<bool> completeEventRegistration(String eventId) async {
-    if (_userId == null || _userType == null) {
-      _setError('User ID and user type are required');
-      return false;
-    }
-
-    _setLoading(true);
-    _setError(null);
-
-    try {
-      await _apiService.attendEvent(
-        eventId: eventId,
-        userId: _userId!,
-        userType: _userType!,
-      );
-      await fetchEvents();
-      return true;
-    } catch (e) {
-      _setError(e.toString());
-      return false;
+      return {'success': false, 'message': e.toString()};
     } finally {
       _setLoading(false);
     }

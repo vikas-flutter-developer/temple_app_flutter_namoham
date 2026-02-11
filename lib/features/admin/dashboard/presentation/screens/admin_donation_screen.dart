@@ -202,20 +202,30 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text("Donation Traffic", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFAFAFA),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Row(
-                                    children: [
-                                      Text("Location", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                                      SizedBox(width: 4),
-                                      Icon(Icons.keyboard_arrow_down, size: 16),
+                                  PopupMenuButton<String>(
+                                    onSelected: (value) {
+                                      // Handle location filter
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(value: 'location', child: Text("Location")),
+                                      const PopupMenuItem(value: 'temple', child: Text("Temple")),
+                                      const PopupMenuItem(value: 'city', child: Text("City")),
                                     ],
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFAFAFA),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Row(
+                                        children: [
+                                          Text("Location", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                          SizedBox(width: 4),
+                                          Icon(Icons.keyboard_arrow_down, size: 16),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                             const Spacer(),
@@ -262,18 +272,28 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
                              children: [
                                const Text("Sort By", style: TextStyle(color: Colors.grey, fontSize: 12)),
                                const SizedBox(width: 8),
-                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey.shade300),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    Text("Date", style: TextStyle(fontSize: 12)),
-                                    SizedBox(width: 4),
-                                    Icon(Icons.keyboard_arrow_down, size: 16),
-                                  ],
+                               PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  // Handle sort
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(value: 'date', child: Text("Date")),
+                                  const PopupMenuItem(value: 'amount_desc', child: Text("Amount (High to Low)")),
+                                  const PopupMenuItem(value: 'amount_asc', child: Text("Amount (Low to High)")),
+                                ],
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Row(
+                                    children: [
+                                      Text("Date", style: TextStyle(fontSize: 12)),
+                                      SizedBox(width: 4),
+                                      Icon(Icons.keyboard_arrow_down, size: 16),
+                                    ],
+                                  ),
                                 ),
                                ),
                              ],
@@ -316,8 +336,22 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
                                style: TextStyle(color: Colors.grey[500], fontSize: 12),
                              ),
                              const SizedBox(width: 8),
-                             Text("${_pagination!.limit}/page", style: TextStyle(color: Colors.grey[800], fontSize: 12)),
-                             const Icon(Icons.keyboard_arrow_down, size: 14),
+                             PopupMenuButton<int>(
+                               onSelected: (value) {
+                                 // Handle page limit change
+                               },
+                               itemBuilder: (context) => [
+                                 const PopupMenuItem(value: 10, child: Text("10/page")),
+                                 const PopupMenuItem(value: 20, child: Text("20/page")),
+                                 const PopupMenuItem(value: 50, child: Text("50/page")),
+                               ],
+                               child: Row(
+                                 children: [
+                                   Text("${_pagination!.limit}/page", style: TextStyle(color: Colors.grey[800], fontSize: 12)),
+                                   const Icon(Icons.keyboard_arrow_down, size: 14),
+                                 ],
+                               ),
+                             ),
                              const Spacer(),
                               const Icon(Icons.chevron_left, size: 18, color: Colors.grey),
                               const SizedBox(width: 12),

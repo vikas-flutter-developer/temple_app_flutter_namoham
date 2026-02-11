@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/api/api_service.dart';
 import '../../data/models/conversation_model.dart';
 import '../providers/messages_provider.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class DirectChatScreen extends StatefulWidget {
   final String receiverId;
@@ -118,17 +119,30 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
             CircleAvatar(
               radius: 18,
               backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              backgroundImage:
-                  widget.receiverImage.trim().isNotEmpty ? NetworkImage(widget.receiverImage) : null,
-              child: widget.receiverImage.trim().isEmpty
-                  ? Text(
+
+              child: widget.receiverImage.trim().isNotEmpty
+                  ? ClipOval(
+                      child: CustomNetworkImage(
+                        imageUrl: widget.receiverImage,
+                        fit: BoxFit.cover,
+                        width: 36,
+                        height: 36,
+                        errorWidget: Text(
+                          widget.receiverName.isNotEmpty ? widget.receiverName[0].toUpperCase() : '?',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Text(
                       widget.receiverName.isNotEmpty ? widget.receiverName[0].toUpperCase() : '?',
                       style: TextStyle(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.bold,
                       ),
-                    )
-                  : null,
+                    ),
             ),
             const SizedBox(width: 10),
             Expanded(

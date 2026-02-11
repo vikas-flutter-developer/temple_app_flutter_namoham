@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart'; // For debugPrint
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/creator/data/model/creators_model.dart';
 import '../../features/temples/data/models/temple_model.dart';
@@ -194,6 +195,80 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
     );
     return json.decode(response.body) as Map<String, dynamic>;
+  }
+
+  // ============== ACCOUNT DELETION & REACTIVATION ==============
+
+  /// Request Account Deletion (Sends OTP)
+  Future<Map<String, dynamic>> requestAccountDeletion() async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/auth/request-account-deletion'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to request account deletion: ${response.body}');
+    }
+  }
+
+  /// Verify and Deactivate Account (Soft Delete)
+  Future<Map<String, dynamic>> verifyDeleteAccount(String otp) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/auth/verify-delete-account'),
+      headers: await _getHeaders(),
+      body: json.encode({'otp': otp}),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      // Handle "OTP Mismatch" or other errors
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic> && decoded.containsKey('message')) {
+         throw Exception(decoded['message']);
+      }
+      throw Exception('Failed to verify account deletion: ${response.body}');
+    }
+  }
+
+  /// Reactivate Account
+  Future<Map<String, dynamic>> reactivateAccount({
+    required String email,
+    required String password,
+    required String userType,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/auth/reactivate-account'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'email': email,
+        'password': password,
+        'userType': userType,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to reactivate account: ${response.body}');
+    }
+  }
+
+  /// Cleanup All Expired Accounts (Admin)
+  /// POST /admin/cleanup-expired-accounts
+  Future<Map<String, dynamic>> cleanupExpiredAccounts() async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/admin/cleanup-expired-accounts'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to cleanup accounts: ${response.body}');
+    }
   }
 
   // ============== AUTHENTICATION ==============
@@ -1408,6 +1483,8 @@ class ApiService {
 
   // ============== EVENTS ==============
 
+  // ============== EVENTS ==============
+
   /// Get all events
   Future<List<Map<String, dynamic>>> getEvents() async {
     final response = await client.get(
@@ -1448,7 +1525,6 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
-      // Keep server message if present
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
@@ -1502,6 +1578,7 @@ class ApiService {
   }
 
   /// Attend event (User)
+  /// Returns { message, price, isPaid: bool }
   Future<Map<String, dynamic>> attendEvent({
     required String eventId,
     required String userId,
@@ -1533,22 +1610,11 @@ class ApiService {
   // ============== EVENT PAYMENTS ==============
 
   /// Create Razorpay order for paid event
-  Future<Map<String, dynamic>> createEventPaymentOrder({
-    required double amount,
-    required String eventId,
-    required String description,
-    required String recipientId,
-    required String recipientType,
-  }) async {
+  Future<Map<String, dynamic>> createEventPaymentOrder(String eventId) async {
     final response = await client.post(
       Uri.parse('$baseUrl/events/$eventId/create-order'),
       headers: await _getHeaders(),
-      body: json.encode({
-        'amount': amount,
-        'description': description,
-        'recipientId': recipientId,
-        'recipientType': recipientType,
-      }),
+      body: json.encode({}), // Empty body as per spec, backend handles logic
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -1560,16 +1626,16 @@ class ApiService {
           throw Exception(decoded['message'].toString());
         }
       } catch (_) {}
-      throw Exception('Failed to create payment order:  | ');
+      throw Exception('Failed to create payment order: ${response.statusCode}');
     }
   }
 
   /// Verify Razorpay payment and register for event
   Future<Map<String, dynamic>> verifyEventPayment({
+    required String eventId,
     required String razorpayOrderId,
     required String razorpayPaymentId,
     required String razorpaySignature,
-    required String eventId,
   }) async {
     final response = await client.post(
       Uri.parse('$baseUrl/events/$eventId/verify-payment'),
@@ -1592,6 +1658,27 @@ class ApiService {
         }
       } catch (_) {}
       throw Exception('Failed to verify payment: ${response.statusCode}');
+    }
+  }
+
+  /// Create Hosted Payment Link (Optional/Admin use)
+  Future<Map<String, dynamic>> createEventPaymentLink(String eventId) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/events/$eventId/payment-link'),
+      headers: await _getHeaders(),
+      body: json.encode({}), 
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      try {
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+      throw Exception('Failed to create payment link: ${response.statusCode}');
     }
   }
 
@@ -2067,9 +2154,10 @@ class ApiService {
     int page = 1,
     int limit = 20,
     String type = 'all',
+    String search = '',
   }) async {
     final response = await client.get(
-      Uri.parse('$baseUrl/dashboard/clients?page=$page&limit=$limit&type=$type'),
+      Uri.parse('$baseUrl/dashboard/clients?page=$page&limit=$limit&type=$type&search=${Uri.encodeComponent(search)}'),
       headers: await _getHeaders(),
     );
 
@@ -2077,6 +2165,65 @@ class ApiService {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
       throw Exception('Failed to fetch client list: ${response.statusCode}');
+    }
+  }
+
+  /// Get Deactivated Accounts (Admin)
+  /// GET /admin/deactivated-accounts
+  Future<Map<String, dynamic>> getDeactivatedAccounts() async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/admin/deactivated-accounts'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to fetch deactivated accounts: ${response.statusCode}');
+    }
+  }
+
+  /// Reactivate Account (Admin)
+  /// POST /admin/reactivate-account
+  Future<Map<String, dynamic>> adminReactivateAccount({
+    required String accountType,
+    required String accountId,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/admin/reactivate-account'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'accountType': accountType,
+        'accountId': accountId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to reactivate account: ${response.statusCode}');
+    }
+  }
+
+  /// Hard Delete Account (Admin - Immediate)
+  /// POST /admin/hard-delete-account
+  Future<Map<String, dynamic>> hardDeleteAccount({
+    required String accountType,
+    required String accountId,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/admin/hard-delete-account'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'accountType': accountType,
+        'accountId': accountId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to delete account: ${response.statusCode}');
     }
   }
 
@@ -2287,11 +2434,49 @@ class ApiService {
     }
   }
 
-  /// Get All App Ratings
-  /// GET {{baseUrl}}/app-ratings?page=1&limit=20
-  Future<Map<String, dynamic>> getAppRatings({int page = 1, int limit = 20}) async {
+  /// Update App Rating
+  /// PUT {{baseUrl}}/app-ratings
+  Future<Map<String, dynamic>> updateAppRating(Map<String, dynamic> data) async {
+    final response = await client.put(
+      Uri.parse('$baseUrl/app-ratings'),
+      headers: await _getHeaders(),
+      body: json.encode(data),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to update rating: ${response.statusCode}');
+    }
+  }
+
+  /// Get specific user by ID (Admin)
+  Future<Map<String, dynamic>> getAdminUserById(String userId) async {
     final response = await client.get(
-      Uri.parse('$baseUrl/app-ratings?page=$page&limit=$limit'),
+      Uri.parse('$baseUrl/admin/users/$userId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic> && decoded['user'] != null) {
+        return decoded['user'];
+      }
+      return decoded as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to fetch admin user details: ${response.statusCode}');
+    }
+  }
+
+  /// Get All App Ratings
+  /// GET {{baseUrl}}/app-ratings?page=1&limit=20&sort=newest
+  Future<Map<String, dynamic>> getAppRatings({
+    int page = 1, 
+    int limit = 20,
+    String sort = 'newest', // 'newest', 'oldest', 'rating_desc', 'rating_asc'
+  }) async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/app-ratings?page=$page&limit=$limit&sort=$sort'),
       headers: await _getHeaders(),
     );
 
@@ -2305,10 +2490,14 @@ class ApiService {
   /// Get My Application Rating
   /// GET {{baseUrl}}/app-ratings/me
   Future<Map<String, dynamic>> getMyAppRating() async {
+    debugPrint("API: Fetching my app rating...");
     final response = await client.get(
       Uri.parse('$baseUrl/app-ratings/me'),
       headers: await _getHeaders(),
     );
+
+    debugPrint("API: getMyAppRating status: ${response.statusCode}");
+    debugPrint("API: getMyAppRating body: ${response.body}");
 
     if (response.statusCode == 200) {
       final decoded = json.decode(response.body);
@@ -2319,6 +2508,7 @@ class ApiService {
       }
       return {}; 
     } else if (response.statusCode == 404) {
+      debugPrint("API: Rating not found (404)");
       return {}; // No rating found
     } else {
       throw Exception('Failed to fetch my rating: ${response.statusCode}');

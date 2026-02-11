@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/post_provider.dart';
 import 'package:flutter_user_app/features/posts/data/models/post_model.dart';
 import 'package:flutter_user_app/core/util/share_helper.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
@@ -66,12 +67,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   // User info
                   ListTile(
                     leading: CircleAvatar(
-                      backgroundImage: widget.post.userImage.isNotEmpty
-                          ? NetworkImage(widget.post.userImage)
-                          : null,
-                      child: widget.post.userImage.isEmpty
-                          ? Text(widget.post.username[0].toUpperCase())
-                          : null,
+                      backgroundColor: Colors.transparent,
+                      child: widget.post.userImage.isNotEmpty
+                          ? ClipOval(
+                              child: CustomNetworkImage(
+                                imageUrl: widget.post.userImage,
+                                fit: BoxFit.cover,
+                                width: 40,
+                                height: 40,
+                                errorWidget: Text(widget.post.username[0].toUpperCase()),
+                              ),
+                            )
+                          : Text(widget.post.username[0].toUpperCase()),
                     ),
                     title: Text(widget.post.username),
                     subtitle: Text(
@@ -87,15 +94,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       child: PageView.builder(
                         itemCount: widget.post.imageUrls.length,
                         itemBuilder: (context, index) {
-                          return Image.network(
-                            widget.post.imageUrls[index],
+                          return CustomNetworkImage(
+                            imageUrl: widget.post.imageUrls[index],
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: theme.colorScheme.surfaceContainerHighest,
-                                child: const Icon(Icons.broken_image, size: 64),
-                              );
-                            },
+                            errorWidget: Container(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              child: const Icon(Icons.broken_image, size: 64),
+                            ),
                           );
                         },
                       ),
@@ -196,12 +201,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundImage: comment.userImage.isNotEmpty
-                                  ? NetworkImage(comment.userImage)
-                                  : null,
-                              child: comment.userImage.isEmpty
-                                  ? Text(comment.username[0].toUpperCase())
-                                  : null,
+                              backgroundColor: Colors.transparent,
+                              child: comment.userImage.isNotEmpty
+                                  ? ClipOval(
+                                      child: CustomNetworkImage(
+                                        imageUrl: comment.userImage,
+                                        fit: BoxFit.cover,
+                                        width: 40,
+                                        height: 40,
+                                        errorWidget: Text(comment.username[0].toUpperCase()),
+                                      ),
+                                    )
+                                  : Text(comment.username[0].toUpperCase()),
                             ),
                             title: Text(comment.username),
                             subtitle: Text(comment.text),

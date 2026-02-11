@@ -15,6 +15,7 @@ import 'package:flutter_user_app/features/posts/data/repository/post_repository_
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_user_app/features/events/presentation/screens/create_event_screen.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 import 'package:flutter_user_app/features/temples/presentation/tabs/temple_about_tab.dart';
 import 'package:flutter_user_app/features/temples/presentation/tabs/temple_review_tab.dart';
 import 'package:flutter_user_app/features/temples/presentation/tabs/temple_gallery_tab.dart';
@@ -171,15 +172,13 @@ class _TemplePageState extends State<TemplePage>
                           fit: StackFit.expand,
                           children: [
                             // Main Image
-                            Image.network(
-                              temple.imageUrl,
+                            CustomNetworkImage(
+                              imageUrl: temple.imageUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: Colors.grey.shade300,
-                                  child: Icon(Icons.temple_hindu, size: 64, color: Colors.grey),
-                                );
-                              },
+                              errorWidget: Container(
+                                color: Colors.grey.shade300,
+                                child: const Icon(Icons.temple_hindu, size: 64, color: Colors.grey),
+                              ),
                             ),
 
 

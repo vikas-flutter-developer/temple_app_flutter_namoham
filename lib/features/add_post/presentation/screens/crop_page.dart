@@ -105,8 +105,9 @@ class ImageFilter {
 
 class CropPage extends StatefulWidget {
   final String imagePath;
+  final bool isProfile;
 
-  const CropPage({Key? key, required this.imagePath}) : super(key: key);
+  const CropPage({Key? key, required this.imagePath, this.isProfile = false}) : super(key: key);
 
   @override
   State<CropPage> createState() => _CropPageState();
@@ -197,12 +198,16 @@ class _CropPageState extends State<CropPage> {
         await filteredFile.writeAsBytes(finalBytes);
 
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PostComposerPage(imagePath: filteredPath),
-            ),
-          );
+          if (widget.isProfile) {
+            Navigator.pop(context, filteredPath);
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PostComposerPage(imagePath: filteredPath),
+              ),
+            );
+          }
         }
       } catch (e) {
         debugPrint('Error processing image: $e');

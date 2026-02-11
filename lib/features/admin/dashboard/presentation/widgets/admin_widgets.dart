@@ -79,12 +79,34 @@ class AdminHeader extends StatelessWidget {
   }
 
   Widget _buildDropdown(String text) {
-    return Row(
-      children: [
-        Text(text, style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[800], fontSize: 14)),
-        const SizedBox(width: 6),
-        const Icon(Icons.keyboard_arrow_down, size: 20, color: Colors.grey),
-      ],
+    List<PopupMenuEntry<String>> items = [];
+    if (text == "Today") {
+      items = [
+        const PopupMenuItem(value: 'today', child: Text("Today")),
+        const PopupMenuItem(value: 'yesterday', child: Text("Yesterday")),
+        const PopupMenuItem(value: 'this_week', child: Text("This Week")),
+        const PopupMenuItem(value: 'this_month', child: Text("This Month")),
+      ];
+    } else if (text == "Start Date" || text == "End Date") {
+      items = [
+        const PopupMenuItem(value: 'select', child: Text("Select Date")),
+        const PopupMenuItem(value: 'clear', child: Text("Clear")),
+      ];
+    }
+
+    return PopupMenuButton<String>(
+      onSelected: (value) {
+        // Implement date filtering action here
+        // If 'select', we could showDatePicker in a real implementation
+      },
+      itemBuilder: (context) => items,
+      child: Row(
+        children: [
+          Text(text, style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[800], fontSize: 14)),
+          const SizedBox(width: 6),
+          const Icon(Icons.keyboard_arrow_down, size: 20, color: Colors.grey),
+        ],
+      ),
     );
   }
 }

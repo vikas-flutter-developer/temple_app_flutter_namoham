@@ -1,8 +1,10 @@
 ﻿import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/admin/dashboard/data/models/dashboard_models.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/widgets/admin_widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_app_ratings_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -17,6 +19,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
   String? _error;
   String _selectedFilter = 'all';
+  String _searchQuery = ''; // Added search state
   
   // Data from API
   DashboardStatsModel? _stats;
@@ -24,6 +27,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<TrafficLocationModel> _trafficLocations = [];
   List<ClientModel> _clients = [];
   PaginationModel? _clientPagination;
+  bool _isClientLoading = false; // Separate loading for search
   
   @override
   void initState() {
@@ -31,7 +35,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _loadData();
   }
   
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool refreshClientsOnly = false}) async {
+    if (refreshClientsOnly) {
+      if (mounted) setState(() => _isClientLoading = true);
+      try {
+        final clientResponse = await _apiService.getClientList(
+          type: _selectedFilter, 
+          search: _searchQuery
+        );
+        if (mounted) {
+           setState(() {
+             final data = ClientListResponse.fromJson(clientResponse);
+             _clients = data.clients;
+             _clientPagination = data.pagination;
+             _isClientLoading = false;
+           });
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to search: $e')));
+          setState(() => _isClientLoading = false);
+        }
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -43,7 +71,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _apiService.getDashboardStats(),
         _apiService.getMonthlyEngagement(),
         _apiService.getTrafficByLocation(),
-        _apiService.getClientList(type: _selectedFilter),
+        _apiService.getClientList(type: _selectedFilter, search: _searchQuery),
       ]);
       
       setState(() {
@@ -65,9 +93,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   
   void _onFilterChanged(String filter) {
     setState(() {
-      _selectedFilter = filter.toLowerCase();
+      _selectedFilter = filter;
     });
-    _loadData();
+    _loadData(refreshClientsOnly: true);
+  }
+
+
+
+  // Debouncing logic can be improved, for now simple setState
+  Timer? _debounce;
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _searchQuery = query;
+        });
+        _loadData(refreshClientsOnly: true);
+      }
+    });
   }
 
   @override
@@ -96,13 +140,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           AdminHeader(
             filters: Row(
               children: [
-                _buildFilterBtn("All", _selectedFilter == 'all'),
+                _buildFilterBtn("All", 'all'),
                 const SizedBox(width: 12),
-                _buildFilterBtn("Users", _selectedFilter == 'user'),
+                _buildFilterBtn("Users", 'user'),
                 const SizedBox(width: 12),
-                _buildFilterBtn("Temple", _selectedFilter == 'temple'),
+                _buildFilterBtn("Temples", 'temple'),
                 const SizedBox(width: 12),
-                _buildFilterBtn("Creator", _selectedFilter == 'creator'),
+                _buildFilterBtn("Creators", 'creator'),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AdminAppRatingsScreen()),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: const Text(
+                      "App Ratings",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -239,7 +307,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Client List
+                // Client List Header & Search
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -247,22 +315,83 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       "Client List (${_clientPagination?.total ?? 0})", 
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(20),
-                        color: Colors.white,
+                    if (_isClientLoading)
+                      Container(
+                        margin: const EdgeInsets.only(left: 12),
+                        width: 100,
+                        height: 4,
+                        child: const LinearProgressIndicator(),
                       ),
-                      child: Row(
-                        children: [
-                          Text("Type", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                          const SizedBox(width: 8),
-                          Text(_selectedFilter.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.keyboard_arrow_down, size: 16),
-                        ],
-                      ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        // Search Bar
+                        Container(
+                          width: 280, // Slightly wider for better look
+                          height: 40, // Slightly smaller than header (48) to fit in list header
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          margin: const EdgeInsets.only(right: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.grey.shade300, width: 1),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.search,
+                                color: Colors.grey,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                   decoration: const InputDecoration(
+                                     hintText: 'Search user...',
+                                     hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+                                     border: InputBorder.none,
+                                     filled: true,
+                                     fillColor: Colors.white,
+                                     contentPadding: EdgeInsets.only(bottom: 12), // Align text
+                                     isDense: true,
+                                   ),
+                                   style: const TextStyle(fontSize: 13),
+                                   onChanged: (value) {
+                                     _onSearchChanged(value);
+                                   },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white,
+                          ),
+                          child: PopupMenuButton<String>(
+                            onSelected: _onFilterChanged,
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(value: 'all', child: Text("All")),
+                              const PopupMenuItem(value: 'user', child: Text("Users")),
+                              const PopupMenuItem(value: 'temple', child: Text("Temples")),
+                              const PopupMenuItem(value: 'creator', child: Text("Creators")),
+                            ],
+                            child: Row(
+                              children: [
+                                Text("Type", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                                const SizedBox(width: 8),
+                                Text(_selectedFilter.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.keyboard_arrow_down, size: 16),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -309,8 +438,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(client.status, style: const TextStyle(fontSize: 12)),
-                      const Spacer(),
-                      const Icon(Icons.more_vert, size: 16, color: Colors.grey),
                     ]),
                   ]).toList(),
                 ),
@@ -366,9 +493,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }).toList();
   }
 
-  Widget _buildFilterBtn(String title, bool isSelected) {
+  Widget _buildFilterBtn(String label, String value) {
+    bool isSelected = _selectedFilter == value;
     return GestureDetector(
-      onTap: () => _onFilterChanged(title),
+      onTap: () => _onFilterChanged(value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         decoration: BoxDecoration(
@@ -377,7 +505,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           border: Border.all(color: Colors.grey.shade300),
         ),
         child: Text(
-          title,
+          label,
           style: TextStyle(
             color: isSelected ? Colors.white : Colors.black,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -435,7 +563,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-               Text(name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+               Flexible(child: Text(name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
             ],
           ),
           const SizedBox(height: 6),

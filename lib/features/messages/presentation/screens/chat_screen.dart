@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/models/conversation_model.dart';
 import '../providers/messages_provider.dart';
+import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 class ChatScreen extends StatefulWidget {
   final ConversationModel conversation;
@@ -79,11 +80,26 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 18,
               backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              backgroundImage: widget.conversation.otherUserImage.trim().isNotEmpty
-                  ? NetworkImage(widget.conversation.otherUserImage)
-                  : null,
-              child: widget.conversation.otherUserImage.trim().isEmpty
-                  ? Text(
+
+              child: widget.conversation.otherUserImage.trim().isNotEmpty
+                  ? ClipOval(
+                      child: CustomNetworkImage(
+                        imageUrl: widget.conversation.otherUserImage,
+                        fit: BoxFit.cover,
+                        width: 36,
+                        height: 36,
+                        errorWidget: Text(
+                          widget.conversation.otherUserName.isNotEmpty
+                              ? widget.conversation.otherUserName[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Text(
                       widget.conversation.otherUserName.isNotEmpty
                           ? widget.conversation.otherUserName[0].toUpperCase()
                           : '?',
@@ -91,8 +107,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.bold,
                       ),
-                    )
-                  : null,
+                    ),
             ),
             const SizedBox(width: 10),
             Expanded(

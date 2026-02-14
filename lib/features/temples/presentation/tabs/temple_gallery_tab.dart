@@ -71,8 +71,8 @@ class GalleryTabState extends State<GalleryTab> {
         bool matchesId = matchesCurrent || matchesOldGoldenTemple;
         
         // Exclude dummy test videos
-        bool isRealVideo = videoUrl.contains('supabase.co') || 
-                          (!videoUrl.contains('/uploads/reels/example.mp4'));
+        bool isRealVideo = videoUrl.isNotEmpty && 
+                          !videoUrl.contains('/uploads/reels/example.mp4');
         
         return matchesId && isRealVideo;
       }).toList();

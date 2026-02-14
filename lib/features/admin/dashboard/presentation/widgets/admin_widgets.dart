@@ -6,12 +6,16 @@ class AdminHeader extends StatelessWidget {
   final String title;
   final bool showSearch;
   final Widget? filters;
+  final VoidCallback? onBackPressed;
+  final ValueChanged<String>? onSearchChanged;
 
   const AdminHeader({
     super.key,
     this.title = "",
     this.showSearch = true,
     this.filters,
+    this.onBackPressed,
+    this.onSearchChanged,
   });
 
   @override
@@ -24,8 +28,22 @@ class AdminHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.arrow_back, color: Colors.black),
+              GestureDetector(
+                onTap: onBackPressed ?? () => Navigator.maybePop(context),
+                child: const Icon(Icons.arrow_back, color: Colors.black),
+              ),
               const SizedBox(width: 16),
+              if (title.isNotEmpty) ...[
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(width: 24),
+              ],
               if (showSearch)
                 Expanded(
                   child: Container(
@@ -45,6 +63,7 @@ class AdminHeader extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                          Expanded(child: TextField(
+                          onChanged: onSearchChanged,
                           style: const TextStyle(fontSize: 12),
                           decoration: InputDecoration(
                             border: InputBorder.none,

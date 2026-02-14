@@ -1,16 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_user_app/core/api/api_service.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:timeago/timeago.dart' as timeago; 
+
+import 'package:flutter_user_app/features/notifications/presentation/providers/notification_provider.dart';
+import 'package:flutter_user_app/core/helper/navigation_helper.dart';
+
+// Correct Imports for Detail Screens
+import 'package:flutter_user_app/features/posts/presentation/screens/post_detail_screen.dart'; // Corrected from post_detail_page.dart
+import 'package:flutter_user_app/features/reels/presentation/screens/video_screen.dart'; // Corrected from reel_detail_screen.dart
+import 'package:flutter_user_app/features/events/presentation/screens/event_detail_screen.dart';
+import 'package:flutter_user_app/features/temples/presentation/screens/temple_page.dart'; // Corrected from temple_profile_page.dart
+import 'package:flutter_user_app/features/creator/presentation/screens/creator_page.dart'; // Corrected from creator_profile_page.dart
+
+// Models
 import 'package:flutter_user_app/features/notifications/data/models/notification_model.dart';
 import 'package:flutter_user_app/features/posts/data/models/post_model.dart';
-import 'package:flutter_user_app/features/posts/presentation/screens/post_detail_screen.dart';
-import 'package:flutter_user_app/features/reels/data/models/reel_model.dart';
-import 'package:flutter_user_app/features/reels/presentation/screens/video_screen.dart';
 import 'package:flutter_user_app/features/events/data/models/event_model.dart';
-import 'package:flutter_user_app/features/events/presentation/screens/event_detail_screen.dart';
-import 'package:flutter_user_app/features/temples/presentation/screens/temple_page.dart';
-import 'package:flutter_user_app/features/creator/presentation/screens/creator_page.dart';
-import 'package:timeago/timeago.dart' as timeago;
-import '../../../../widgets/custom_widgets/custom_network_image.dart';
+import 'package:flutter_user_app/features/reels/data/models/reel_model.dart';
+import 'package:flutter_user_app/features/temples/data/models/temple_model.dart';
+import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
+
+import 'package:flutter_user_app/core/api/api_service.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -20,239 +32,95 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
-  final ApiService _apiService = ApiService.create();
-  List<NotificationModel> _notifications = [];
-  bool _isLoading = true;
-  String? _error;
-
   @override
   void initState() {
     super.initState();
-    _fetchNotifications();
-  }
-
-  Future<void> _fetchNotifications() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
+    // Refresh notifications when screen opens to ensure up-to-date data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
     });
-    
-    try {
-      final data = await _apiService.getNotifications();
-      if (mounted) {
-        setState(() {
-          _notifications = data;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching notifications: $e');
-      if (mounted) {
-        setState(() {
-          _error = 'Failed to load notifications';
-          _isLoading = false;
-        });
-      }
-    }
   }
 
-  Future<void> _markAsRead(String notificationId) async {
-    try {
-      await _apiService.markNotificationRead(notificationId);
-      // Update local state
-      setState(() {
-        final index = _notifications.indexWhere((n) => n.id == notificationId);
-        if (index != -1) {
-          // Create a new notification with isRead = true
-          final old = _notifications[index];
-          _notifications[index] = NotificationModel(
-            id: old.id,
-            recipientId: old.recipientId,
-            recipientModel: old.recipientModel,
-            sender: old.sender,
-            senderModel: old.senderModel,
-            type: old.type,
-            message: old.message,
-            isRead: true,
-            createdAt: old.createdAt,
-            post: old.post,
-            reel: old.reel,
-            event: old.event,
-          );
-        }
-      });
-    } catch (e) {
-      debugPrint('Error marking notification as read: $e');
-    }
-  }
-
-  Future<void> _markAllAsRead() async {
-    try {
-      await _apiService.markAllNotificationsRead();
-      // Update local state
-      setState(() {
-        _notifications = _notifications.map((n) => NotificationModel(
-          id: n.id,
-          recipientId: n.recipientId,
-          recipientModel: n.recipientModel,
-          sender: n.sender,
-          senderModel: n.senderModel,
-          type: n.type,
-          message: n.message,
-          isRead: true,
-          createdAt: n.createdAt,
-          post: n.post,
-          reel: n.reel,
-          event: n.event,
-        )).toList();
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All notifications marked as read')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error marking all notifications as read: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to mark notifications as read')),
-        );
-      }
-    }
-  }
-
-  Future<void> _handleNotificationTap(NotificationModel notification) async {
-    // Mark as read first
+  Future<void> _onNotificationTap(NotificationModel notification) async {
     if (!notification.isRead) {
-      _markAsRead(notification.id);
+      Provider.of<NotificationProvider>(context, listen: false).markAsRead(notification.id);
     }
 
-    final targetId = notification.targetId;
-    if (targetId == null) return;
+    if (notification.targetId != null) {
+      final targetId = notification.targetId!;
+      final apiService = Provider.of<ApiService>(context, listen: false);
 
-    _showLoadingOverlay();
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
 
-    try {
-      Widget? destination;
-
-      switch (notification.type) {
-        case 'new_post':
-          // DIRECT NAVIGATION STRATEGY
-          // 1. Check if we have enough data in the notification itself
-          if (notification.post != null) {
-             final post = PostModel(
-                 id: notification.post!.id,
-                 userId: notification.sender?.id ?? '',
-                 username: notification.sender?.displayName ?? 'Unknown',
-                 userImage: notification.sender?.imageUrl ?? '',
-                 userType: notification.senderModel,
-                 caption: notification.post!.caption,
-                 location: '',
-                 imageUrls: notification.post!.imageUrls,
-                 likes: 0,
-                 likedBy: [],
-                 likedByNames: [],
-                 commentsCount: 0,
-                 shareCount: 0,
-                 timestamp: 'Just now',
-                 createdAt: DateTime.now().toIso8601String(),
-             );
-             destination = PostDetailScreen(post: post);
-          } else {
-             // 2. Fallback to API if notification data is missing
+      try {
+        if (notification.type == 'new_post') {
+          final postData = await apiService.getPostById(targetId);
+          if (mounted) {
+            Navigator.pop(context); // Close loading
+            navigateToPage(context, PostDetailScreen(post: PostModel.fromJson(postData)));
+          }
+        } else if (notification.type == 'new_reel') {
+          final reelData = await apiService.getReelById(targetId);
+          if (mounted) {
+            Navigator.pop(context); // Close loading
+            // VideosScreen expects a list of reels
+            final reel = ReelModel.fromJson(reelData);
+            navigateToPage(context, VideosScreen(initialReels: [reel], initialIndex: 0));
+          }
+        } else if (notification.type == 'new_event') {
+          final eventData = await apiService.getEventById(targetId);
+          if (mounted) {
+            Navigator.pop(context); // Close loading
+             navigateToPage(context, EventDetailScreen(event: EventModel.fromJson(eventData)));
+          }
+        } else if (notification.type == 'follow' || notification.type == 'new_follower') {
+          if (notification.targetType == 'temple' || notification.type == 'temple') { // Handle loose typing if needed
              try {
-                final raw = await _apiService.getPostById(targetId);
-                final post = PostModel.fromJson(raw);
-                destination = PostDetailScreen(post: post);
-             } catch(e) {
-                debugPrint('Post fetch failed: $e');
-                throw Exception('Post content unavailable');
+                final temple = await apiService.getTempleById(targetId);
+                if (mounted) {
+                  Navigator.pop(context);
+                  navigateToPage(context, TemplePage(templeModel: temple));
+                }
+             } catch (e) {
+               // Fallback or retry? If temple fetch fails, maybe it's a creator?
+               // But assuming notification.targetType is accurate.
+               if (mounted) Navigator.pop(context); 
+               debugPrint('Error fetching temple: $e');
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not load profile')));
              }
-          }
-          break;
-
-        case 'new_reel':
-          print('NOTIF_SCREEN: Handling new_reel');
-          // DIRECT NAVIGATION STRATEGY
-          if (notification.reel != null) {
-              print('NOTIF_SCREEN: Using direct reel data. ID: ${notification.reel!.id} Video: ${notification.reel!.videoUrl}');
-              final reel = ReelModel(
-                id: notification.reel!.id,
-                userId: notification.sender?.id ?? '',
-                userType: notification.senderModel,
-                username: notification.sender?.displayName ?? 'Someone',
-                userImage: notification.sender?.imageUrl ?? '',
-                caption: notification.reel!.caption,
-                videoUrl: notification.reel!.videoUrl,
-                thumbnailUrl: notification.reel!.thumbnailUrl,
-                likes: 0,
-                views: 0,
-              );
-              destination = VideosScreen(initialReels: [reel], initialIndex: 0);
+          } else if (notification.targetType == 'creator' || notification.type == 'creator') {
+             try {
+                final creator = await apiService.getCreatorById(targetId);
+                 if (mounted) {
+                  Navigator.pop(context);
+                  navigateToPage(context, CreatorPage(creator: creator));
+                }
+             } catch (e) {
+                if (mounted) Navigator.pop(context); 
+                debugPrint('Error fetching creator: $e');
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not load profile')));
+             }
           } else {
-            print('NOTIF_SCREEN: No direct reel data. Fetching from API...');
-            // Fallback to API
-            try {
-              final raw = await _apiService.getReelById(targetId);
-              final reel = ReelModel.fromJson(raw);
-              print('NOTIF_SCREEN: Fetched reel from API. ID: ${reel.id}');
-              destination = VideosScreen(initialReels: [reel], initialIndex: 0);
-            } catch (e) {
-              debugPrint('Reel fetch failed: $e');
-              throw Exception('Reel content unavailable');
-            }
+             Navigator.pop(context); // Close loading if unknown type
           }
-          break;
-
-        case 'new_event':
-          final raw = await _apiService.getEventById(targetId);
-          final event = EventModel.fromJson(raw);
-          destination = EventDetailScreen(event: event);
-          break;
-
-        case 'follow':
-        case 'new_follower':
-          if (notification.senderModel == 'temple') {
-            final temple = await _apiService.getTempleById(targetId);
-            destination = TemplePage(templeModel: temple);
-          } else if (notification.senderModel == 'creator') {
-            final creator = await _apiService.getCreatorById(targetId);
-            destination = CreatorPage(creator: creator);
-          }
-          break;
-      }
-
-      if (mounted) {
-        Navigator.of(context).pop(); // Remove loading overlay
-        if (destination != null) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => destination!),
+        } else {
+           Navigator.pop(context); // Close loading for unhandled types
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pop(context); // Close loading on error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Attributes not found or error loading: ${e.toString()}')),
           );
         }
       }
-    } catch (e) {
-      debugPrint('Navigation error: $e');
-      if (mounted) {
-        Navigator.of(context).pop(); // Remove loading overlay
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open content: $e')),
-        );
-      }
     }
   }
-
-  void _showLoadingOverlay() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
-  }
-
-  int get _unreadCount => _notifications.where((n) => !n.isRead).length;
 
   @override
   Widget build(BuildContext context) {
@@ -261,392 +129,272 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(
-          'Notifications',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold, 
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-        backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          if (_unreadCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: TextButton(
-                onPressed: _markAllAsRead,
-                child: Text(
-                  'Mark all read',
-                  style: TextStyle(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(
-            height: 1, 
-            thickness: 1, 
-            color: theme.colorScheme.outlineVariant.withAlpha(50),
-          ),
-        ),
-      ),
-      body: _buildBody(theme),
-    );
-  }
-
-  Map<String, List<NotificationModel>> _groupNotifications() {
-    final Map<String, List<NotificationModel>> groups = {
-      'Today': [],
-      'Yesterday': [],
-      'Earlier': [],
-    };
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-
-    for (var n in _notifications) {
-      final date = DateTime(n.createdAt.year, n.createdAt.month, n.createdAt.day);
-      if (date == today) {
-        groups['Today']!.add(n);
-      } else if (date == yesterday) {
-        groups['Yesterday']!.add(n);
-      } else {
-        groups['Earlier']!.add(n);
-      }
-    }
-
-    return groups;
-  }
-
-  Widget _buildBody(ThemeData theme) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-            const SizedBox(height: 16),
-            Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _fetchNotifications,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    if (_notifications.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withAlpha(50),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.notifications_none_rounded, 
-                size: 80, 
-                color: theme.colorScheme.primary.withAlpha(150),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'All caught up!',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+        title: Consumer<NotificationProvider>(
+          builder: (context, provider, _) {
+            final count = provider.unreadCount;
+            return Text(
+              "Notifications ${count > 0 ? '($count)' : ''}",
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w600,
                 color: theme.colorScheme.onSurface,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'No new notifications at the moment.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
+            );
+          }
         ),
-      );
-    }
-
-    final groups = _groupNotifications();
-    
-    return RefreshIndicator(
-      onRefresh: _fetchNotifications,
-      child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: [
-          if (groups['Today']!.isNotEmpty) ...[
-            _buildSectionHeader('Today', theme),
-            ...groups['Today']!.map((n) => _buildNotificationItem(n, theme)),
-          ],
-          if (groups['Yesterday']!.isNotEmpty) ...[
-            _buildSectionHeader('Yesterday', theme),
-            ...groups['Yesterday']!.map((n) => _buildNotificationItem(n, theme)),
-          ],
-          if (groups['Earlier']!.isNotEmpty) ...[
-            _buildSectionHeader('Earlier', theme),
-            ...groups['Earlier']!.map((n) => _buildNotificationItem(n, theme)),
-          ],
-          const SizedBox(height: 24),
+        centerTitle: true,
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.done_all, color: theme.colorScheme.primary),
+            tooltip: 'Mark all as read',
+            onPressed: () {
+              Provider.of<NotificationProvider>(context, listen: false).markAllAsRead();
+            },
+          ),
         ],
       ),
-    );
-  }
+      body: Consumer<NotificationProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading && provider.notifications.isEmpty) {
+            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
+          }
 
-  Widget _buildSectionHeader(String title, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: Text(
-        title,
-        style: theme.textTheme.titleSmall?.copyWith(
-          color: theme.colorScheme.primary,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.1,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotificationItem(NotificationModel notification, ThemeData theme) {
-    return InkWell(
-      onTap: () => _handleNotificationTap(notification),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        decoration: BoxDecoration(
-          color: notification.isRead 
-              ? Colors.transparent 
-              : theme.colorScheme.primary.withAlpha(15),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Sender Avatar
-            _buildSenderAvatar(notification, theme),
-            const SizedBox(width: 14),
-            
-            // Content
-            Expanded(
+          if (provider.error != null && provider.notifications.isEmpty) {
+            return Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  RichText(
-                    text: TextSpan(
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontSize: 15,
-                        height: 1.4,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: notification.sender?.displayName ?? 'Someone',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        TextSpan(text: ' ${_getNotificationActionText(notification)}'),
-                      ],
+                   Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+                   const SizedBox(height: 16),
+                   Text(
+                     provider.error!,
+                     style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.error),
+                   ),
+                   const SizedBox(height: 16),
+                   ElevatedButton(
+                     onPressed: () => provider.fetchNotifications(),
+                     child: const Text("Retry"),
+                   )
+                ],
+              ),
+            );
+          }
+
+          if (provider.notifications.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.notifications_off_outlined, size: 60, color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(height: 16),
+                  Text(
+                    "No notifications yet",
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (notification.body.isNotEmpty)
-                    Text(
-                      notification.body,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontSize: 13,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(
-                        _getNotificationIcon(notification.type),
-                        size: 14,
-                        color: _getNotificationColor(notification.type).withAlpha(200),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_getNotificationTypeText(notification.type)} • ${timeago.format(notification.createdAt, locale: 'en_short')}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
+            );
+          }
+
+          // Grouping logic for UI
+          final grouped = <String, List<NotificationModel>>{};
+          for (var n in provider.notifications) {
+             final now = DateTime.now();
+             final diff = now.difference(n.createdAt).inDays;
+             String groupKey;
+             if (diff == 0 && n.createdAt.day == now.day) {
+               groupKey = 'Today';
+             } else if (diff == 0 || (diff == 1 && n.createdAt.day == now.day - 1)) {
+               groupKey = 'Yesterday';
+             } else if (diff < 7) {
+               groupKey = 'This Week';
+             } else {
+               groupKey = 'Older';
+             }
+
+             if (grouped[groupKey] == null) grouped[groupKey] = [];
+             grouped[groupKey]!.add(n);
+          }
+
+          return RefreshIndicator(
+            onRefresh: () => provider.fetchNotifications(),
+            color: theme.colorScheme.primary,
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              itemCount: grouped.keys.length,
+              itemBuilder: (context, index) {
+                final key = grouped.keys.elementAt(index);
+                final notifications = grouped[key]!;
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                     Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
+                        child: Text(
+                          key,
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ...notifications.map((n) => _buildNotificationCard(context, n, theme)),
+                  ],
+                );
+              },
             ),
-            
-            // Content Preview or Unread dot
-            const SizedBox(width: 12),
-            _buildTrailing(notification, theme),
-          ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildNotificationCard(BuildContext context, NotificationModel notification, ThemeData theme) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      color: notification.isRead 
+          ? theme.colorScheme.surfaceContainer
+          : theme.colorScheme.primaryContainer.withValues(alpha: 0.1), // Fixed withValues
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), // Fixed withValues
+        ),
+      ),
+      child: InkWell(
+        onTap: () => _onNotificationTap(notification),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar
+              Container(
+                height: 48,
+                width: 48,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHigh,
+                  shape: BoxShape.circle,
+                  image: notification.imageUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(notification.imageUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: notification.imageUrl == null
+                    ? Icon(Icons.notifications, color: theme.colorScheme.primary)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notification.title,
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          _formatTime(notification.createdAt),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      notification.body,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (notification.type == 'new_event' && notification.event?.eventDate != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today, size: 12, color: theme.colorScheme.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              DateFormat('MMM d, y • h:mm a').format(notification.event!.eventDate!),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              
+              // Unread indicator
+              if (!notification.isRead)
+                Container(
+                  margin: const EdgeInsets.only(left: 8, top: 20),
+                  height: 8,
+                  width: 8,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  String _getNotificationActionText(NotificationModel notification) {
-    switch (notification.type) {
-      case 'new_post':
-        return 'shared a new post.';
-      case 'new_reel':
-        return 'shared a new reel.';
-      case 'new_event':
-        return 'created an upcoming event.';
-      case 'follow':
-      case 'new_follower':
-        return 'started following you.';
-      default:
-        return 'sent you a notification.';
-    }
-  }
-
-  Widget _buildSenderAvatar(NotificationModel notification, ThemeData theme) {
-    final imageUrl = notification.sender?.imageUrl;
-    
-    return Stack(
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: theme.colorScheme.primary.withAlpha(30),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(10),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: CircleAvatar(
-            backgroundColor: theme.colorScheme.surfaceContainerHighest,
-            child: imageUrl != null && imageUrl.isNotEmpty
-                ? ClipOval(
-                    child: CustomNetworkImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.cover,
-                      width: 52,
-                      height: 52,
-                      errorWidget: Icon(Icons.person, color: theme.colorScheme.primary),
-                    ),
-                  )
-                : Icon(Icons.person, color: theme.colorScheme.primary),
-          ),
-        ),
-        if (!notification.isRead)
-          Positioned(
-            right: 0,
-            top: 0,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                shape: BoxShape.circle,
-                border: Border.all(color: theme.colorScheme.surface, width: 2.5),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildTrailing(NotificationModel notification, ThemeData theme) {
-    // If it's a post or reel, show a tiny thumbnail if available
-    String? thumbUrl;
-    if (notification.type == 'new_post') {
-      thumbUrl = notification.post?.imagePreview;
-    } else if (notification.type == 'new_reel') {
-      thumbUrl = notification.reel?.thumbnail;
-    } else if (notification.type == 'new_event') {
-      thumbUrl = notification.event?.eventImages.isNotEmpty == true 
-                 ? notification.event!.eventImages.first 
-                 : null;
-    }
-
-    if (thumbUrl != null && thumbUrl.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(100)),
-          ),
-          child: CustomNetworkImage(
-            imageUrl: thumbUrl,
-            fit: BoxFit.cover,
-            errorWidget: Container(color: theme.colorScheme.surfaceContainerHighest),
-          ),
-        ),
-      );
-    }
-
-    // Default: Maybe show a right arrow or nothing
-    return Icon(
-      Icons.chevron_right_rounded,
-      color: theme.colorScheme.onSurfaceVariant.withAlpha(100),
-    );
-  }
-
-  IconData _getNotificationIcon(String type) {
-    switch (type) {
-      case 'new_post': return Icons.image_rounded;
-      case 'new_reel': return Icons.play_circle_outline_rounded;
-      case 'new_event': return Icons.calendar_month_rounded;
-      case 'follow':
-      case 'new_follower': return Icons.person_add_rounded;
-      default: return Icons.notifications_rounded;
-    }
-  }
-
-  Color _getNotificationColor(String type) {
-    switch (type) {
-      case 'new_post': return Colors.blue;
-      case 'new_reel': return Colors.purple;
-      case 'new_event': return Colors.orange;
-      case 'follow':
-      case 'new_follower': return Colors.green;
-      default: return Colors.grey;
-    }
-  }
-
-  String _getNotificationTypeText(String type) {
-    switch (type) {
-      case 'new_post': return 'Post';
-      case 'new_reel': return 'Reel';
-      case 'new_event': return 'Event';
-      case 'follow':
-      case 'new_follower': return 'Follower';
-      default: return 'Other';
+  String _formatTime(DateTime time) {
+    try {
+      return timeago.format(time, locale: 'en_short');
+    } catch (_) {
+      final now = DateTime.now();
+      final difference = now.difference(time);
+      if (difference.inMinutes < 1) {
+        return 'Just now';
+      } else if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}m ago';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours}h ago';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays}d ago';
+      } else {
+        return DateFormat('MMM d').format(time);
+      }
     }
   }
 }
+

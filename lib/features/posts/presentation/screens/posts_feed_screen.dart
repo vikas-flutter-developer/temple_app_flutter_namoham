@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/post_provider.dart';
@@ -13,13 +14,46 @@ class PostsFeedScreen extends StatefulWidget {
   State<PostsFeedScreen> createState() => _PostsFeedScreenState();
 }
 
-class _PostsFeedScreenState extends State<PostsFeedScreen> {
+class _PostsFeedScreenState extends State<PostsFeedScreen> with WidgetsBindingObserver {
+  Timer? _refreshTimer;
+  static const _refreshInterval = Duration(seconds: 30);
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PostProvider>().fetchPosts();
     });
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshPosts();
+      _startAutoRefresh();
+    } else if (state == AppLifecycleState.paused) {
+      _refreshTimer?.cancel();
+    }
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) => _refreshPosts());
+  }
+
+  void _refreshPosts() {
+    if (mounted) {
+      context.read<PostProvider>().fetchPosts();
+    }
   }
 
   @override
@@ -38,16 +72,26 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (postProvider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+          if (postProvider.error != null && postProvider.posts.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: () => postProvider.fetchPosts(),
+              child: ListView(
                 children: [
-                  Text('Error: ${postProvider.error}'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => postProvider.fetchPosts(),
-                    child: const Text('Retry'),
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Error: ${postProvider.error}'),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => postProvider.fetchPosts(),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -55,7 +99,17 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
           }
 
           if (postProvider.posts.isEmpty) {
-            return const Center(child: Text('No posts available'));
+            return RefreshIndicator(
+              onRefresh: () => postProvider.fetchPosts(),
+              child: ListView(
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    child: const Center(child: Text('No posts available')),
+                  ),
+                ],
+              ),
+            );
           }
 
           return RefreshIndicator(
@@ -82,7 +136,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AddPostPage()),
-                );
+                ).then((_) => _refreshPosts());
               },
               child: const Icon(Icons.add),
             ),

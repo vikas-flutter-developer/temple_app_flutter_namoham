@@ -2,6 +2,7 @@
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/admin/dashboard/data/models/dashboard_models.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/widgets/admin_widgets.dart';
+import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_main_layout.dart';
 import 'package:intl/intl.dart';
 
 class AdminCalendarScreen extends StatefulWidget {
@@ -80,10 +81,14 @@ class _AdminCalendarScreenState extends State<AdminCalendarScreen> {
       );
     }
     
-    return SingleChildScrollView(
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         children: [
           AdminHeader(
+            onBackPressed: () => AdminMainLayout.switchToTab(0),
             filters: Row(
                children: [
                 _buildFilterBtn("All", _selectedFilter == 'all'),
@@ -260,6 +265,7 @@ class _AdminCalendarScreenState extends State<AdminCalendarScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

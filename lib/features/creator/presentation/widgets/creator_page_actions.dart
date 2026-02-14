@@ -13,8 +13,13 @@ import 'package:flutter_user_app/features/messages/presentation/screens/chat_scr
 
 class CreatorProfileActions extends StatelessWidget {
   final CreatorModel profile;
+  final bool isOwner;
 
-  const CreatorProfileActions({super.key, required this.profile});
+  const CreatorProfileActions({
+    super.key,
+    required this.profile,
+    required this.isOwner,
+  });
 
   Future<void> _launchMaps() async {
     // Use creator name for direction search
@@ -41,6 +46,8 @@ class CreatorProfileActions extends StatelessWidget {
           Expanded(
             child: Consumer<FollowProvider>(
               builder: (context, followProvider, child) {
+                // If the user type prevents following (logic inside provider) 
+                // but provider usually returns true for user/creator/temple now.
                 if (!followProvider.canFollow) {
                   return _buildButton(
                     text: l10n.follow,
@@ -48,10 +55,11 @@ class CreatorProfileActions extends StatelessWidget {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Login as User or Creator to follow temples/creators'),
+                          content: Text('Login as User, Temple or Creator to follow'),
                         ),
                       );
                     },
+                    context: context,
                   );
                 }
 
@@ -65,6 +73,14 @@ class CreatorProfileActions extends StatelessWidget {
                   onPressed: followProvider.isToggling
                       ? () {}
                       : () async {
+                          // Prevent Self-Follow
+                          if (isOwner && !isFollowing) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('You cannot follow your own account')),
+                            );
+                            return;
+                          }
+
                           final ok = isFollowing
                               ? await followProvider.unfollow(
                                   followingId: profile.id,
@@ -92,12 +108,13 @@ class CreatorProfileActions extends StatelessWidget {
                             );
                           }
                         },
+                  context: context,
                 );
               },
             ),
           ),
           
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           
           // Direction Button
           Expanded(
@@ -105,6 +122,7 @@ class CreatorProfileActions extends StatelessWidget {
               text: 'Direction',
               color: buttonColor,
               onPressed: _launchMaps,
+              context: context,
             ),
           ),
 
@@ -116,6 +134,12 @@ class CreatorProfileActions extends StatelessWidget {
               text: l10n.donate,
               color: buttonColor,
               onPressed: () {
+                if (isOwner) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('You cannot donate to yourself')),
+                  );
+                  return;
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -128,90 +152,95 @@ class CreatorProfileActions extends StatelessWidget {
                   ),
                 );
               },
+              context: context,
             ),
           ),
           
           const SizedBox(width: 8),
 
-                // Message Button Logic
-                _buildButton(
-                  text: l10n.message,
-                  color: buttonColor,
-                  onPressed: () async {
-                    // 1. Show loading indicator
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) => const Center(child: CircularProgressIndicator()),
+          // Message Button
+          Expanded(
+            child: _buildButton(
+              text: l10n.message,
+              color: buttonColor,
+              onPressed: () async {
+                if (isOwner) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('You cannot message yourself')),
+                  );
+                  return;
+                }
+
+                // 1. Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => const Center(child: CircularProgressIndicator()),
+                );
+
+                // Create MessagesProvider instance
+                final provider = MessagesProvider(ApiService.create());
+                
+                // 2. Initiate or Find Chat
+                final conversation = await provider.initiateChat(
+                  otherUserId: profile.id,
+                  otherUserType: 'creator',
+                  otherUserName: profile.creatorName,
+                );
+
+                // 3. Dismiss loading
+                if (context.mounted) Navigator.pop(context);
+
+                if (conversation == null) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                       SnackBar(content: Text(provider.error ?? 'Failed to start chat')),
                     );
+                  }
+                  return;
+                }
 
-                    // Create MessagesProvider instance
-                    final provider = MessagesProvider(ApiService.create());
-                    
-                    // 2. Initiate or Find Chat
-                    final conversation = await provider.initiateChat(
-                      otherUserId: profile.id,
-                      otherUserType: 'creator',
-                      otherUserName: profile.creatorName,
-                    );
+                // 4. Check Status
+                if (!context.mounted) return;
 
-                    // 3. Dismiss loading
-                    if (context.mounted) Navigator.pop(context);
-
-                    if (conversation == null) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                           SnackBar(content: Text(provider.error ?? 'Failed to start chat')),
-                        );
-                      }
-                      return;
-                    }
-
-                    // DEBUG: Log conversation details
-                    debugPrint('CHAT_DEBUG: Conversation ID: ${conversation.id}');
-                    debugPrint('CHAT_DEBUG: Status: ${conversation.status}');
-                    debugPrint('CHAT_DEBUG: Request Sender ID: ${conversation.requestSenderId}');
-                    debugPrint('CHAT_DEBUG: Current User ID: ${provider.userId}');
-
-                    // 4. Check Status
-                    if (!context.mounted) return;
-
-                    if (conversation.status == 'accepted') {
-                      // Open Chat Screen
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChangeNotifierProvider.value(
-                            value: provider,
-                            child: ChatScreen(conversation: conversation),
-                          ),
-                        ),
-                      );
-                    } else if (conversation.status == 'pending') {
-                       // Show Confirmation (Instagram Style)
-                       showDialog(
-                         context: context,
-                         builder: (_) => AlertDialog(
-                           title: const Text('Request Sent'),
-                           content: Text(
-                             'You have sent a message request to ${profile.creatorName}. '
-                             'You can chat once they accept your request.'
-                           ),
-                           actions: [
-                             TextButton(
-                               onPressed: () => Navigator.pop(context),
-                               child: const Text('OK'),
-                             ),
-                           ],
+                if (conversation.status == 'accepted') {
+                  // Open Chat Screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: ChatScreen(conversation: conversation),
+                      ),
+                    ),
+                  );
+                } else if (conversation.status == 'pending') {
+                   // Show Confirmation (Instagram Style)
+                   showDialog(
+                     context: context,
+                     builder: (_) => AlertDialog(
+                       title: const Text('Request Sent'),
+                       content: Text(
+                         'You have sent a message request to ${profile.creatorName}. '
+                         'You can chat once they accept your request.'
+                       ),
+                       actions: [
+                         TextButton(
+                           onPressed: () => Navigator.pop(context),
+                           child: const Text('OK'),
                          ),
-                       );
-                    } else if (conversation.status == 'rejected') {
-                       ScaffoldMessenger.of(context).showSnackBar(
-                         const SnackBar(content: Text('Message request was declined.')),
-                       );
-                    }
-                  },
-                ),
+                       ],
+                     ),
+                   );
+                } else if (conversation.status == 'rejected') {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                     const SnackBar(content: Text('Message request was declined.')),
+                   );
+                }
+              },
+              context: context,
+            ),
+          ),
         ],
       ),
     );
@@ -221,26 +250,27 @@ class CreatorProfileActions extends StatelessWidget {
     required String text,
     required Color color,
     required VoidCallback onPressed,
+    required BuildContext context,
     bool isOutlined = false,
   }) {
     return SizedBox(
-      height: 44,
+      height: 36, // Slight reduce height to fit 4 buttons
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isOutlined ? Colors.white : color,
+          backgroundColor: isOutlined ? Theme.of(context).colorScheme.surface : color,
           foregroundColor: isOutlined ? color : Colors.white,
           elevation: 0,
           side: isOutlined ? BorderSide(color: color) : null,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          padding: EdgeInsets.zero,
+          padding: EdgeInsets.zero, // Compact padding
         ),
         child: Text(
           text,
           style: const TextStyle(
-            fontSize: 15,
+            fontSize: 13, // Slightly smaller font
             fontWeight: FontWeight.w600,
           ),
         ),

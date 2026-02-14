@@ -8,6 +8,7 @@ class PostCommentEntity extends Equatable {
   final String userId;
   final String username;
   final String userImage;
+  final String? name; // Added name field
   final String text;
   final String timestamp;
   final List<PostCommentEntity>? replies;
@@ -21,6 +22,7 @@ class PostCommentEntity extends Equatable {
     required this.userId,
     required this.username,
     required this.userImage,
+    this.name, // Added name to constructor
     required this.text,
     required this.timestamp,
     this.replies,
@@ -36,6 +38,7 @@ class PostCommentEntity extends Equatable {
         userId,
         username,
         userImage,
+        name, // Added name to props
         text,
         timestamp,
         List.from(replies ?? []),
@@ -50,6 +53,7 @@ class PostCommentEntity extends Equatable {
     String? userId,
     String? username,
     String? userImage,
+    String? name, // Added name parameter
     String? text,
     String? timestamp,
     List<PostCommentEntity>? replies,
@@ -63,6 +67,7 @@ class PostCommentEntity extends Equatable {
       userId: userId ?? this.userId,
       username: username ?? this.username,
       userImage: userImage ?? this.userImage,
+      name: name ?? this.name, // Added name assignment
       text: text ?? this.text,
       timestamp: timestamp ?? this.timestamp,
       replies: replies ?? this.replies,

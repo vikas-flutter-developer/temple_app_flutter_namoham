@@ -9,7 +9,8 @@ import 'package:flutter_user_app/widgets/custom_widgets/custom_textfield.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_dropdown_widget.dart';
 
 class ForgotPasswordEmailPage extends StatefulWidget {
-  const ForgotPasswordEmailPage({super.key});
+  final String? initialUserType;
+  const ForgotPasswordEmailPage({super.key, this.initialUserType});
 
   @override
   State<ForgotPasswordEmailPage> createState() => _ForgotPasswordEmailPageState();
@@ -19,13 +20,13 @@ class _ForgotPasswordEmailPageState extends State<ForgotPasswordEmailPage> {
   final TextEditingController _emailController = TextEditingController();
   final ApiService _apiService = ApiService.create();
   bool _isLoading = false;
-  String _selectedUserType = 'user';
+  late String _selectedUserType;
 
-  final List<Map<String, String>> _userTypes = [
-    {'label': 'User', 'value': 'user'},
-    {'label': 'Temple', 'value': 'temple'},
-    {'label': 'Creator', 'value': 'creator'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _selectedUserType = widget.initialUserType ?? 'user';
+  }
 
   Future<void> _handleRequestReset() async {
     final email = _emailController.text.trim();
@@ -115,12 +116,12 @@ class _ForgotPasswordEmailPageState extends State<ForgotPasswordEmailPage> {
 
                     // User Type Dropdown
                     CustomDropdown(
-                      label: 'Account Type',
-                      value: _selectedUserType,
-                      items: _userTypes,
+                      title: 'Account Type',
+                      value: _selectedUserType == 'user' ? 'User' : _selectedUserType == 'temple' ? 'Temple' : 'Creator',
+                      items: const ['User', 'Temple', 'Creator'],
                       onChanged: (value) {
                         if (value != null) {
-                          setState(() => _selectedUserType = value);
+                          setState(() => _selectedUserType = value.toLowerCase());
                         }
                       },
                     ),

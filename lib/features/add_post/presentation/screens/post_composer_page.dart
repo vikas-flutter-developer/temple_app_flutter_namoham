@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
-import 'package:flutter_user_app/core/services/image_upload_service.dart';
+import 'package:flutter_user_app/core/services/r2_upload_service.dart';
 
 class PostComposerPage extends StatefulWidget {
   final String imagePath;
@@ -48,15 +48,15 @@ class _PostComposerPageState extends State<PostComposerPage> {
         return;
       }
 
-      // Upload image to Supabase
+      // Upload image to R2
       final imageFile = File(widget.imagePath);
-      final imageUploadService = ImageUploadService();
-      final uploadedUrl = await imageUploadService.uploadImage(imageFile);
+      final r2UploadService = R2UploadService();
+      final uploadedUrl = await r2UploadService.uploadFile(imageFile, 'posts');
 
       if (uploadedUrl == null || uploadedUrl.isEmpty) {
         // If upload fails, try one more time
         debugPrint('Upload failed, retrying once...');
-        final retryUrl = await imageUploadService.uploadImage(imageFile);
+        final retryUrl = await r2UploadService.uploadFile(imageFile, 'posts');
         if (retryUrl == null || retryUrl.isEmpty) {
              throw Exception('Failed to upload image. Please check your internet connection.');
         }

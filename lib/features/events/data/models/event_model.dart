@@ -20,6 +20,8 @@ class EventModel extends Equatable {
   final List<Attendee> attendees;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<String> remindersSent;
+  final List<String> remindersPending;
 
   const EventModel({
     required this.id,
@@ -41,6 +43,8 @@ class EventModel extends Equatable {
     required this.attendees,
     required this.createdAt,
     required this.updatedAt,
+    this.remindersSent = const [],
+    this.remindersPending = const [],
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
@@ -67,6 +71,8 @@ class EventModel extends Equatable {
           [],
       createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
       updatedAt: DateTime.parse(json['updatedAt'] ?? DateTime.now().toIso8601String()),
+      remindersSent: List<String>.from(json['remindersSent'] ?? []),
+      remindersPending: List<String>.from(json['remindersPending'] ?? []),
     );
   }
 
@@ -91,6 +97,8 @@ class EventModel extends Equatable {
       'attendees': attendees.map((e) => e.toJson()).toList(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'remindersSent': remindersSent,
+      'remindersPending': remindersPending,
     };
   }
 

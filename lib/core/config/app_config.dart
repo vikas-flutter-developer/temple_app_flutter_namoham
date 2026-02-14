@@ -12,17 +12,7 @@ class AppConfig {
     return url;
   }
 
-  // Supabase Configuration
-  static String get supabaseUrl {
-    final url = dotenv.env['SUPABASE_URL'];
-    if (url == null || url.isEmpty) {
-      throw Exception('SUPABASE_URL not found in .env file. Please configure your .env file.');
-    }
-    return url;
-  }
-  
-  static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-  static String get supabaseBucket => dotenv.env['SUPABASE_BUCKET'] ?? 'media';
+
 
   // Admin credentials (for development auto-fill)
   static String get adminUsername => dotenv.env['ADMIN_USERNAME'] ?? '';

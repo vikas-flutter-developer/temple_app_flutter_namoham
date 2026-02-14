@@ -130,60 +130,6 @@ class ApiService {
     }
   }
 
-  // ============== OTP ==============
-
-  /// Send OTP to phone number
-  /// purpose: "registration", "forgot_password", "login"
-  Future<Map<String, dynamic>> sendOtp({
-    required String phoneNumber,
-    required String countryCode,
-    required String purpose,
-  }) async {
-    final response = await client.post(
-      Uri.parse('$baseUrl/otp/send'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'phoneNumber': phoneNumber,
-        'countryCode': countryCode,
-        'purpose': purpose,
-      }),
-    );
-    return json.decode(response.body) as Map<String, dynamic>;
-  }
-
-  /// Verify OTP
-  Future<Map<String, dynamic>> verifyOtp({
-    required String phoneNumber,
-    required String countryCode,
-    required String otp,
-  }) async {
-    final response = await client.post(
-      Uri.parse('$baseUrl/otp/verify'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'phoneNumber': phoneNumber,
-        'countryCode': countryCode,
-        'otp': otp,
-      }),
-    );
-    return json.decode(response.body) as Map<String, dynamic>;
-  }
-
-  /// Resend OTP
-  Future<Map<String, dynamic>> resendOtp({
-    required String phoneNumber,
-    required String countryCode,
-  }) async {
-    final response = await client.post(
-      Uri.parse('$baseUrl/otp/resend'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'phoneNumber': phoneNumber,
-        'countryCode': countryCode,
-      }),
-    );
-    return json.decode(response.body) as Map<String, dynamic>;
-  }
 
   /// Check if phone is verified
   Future<Map<String, dynamic>> checkPhoneVerified({
@@ -430,12 +376,17 @@ class ApiService {
     if (response.statusCode == 200) {
       final jsonResponse = json.decode(response.body);
       
-      // Check for success flag if present
       if (jsonResponse is Map<String, dynamic>) {
-        if (jsonResponse.containsKey('success') && jsonResponse['success'] == false) {
+        if (jsonResponse['success'] == true) {
+             // New API returns { success: true, user: { ... } }
+             if (jsonResponse.containsKey('user')) {
+               return jsonResponse['user'];
+             }
+             // Fallback for older APIs or different structures
+             return jsonResponse['data'] ?? jsonResponse;
+        } else {
              throw Exception(jsonResponse['message'] ?? 'Failed to fetch profile');
         }
-        return jsonResponse;
       }
       
       throw Exception('Invalid profile response format');
@@ -479,21 +430,121 @@ class ApiService {
     }
   }
 
+  // ============== PHONE OTP ==============
+
+  /// Send OTP to phone number
+  /// POST /auth/send-otp
+  Future<Map<String, dynamic>> sendOtp({
+    required String phoneNumber,
+    required String countryCode,
+    String purpose = 'forgot_password',
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/auth/send-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'phoneNumber': phoneNumber,
+        'countryCode': countryCode,
+        'purpose': purpose,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      final errorBody = response.body;
+      try {
+        final decoded = json.decode(errorBody);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+      throw Exception('Failed to send OTP: ${response.statusCode} $errorBody');
+    }
+  }
+
+  /// Verify OTP
+  /// POST /auth/verify-otp
+  Future<Map<String, dynamic>> verifyOtp({
+    required String phoneNumber,
+    required String countryCode,
+    required String otp,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/auth/verify-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'phoneNumber': phoneNumber,
+        'countryCode': countryCode,
+        'otp': otp,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      final errorBody = response.body;
+      try {
+        final decoded = json.decode(errorBody);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+      throw Exception('Failed to verify OTP: ${response.statusCode} $errorBody');
+    }
+  }
+
+  /// Resend OTP
+  /// POST /auth/resend-otp
+  Future<Map<String, dynamic>> resendOtp({
+    required String phoneNumber,
+    required String countryCode,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/auth/resend-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'phoneNumber': phoneNumber,
+        'countryCode': countryCode,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      final errorBody = response.body;
+      try {
+        final decoded = json.decode(errorBody);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          throw Exception(decoded['message'].toString());
+        }
+      } catch (_) {}
+      throw Exception('Failed to resend OTP: ${response.statusCode} $errorBody');
+    }
+  }
+
   // ============== PASSWORD RESET ==============
 
-  /// Request password reset - sends OTP to registered phone number
-  /// userType: "user", "temple", or "creator"
+  /// Request password reset - sends OTP
+  /// POST {{baseUrl}}/auth/forgot-password
   Future<Map<String, dynamic>> requestPasswordReset({
-    required String email,
-    required String userType,
+    String? email,
+    String? phoneNumber,
+    String? userType = "user",
   }) async {
+    // Backend requires 'email'. If we only have phone, send it as email.
+    final effectiveEmail = email ?? phoneNumber;
+    
+    final body = {
+      'email': effectiveEmail,
+      if (phoneNumber != null) 'phoneNumber': phoneNumber,
+      'userType': userType,
+    };
+
     final response = await client.post(
       Uri.parse('$baseUrl/auth/forgot-password'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'email': email,
-        'userType': userType,
-      }),
+      body: json.encode(body),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -510,17 +561,21 @@ class ApiService {
     }
   }
 
-  /// Reset password with OTP verification
+  /// Reset Password with OTP
+  /// POST {{baseUrl}}/auth/reset-password
   Future<Map<String, dynamic>> resetPasswordWithOTP({
-    required String email,
-    required String userType,
+    String? email,
+    String? userType = "user",
     required String phoneNumber,
     required String otp,
     required String newPassword,
     String? sessionId,
   }) async {
+    // Backend requires 'email'. If we only have phone, send it as email.
+    final effectiveEmail = email ?? phoneNumber;
+
     final body = {
-      'email': email,
+      'email': effectiveEmail,
       'userType': userType,
       'phoneNumber': phoneNumber,
       'otp': otp,
@@ -548,18 +603,26 @@ class ApiService {
     }
   }
 
-  /// Resend password reset OTP
+  /// Resend Password Reset OTP
+  /// POST {{baseUrl}}/auth/resend-reset-otp
   Future<Map<String, dynamic>> resendResetOTP({
-    required String email,
-    required String userType,
+    String? email,
+    String? phoneNumber,
+    String? userType = "user",
   }) async {
+    // Backend requires 'email'. If we only have phone, send it as email.
+    final effectiveEmail = email ?? phoneNumber;
+
+    final body = {
+      'email': effectiveEmail,
+      if (phoneNumber != null) 'phoneNumber': phoneNumber,
+      'userType': userType,
+    };
+
     final response = await client.post(
       Uri.parse('$baseUrl/auth/resend-reset-otp'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'email': email,
-        'userType': userType,
-      }),
+      body: json.encode(body),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -666,6 +729,8 @@ class ApiService {
       throw Exception('Failed to unfollow temple');
     }
   }
+
+
 
   // ============== CREATORS API ==============
 
@@ -1308,11 +1373,14 @@ class ApiService {
   /// Delete post comment
   Future<void> deletePostComment(String postId, String commentId, String userId) async {
     try {
-      final response = await client.delete(
-        Uri.parse('$baseUrl/posts/$postId/comments/$commentId'),
-        headers: await _getHeaders(),
-        body: json.encode({'userId': userId}),
-      );
+      // DELETE {{baseUrl}}/posts/{{POST_ID}}/comments/{{COMMENT_ID}}
+      // Body: { "userId": "{{USER_ID}}" }
+      final request = http.Request('DELETE', Uri.parse('$baseUrl/posts/$postId/comments/$commentId'));
+      request.headers.addAll(await _getHeaders());
+      request.body = json.encode({'userId': userId});
+
+      final streamedResponse = await client.send(request);
+      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode != 200 && response.statusCode != 204) {
         // Try to parse error message
@@ -1324,7 +1392,6 @@ class ApiService {
         throw Exception(msg);
       }
     } catch (e) {
-      // Fallback to generic delete if specific fails? No, user specified this API.
       rethrow;
     }
   }
@@ -2227,6 +2294,106 @@ class ApiService {
     }
   }
 
+  /// Deactivate Account (Admin)
+  /// POST /admin/deactivate-account
+  Future<Map<String, dynamic>> adminDeactivateAccount({
+    required String accountType,
+    required String accountId,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/admin/deactivate-account'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'accountType': accountType,
+        'accountId': accountId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to deactivate account: ${response.statusCode}');
+    }
+  }
+
+  // ============== ADMIN VERIFICATION ==============
+
+  /// Get pending verifications (temples & creators)
+  /// GET /admin/verifications?status=pending
+  Future<Map<String, dynamic>> getPendingVerifications({String status = 'pending'}) async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/admin/verifications?status=$status'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to fetch verifications: ${response.statusCode}');
+    }
+  }
+
+  /// Get account details for verification
+  /// GET /admin/verifications/{accountType}/{accountId}
+  Future<Map<String, dynamic>> getVerificationDetails(String accountType, String accountId) async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/admin/verifications/$accountType/$accountId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to fetch verification details: ${response.statusCode}');
+    }
+  }
+
+  /// Approve account (temple or creator)
+  /// POST /admin/verify/approve
+  Future<Map<String, dynamic>> approveAccount({
+    required String accountType,
+    required String accountId,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/admin/verify/approve'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'accountType': accountType,
+        'accountId': accountId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to approve account: ${response.statusCode}');
+    }
+  }
+
+  /// Reject account (temple or creator)
+  /// POST /admin/verify/reject
+  Future<Map<String, dynamic>> rejectAccount({
+    required String accountType,
+    required String accountId,
+    required String reason,
+  }) async {
+    final response = await client.post(
+      Uri.parse('$baseUrl/admin/verify/reject'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'accountType': accountType,
+        'accountId': accountId,
+        'reason': reason,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to reject account: ${response.statusCode}');
+    }
+  }
+
   /// Get donation stats
   Future<Map<String, dynamic>> getDashboardDonationStats() async {
     final response = await client.get(
@@ -2301,6 +2468,24 @@ class ApiService {
     }
   }
 
+  /// Get My Upcoming Events (with reminders)
+  /// GET {{baseUrl}}/events/my-upcoming
+  Future<List<Map<String, dynamic>>> getMyUpcomingEvents() async {
+    final response = await client.get(
+      Uri.parse('$baseUrl/events/my-upcoming'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true && data['events'] != null) {
+        return (data['events'] as List).cast<Map<String, dynamic>>();
+      }
+      return [];
+    } else {
+      throw Exception('Failed to fetch upcoming events: ${response.statusCode}');
+    }
+  }
 
 
   /// Get events by organizer (Temple/Creator)
@@ -2512,6 +2697,78 @@ class ApiService {
       return {}; // No rating found
     } else {
       throw Exception('Failed to fetch my rating: ${response.statusCode}');
+    }
+  }
+
+  // ─── Block / Hide ───────────────────────────────────────────────
+
+  /// Block/Hide an entity (temple, creator, user)
+  /// POST /blocks/block
+  Future<Map<String, dynamic>> blockEntity(String entityId, String entityType) async {
+    final headers = await _getHeaders();
+    final response = await client.post(
+      Uri.parse('$baseUrl/blocks/block'),
+      headers: headers,
+      body: json.encode({
+        'entityId': entityId,
+        'entityType': entityType,
+      }),
+    );
+    _checkStatus(response);
+    
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final jsonResponse = json.decode(response.body);
+      if (jsonResponse is Map<String, dynamic> && jsonResponse['success'] == false) {
+        throw Exception(jsonResponse['message'] ?? 'Failed to block entity');
+      }
+      return jsonResponse;
+    } else {
+      throw Exception('Failed to block entity: ${response.statusCode} - ${response.body}');
+    }
+  }
+
+  /// Unblock/Unhide an entity
+  /// POST /blocks/unblock
+  Future<Map<String, dynamic>> unblockEntity(String entityId) async {
+    final headers = await _getHeaders();
+    final response = await client.post(
+      Uri.parse('$baseUrl/blocks/unblock'),
+      headers: headers,
+      body: json.encode({
+        'entityId': entityId,
+      }),
+    );
+    _checkStatus(response);
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final jsonResponse = json.decode(response.body);
+      if (jsonResponse is Map<String, dynamic> && jsonResponse['success'] == false) {
+        throw Exception(jsonResponse['message'] ?? 'Failed to unblock entity');
+      }
+      return jsonResponse;
+    } else {
+       throw Exception('Failed to unblock entity: ${response.statusCode} - ${response.body}');
+    }
+  }
+
+  /// Get the list of blocked entities
+  /// GET /blocks/list
+  Future<Map<String, dynamic>> getBlockList() async {
+    final headers = await _getHeaders();
+    final response = await client.get(
+      Uri.parse('$baseUrl/blocks/list'),
+      headers: headers,
+    );
+    _checkStatus(response);
+
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      if (jsonResponse is Map<String, dynamic> && jsonResponse['success'] == false) {
+        throw Exception(jsonResponse['message'] ?? 'Failed to fetch block list');
+      }
+      return jsonResponse;
+    } else {
+      throw Exception('Failed to fetch block list: ${response.statusCode} - ${response.body}');
     }
   }
 }

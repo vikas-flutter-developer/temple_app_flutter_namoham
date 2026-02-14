@@ -100,10 +100,10 @@ class _CreatorProfileStatsState extends State<CreatorProfileStats> {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Colors.black87, // Strong black for numbers
+            // color: Colors.black87, // Removed hardcoded color
           ),
         ),
         const SizedBox(height: 4),
@@ -111,7 +111,7 @@ class _CreatorProfileStatsState extends State<CreatorProfileStats> {
           label,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey.shade600, // Grey for label
+            // color: Colors.grey.shade600, // Removed hardcoded color
             fontWeight: FontWeight.normal,
           ),
         ),

@@ -8,6 +8,7 @@ class PostCommentModel extends PostCommentEntity {
     required super.userId,
     required super.username,
     required super.userImage,
+    super.name, // Added name
     required super.text,
     required super.timestamp,
     super.replies,
@@ -25,17 +26,42 @@ class PostCommentModel extends PostCommentEntity {
           .toList();
     }
 
+    // Extract name with fallbacks
+    String? name = json['name'] ?? json['fullName'];
+    
+    // Check if userId is a populated object (Map) and extract name/username from it if needed
+    if (json['userId'] is Map) {
+      final userObj = json['userId'];
+      if (name == null || name.isEmpty) {
+        name = userObj['name'] ?? userObj['fullName'] ?? userObj['templeName'] ?? userObj['creatorName'] ?? userObj['username'];
+      }
+    }
+    
+    // Fallback if still empty but we have specific fields at top level
+    if (name == null || name.isEmpty) {
+       name = json['templeName'] ?? json['creatorName'] ?? json['username'] ?? '';
+    }
+
+    // Handle userId being a valid String ID
+    String userIdString = '';
+    if (json['userId'] is Map) {
+      userIdString = json['userId']['_id'] ?? json['userId']['id'] ?? '';
+    } else {
+      userIdString = json['userId'] ?? '';
+    }
+
     return PostCommentModel(
-      id: json['id'],
-      postId: json['postId'],
-      userId: json['userId'],
-      username: json['username'],
-      userImage: json['userImage'],
-      text: json['text'],
-      timestamp: json['timestamp'],
+      id: json['_id'] ?? json['id'] ?? '',
+      postId: json['postId'] ?? '',
+      userId: userIdString,
+      username: json['username'] ?? '',
+      userImage: json['userImage'] ?? '',
+      name: name, // Updated name logic
+      text: json['text'] ?? '',
+      timestamp: json['timestamp'] ?? '',
       replies: replies,
-      likes: json['likes'],
-      likedBy: List<String>.from(json['likedBy']),
+      likes: json['likes'] ?? 0,
+      likedBy: json['likedBy'] != null ? List<String>.from(json['likedBy']) : [],
       isExpanded: json['isExpanded'] ?? false,
     );
   }
@@ -47,6 +73,7 @@ class PostCommentModel extends PostCommentEntity {
       'userId': userId,
       'username': username,
       'userImage': userImage,
+      'name': name, // Added name
       'text': text,
       'timestamp': timestamp,
       'likes': likes,
@@ -73,6 +100,7 @@ class PostCommentModel extends PostCommentEntity {
       userId: userId,
       username: username,
       userImage: userImage,
+      name: name, // Added name
       text: text,
       timestamp: timestamp,
       replies: replies,

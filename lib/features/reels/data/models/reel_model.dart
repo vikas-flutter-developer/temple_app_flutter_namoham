@@ -4,6 +4,7 @@ class ReelComment {
   final String userId;
   final String username;
   final String userImage;
+  final String? name; // Added name
   final String text;
   final DateTime? timestamp;
 
@@ -12,6 +13,7 @@ class ReelComment {
     required this.userId,
     required this.username,
     this.userImage = '',
+    this.name, // Added name
     required this.text,
     this.timestamp,
   });
@@ -22,6 +24,7 @@ class ReelComment {
       userId: json['userId'] ?? '',
       username: json['username'] ?? '',
       userImage: json['userImage'] ?? '',
+      name: json['name'], // Added name
       text: json['text'] ?? '',
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'])
@@ -35,6 +38,7 @@ class ReelComment {
       'userId': userId,
       'username': username,
       'userImage': userImage,
+      'name': name, // Added name
       'text': text,
       'timestamp': timestamp?.toIso8601String(),
     };

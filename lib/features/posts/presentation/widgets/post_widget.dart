@@ -12,9 +12,11 @@ import 'package:intl/intl.dart';
 import 'package:like_button/like_button.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_user_app/features/block/presentation/providers/block_provider.dart';
 import 'package:readmore/readmore.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
+import 'package:flutter_user_app/features/block/presentation/widgets/block_confirmation_dialog.dart';
 // New Imports for Navigation
 import 'package:flutter_user_app/features/temples/presentation/screens/temple_page.dart';
 import 'package:flutter_user_app/features/creator/presentation/screens/creator_page.dart';
@@ -115,6 +117,43 @@ class _PostWidgetState extends State<PostWidget>
     _photoPageController.dispose();
     _animationController.dispose();
     super.dispose();
+  }
+
+  void _showBlockConfirmation(BuildContext context) {
+    final theme = Theme.of(context);
+    final post = widget.postModel;
+    
+    showDialog(
+      context: context,
+      builder: (dialogContext) => BlockConfirmationDialog(
+        username: post.username,
+        onBlock: () async {
+          final blockProvider = Provider.of<BlockProvider>(context, listen: false);
+          final postsProvider = Provider.of<PostsProvider>(context, listen: false);
+          
+          final success = await blockProvider.blockEntity(
+            entityId: post.userId,
+            entityType: post.userType,
+            entityName: post.username,
+            entityImage: post.userImage,
+          );
+          
+          if (mounted) {
+            if (success) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${post.username} hidden')),
+              );
+              // Refresh posts to remove content from blocked user
+              postsProvider.loadPosts(); 
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to block user')),
+              );
+            }
+          }
+        },
+      ),
+    );
   }
 
   void _showDeleteConfirmation(BuildContext context, PostsProvider provider) {
@@ -293,28 +332,50 @@ class _PostWidgetState extends State<PostWidget>
                   const Spacer(),
                   Consumer<PostsProvider>(
                     builder: (context, provider, child) {
-                      if (!provider.canDeletePost(widget.postModel.userId)) {
-                        return const SizedBox.shrink();
-                      }
+                      final isOwnPost = provider.canDeletePost(widget.postModel.userId);
+                      final userTypeLower = (provider.userType ?? '').toLowerCase();
+                      // Block is available for 'user', 'creator', and 'temple' on others' posts
+                      final canBlock = !isOwnPost && 
+                          (userTypeLower == 'user' || userTypeLower == 'creator' || userTypeLower == 'temple');
+                      
+                      // Don't show menu if there are no options
+                      if (!isOwnPost && !canBlock) return const SizedBox.shrink();
                       
                       return PopupMenuButton<String>(
                         icon: const Icon(Icons.more_horiz),
                         onSelected: (value) async {
                           if (value == 'delete') {
                             _showDeleteConfirmation(context, provider);
+                          } else if (value == 'block') {
+                            _showBlockConfirmation(context);
                           }
                         },
                         itemBuilder: (context) => [
-                          const PopupMenuItem<String>(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete_outline, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Delete', style: TextStyle(color: Colors.red)),
-                              ],
+                          if (isOwnPost)
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('Delete', style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
                             ),
-                          ),
+                          if (canBlock)
+                            PopupMenuItem<String>(
+                              value: 'block',
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.block, color: Colors.red),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Hide',
+                                    style: const TextStyle(color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       );
                     },

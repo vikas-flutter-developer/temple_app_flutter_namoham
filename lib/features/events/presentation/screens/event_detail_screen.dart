@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import '../../data/models/event_model.dart';
 import '../providers/events_provider.dart';
 
@@ -21,10 +19,12 @@ class EventDetailScreen extends StatefulWidget {
 
 class _EventDetailScreenState extends State<EventDetailScreen> {
   late Razorpay _razorpay;
+  String? _currentEventId;
 
   @override
   void initState() {
     super.initState();
+    _currentEventId = widget.event.id;
     _razorpay = Razorpay();
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
@@ -45,21 +45,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       razorpayOrderId: response.orderId ?? '',
       razorpayPaymentId: response.paymentId ?? '',
       razorpaySignature: response.signature ?? '',
-      eventId: widget.event.id,
+      eventId: _currentEventId ?? widget.event.id,
     );
 
     if (!mounted) return;
 
     if (verified) {
-      // Payment successful and verified
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Payment successful! You are registered for ${widget.event.eventName}'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment successful! You are registered for ${widget.event.eventName}'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -92,34 +89,56 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   Future<void> _initiatePayment(double price) async {
     final provider = Provider.of<EventsProvider>(context, listen: false);
     
-    // Create Payment Link
-    final result = await provider.createPaymentLink(widget.event.id);
+    // Create Razorpay order via backend
+    final result = await provider.createEventOrder(widget.event.id);
 
     if (!mounted) return;
 
-    if (result == null || !result.containsKey('paymentLink')) {
-       ScaffoldMessenger.of(context).showSnackBar(
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(provider.error ?? 'Failed to create payment link.'),
+          content: Text(provider.error ?? 'Failed to create payment order.'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    final String url = result['paymentLink'];
+    // Backend returns: { order: { id, amount, ... }, key: 'rzp_...' }
+    final order = result['order'] as Map<String, dynamic>? ?? {};
+    final String orderId = order['id'] ?? result['orderId'] ?? '';
+    final int amountInPaise = order['amount'] ?? result['amountInPaise'] ?? (price * 100).toInt();
+    final String razorpayKey = result['key'] ?? 'rzp_live_RmgNgMehnBgdUh';
 
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      // We can't auto-verify with link easily without deep links. 
-      // For now, user returns and we might need a "Verify Payment" button or auto-refresh.
-      // But let's stick to the flow: User pays -> Back to App -> Maybe manual refresh?
-      // Or we can rely on Webhooks (backend side). 
-      // For this step, just opening the link.
-    } else {
+    if (orderId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not launch payment link')),
+        const SnackBar(content: Text('Invalid order. Please try again.'), backgroundColor: Colors.red),
       );
+      return;
+    }
+
+    // Open Razorpay Checkout
+    var options = {
+      'key': razorpayKey,
+      'amount': amountInPaise,
+      'currency': 'INR',
+      'name': widget.event.eventName,
+      'description': 'Event Registration',
+      'order_id': orderId,
+      'prefill': result['prefill'] ?? {},
+      'theme': {
+        'color': '#1976D2',
+      },
+    };
+
+    try {
+      _razorpay.open(options);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening payment: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -175,7 +194,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final event = widget.event;
+    
+    // Get live event data from provider if available
+    final provider = Provider.of<EventsProvider>(context);
+    final liveEvent = provider.events.firstWhere(
+      (e) => e.id == widget.event.id,
+      orElse: () => widget.event, // Fallback if not found in list
+    );
+    
+    final event = liveEvent;
 
     // ... existing dateText, locationParts setup ...
     final dateText = event.eventDate != null
@@ -338,7 +365,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 const SizedBox(height: 12),
               ],
 
-              if (provider.canAttendEvent && !provider.isOrganizer(event))
+              if (provider.canAttendEvent && !provider.isOrganizer(event) && !provider.isRegistered(event))
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -378,6 +405,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                   ? 'Attend Event (Free)'
                                   : 'Attend Event - ₹${event.price}',
                     ),
+                  ),
+                )
+              else if (provider.isRegistered(event))
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green, width: 1.5),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Already Registered',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
                 )
               else if (provider.isOrganizer(event))

@@ -33,12 +33,18 @@ class EventsProvider with ChangeNotifier {
 
   bool get canCreateEvent => _userType?.toLowerCase() == 'temple' || _userType?.toLowerCase() == 'creator';
   
-  // Users and Creators can attend events (but not their own)
-  bool get canAttendEvent => _userType?.toLowerCase() == 'user' || _userType?.toLowerCase() == 'creator';
+  // All user types (users, creators, and temples) can attend events
+  bool get canAttendEvent => _userType != null;
   
   // Check if the current user is the organizer of a specific event
   bool isOrganizer(EventModel event) {
     return _userId != null && event.organizerId == _userId;
+  }
+
+  // Check if the current user is already registered for an event
+  bool isRegistered(EventModel event) {
+    if (_userId == null) return false;
+    return event.attendees.any((a) => a.userId == _userId);
   }
 
   Future<void> _loadUserInfo() async {
@@ -125,8 +131,8 @@ class EventsProvider with ChangeNotifier {
             return organizerType == 'temple' || e.organizerId == _userId;
           }).toList();
         } else if (type == 'temple') {
-          // Temples only see their own events (or maybe other temples? sticking to plan: own events)
-          allEvents = allEvents.where((e) => e.organizerId == _userId).toList();
+          // Temples see all events (so they can attend other organizers' events too)
+          // They will see their own events and events from creators
         }
       }
 
@@ -140,6 +146,22 @@ class EventsProvider with ChangeNotifier {
 
   // Payment Methods
 
+  /// Create Razorpay order for paid event
+  Future<Map<String, dynamic>?> createEventOrder(String eventId) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final result = await _apiService.createEventPaymentOrder(eventId);
+      return result;
+    } catch (e) {
+      _setError(e.toString());
+      return null;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Create hosted payment link for paid event
   Future<Map<String, dynamic>?> createPaymentLink(String eventId) async {
     _setLoading(true);
     _setError(null);
@@ -243,10 +265,11 @@ class EventsProvider with ChangeNotifier {
     String eventType = 'other',
     num price = 0,
   }) async {
-    if (!canCreateEvent) {
-      _setError('Only temples and creators can create events');
-      return false;
-    }
+    // Restriction removed as per user request
+    // if (!canCreateEvent) {
+    //   _setError('Only temples and creators can create events');
+    //   return false;
+    // }
 
     if (_userId == null) {
       _setError('User ID not found. Please log in again.');

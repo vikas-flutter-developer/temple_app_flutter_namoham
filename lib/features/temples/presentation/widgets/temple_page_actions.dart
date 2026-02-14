@@ -7,11 +7,20 @@ import 'package:provider/provider.dart';
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_user_app/features/messages/presentation/screens/direct_chat_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_user_app/core/api/api_service.dart';
+import 'package:flutter_user_app/features/messages/presentation/providers/messages_provider.dart';
+import 'package:flutter_user_app/features/messages/presentation/screens/chat_screen.dart';
 
 class ProfileActions extends StatelessWidget {
   final TempleModel profile;
+  final bool isOwner;
 
-  const ProfileActions({super.key, required this.profile});
+  const ProfileActions({
+    super.key, 
+    required this.profile,
+    this.isOwner = false,
+  });
 
   Future<void> _launchMaps() async {
     // Placeholder for direction logic. 
@@ -56,18 +65,24 @@ class ProfileActions extends StatelessWidget {
                 }
 
                 final isFollowing = followProvider.isFollowing(profile.id);
-                // "Follow" or "Unfollow" - keeping generic "Follow" style for now but text changes
-                // Figma UI shows "Follow" in blue. Usually "Unfollow" is outlined or grey.
-                // For "same to same" UI, if it's "Follow", it should be blue.
                 final label = isFollowing ? l10n.unfollow : l10n.follow;
 
                 return _buildButton(
                   text: followProvider.isToggling ? '...' : label,
                   color: buttonColor,
-                  isOutlined: isFollowing, // Optional: differentiate visually
+                  isOutlined: isFollowing,
                   onPressed: followProvider.isToggling
                       ? () {}
                       : () async {
+                          // Allow "Unfollow" even if it's your own account (though unlikely to be following yourself)
+                          // But block "Follow" if it's your own account
+                          if (isOwner && !isFollowing) {
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               const SnackBar(content: Text('You cannot follow your own account')),
+                             );
+                             return;
+                          }
+
                           final ok = isFollowing
                               ? await followProvider.unfollow(
                                   followingId: profile.id,
@@ -78,7 +93,6 @@ class ProfileActions extends StatelessWidget {
                                   followingType: 'Temple',
                                 );
 
-                          // Refresh
                           await followProvider.loadFollowers(profile.id);
 
                           if (context.mounted) {
@@ -122,6 +136,12 @@ class ProfileActions extends StatelessWidget {
               text: l10n.donate,
               color: buttonColor,
               onPressed: () {
+                if (isOwner) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('You cannot donate to yourself')),
+                  );
+                  return;
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -145,18 +165,82 @@ class ProfileActions extends StatelessWidget {
             child: _buildButton(
               text: l10n.message,
               color: buttonColor,
-              onPressed: () {
-                 Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DirectChatEntry(
-                      receiverId: profile.id,
-                      receiverType: 'temple',
-                      receiverName: profile.name,
-                      receiverImage: profile.imageUrl,
-                    ),
-                  ),
+              onPressed: () async {
+                if (isOwner) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('You cannot message yourself')),
+                  );
+                  return;
+                }
+
+                // Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) =>
+                      const Center(child: CircularProgressIndicator()),
                 );
+
+                // Create MessagesProvider instance
+                final provider = MessagesProvider(ApiService.create());
+                
+                // Initiate or Find Chat
+                final conversation = await provider.initiateChat(
+                  otherUserId: profile.id,
+                  otherUserType: 'temple',
+                  otherUserName: profile.name,
+                );
+
+                // Dismiss loading
+                if (context.mounted) Navigator.pop(context);
+
+                if (conversation == null) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                       SnackBar(content: Text(provider.error ?? 'Failed to start chat')),
+                    );
+                  }
+                  return;
+                }
+
+                // Check Status
+                if (!context.mounted) return;
+
+                if (conversation.status == 'accepted') {
+                  // Open Chat Screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: ChatScreen(conversation: conversation),
+                      ),
+                    ),
+                  );
+                } else if (conversation.status == 'pending') {
+                   // Show Confirmation (Instagram Style)
+                   showDialog(
+                     context: context,
+                     builder: (_) => AlertDialog(
+                       title: const Text('Request Sent'),
+                       content: Text(
+                         'You have sent a message request to ${profile.name}. '
+                         'You can chat once they accept your request.'
+                       ),
+                       actions: [
+                         TextButton(
+                           onPressed: () => Navigator.pop(context),
+                           child: const Text('OK'),
+                         ),
+                       ],
+                     ),
+                   );
+                } else if (conversation.status == 'rejected') {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                     const SnackBar(content: Text('Message request was declined.')),
+                   );
+                }
               },
               context: context,
             ),
@@ -179,7 +263,7 @@ class ProfileActions extends StatelessWidget {
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isOutlined ? Colors.white : color,
+          backgroundColor: isOutlined ? Theme.of(context).colorScheme.surface : color,
           foregroundColor: isOutlined ? color : Colors.white,
           elevation: 0,
           side: isOutlined ? BorderSide(color: color) : null,

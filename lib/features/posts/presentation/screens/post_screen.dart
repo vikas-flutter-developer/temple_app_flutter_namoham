@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
-import 'package:flutter_user_app/core/services/image_upload_service.dart';
+import 'package:flutter_user_app/core/services/r2_upload_service.dart';
 import 'package:flutter_user_app/features/posts/data/repository/post_repository_impl.dart';
 import 'package:flutter_user_app/features/posts/domain/usecase/get_posts_usecase.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
@@ -18,13 +19,45 @@ class PostsScreen extends StatefulWidget {
   State<PostsScreen> createState() => _PostsScreenState();
 }
 
-class _PostsScreenState extends State<PostsScreen> {
+class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   String? _userType;
+  Timer? _refreshTimer;
+  static const _refreshInterval = Duration(seconds: 30);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUserType();
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshPosts();
+      _startAutoRefresh();
+    } else if (state == AppLifecycleState.paused) {
+      _refreshTimer?.cancel();
+    }
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) => _refreshPosts());
+  }
+
+  void _refreshPosts() {
+    if (mounted) {
+      Provider.of<PostsProvider>(context, listen: false).loadPosts();
+    }
   }
 
   Future<void> _loadUserType() async {
@@ -298,8 +331,8 @@ class _PostsScreenState extends State<PostsScreen> {
                   final List<String> allImageUrls = [...imageUrls];
                   
                   if (localImages.isNotEmpty) {
-                    final uploadService = ImageUploadService();
-                    final uploadedUrls = await uploadService.uploadMultipleImages(localImages);
+                    final uploadService = R2UploadService();
+                    final uploadedUrls = await uploadService.uploadMultipleFiles(localImages, 'posts');
                     allImageUrls.addAll(uploadedUrls);
                   }
                   
@@ -393,7 +426,17 @@ class _PostsScreenState extends State<PostsScreen> {
                 ),
               );
             case PostsStatus.error:
-              return Center(child: Text(postsProvider.errorMessage));
+              return RefreshIndicator(
+                onRefresh: () => postsProvider.loadPosts(),
+                child: ListView(
+                  children: [
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.7,
+                      child: Center(child: Text(postsProvider.errorMessage)),
+                    ),
+                  ],
+                ),
+              );
             case PostsStatus.initial:
               return const SizedBox.shrink();
           }
@@ -406,7 +449,7 @@ class _PostsScreenState extends State<PostsScreen> {
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AddPostPage()),
-                ),
+                ).then((_) => _refreshPosts()),
                 child: const Icon(Icons.add),
               ),
             )

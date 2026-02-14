@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/widgets/admin_widgets.dart';
+import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_main_layout.dart';
 
 class AdminAccountManagementScreen extends StatefulWidget {
   const AdminAccountManagementScreen({super.key});
@@ -207,6 +208,7 @@ class _AdminAccountManagementScreenState extends State<AdminAccountManagementScr
         children: [
           // Header
           AdminHeader(
+            onBackPressed: () => AdminMainLayout.switchToTab(0),
             title: "Account Management",
             showSearch: false,
             filters: Row(
@@ -354,39 +356,45 @@ class _AdminAccountManagementScreenState extends State<AdminAccountManagementScr
   }
 
   Widget _buildAccountList(List<Map<String, dynamic>> accounts, String accountType) {
-    if (accounts.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle_outline, size: 64, color: Colors.green[300]),
-            const SizedBox(height: 16),
-            Text(
-              'No deactivated ${accountType}s',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+    return RefreshIndicator(
+      onRefresh: _loadDeactivatedAccounts,
+      child: accounts.isEmpty
+        ? ListView(
+            children: [
+              const SizedBox(height: 100),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_outline, size: 64, color: Colors.green[300]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No deactivated ${accountType}s',
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          )
+        : Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: ListView.separated(
+                itemCount: accounts.length,
+                separatorBuilder: (_, __) => const Divider(height: 32),
+                itemBuilder: (context, index) {
+                  final account = accounts[index];
+                  return _buildAccountItem(account, accountType);
+                },
+              ),
             ),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: ListView.separated(
-          itemCount: accounts.length,
-          separatorBuilder: (_, __) => const Divider(height: 32),
-          itemBuilder: (context, index) {
-            final account = accounts[index];
-            return _buildAccountItem(account, accountType);
-          },
-        ),
-      ),
+          ),
     );
   }
 

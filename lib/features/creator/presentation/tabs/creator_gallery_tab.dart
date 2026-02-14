@@ -59,9 +59,9 @@ class CreatorGalleryTabState extends State<CreatorGalleryTab> {
         // Match by creator ID
         bool matchesId = reelUserId == widget.creatorId || reelCreatorId == widget.creatorId;
         
-        // Exclude dummy test videos - only show real Supabase videos
-        bool isRealVideo = videoUrl.contains('supabase.co') || 
-                          (!videoUrl.contains('/uploads/reels/example.mp4'));
+        // Exclude dummy test videos
+        bool isRealVideo = videoUrl.isNotEmpty && 
+                          !videoUrl.contains('/uploads/reels/example.mp4');
         
         return matchesId && isRealVideo;
       }).toList();

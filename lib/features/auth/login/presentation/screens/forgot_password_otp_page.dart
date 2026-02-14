@@ -124,7 +124,7 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage> {
 
   @override
   Widget build(BuildContext context) {
-    const Color cyanColor = Color(0x0000BCD4); // Bright cyan from design
+    const Color cyanColor = Color(0xFF00BCD4); // Bright cyan from design
     
     return Scaffold(
       backgroundColor: Colors.white,

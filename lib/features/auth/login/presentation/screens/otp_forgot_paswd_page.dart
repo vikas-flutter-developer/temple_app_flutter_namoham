@@ -12,11 +12,13 @@ import 'package:flutter_otp_text_field/flutter_otp_text_field.dart';
 class OtpPaswdPage extends StatefulWidget {
   final String phoneNumber;
   final String countryCode;
+  final String? sessionId;
   
   const OtpPaswdPage({
     super.key,
     required this.phoneNumber,
     required this.countryCode,
+    this.sessionId,
   });
 
   @override
@@ -29,7 +31,6 @@ class _OtpPaswdPageState extends State<OtpPaswdPage> {
   bool _isResendEnabled = false;
   bool _isLoading = false;
   String _otpCode = '';
-  int? _attemptsRemaining;
 
   final ApiService _apiService = ApiService.create();
 
@@ -59,9 +60,8 @@ class _OtpPaswdPageState extends State<OtpPaswdPage> {
   Future<void> _resendOtp() async {
     setState(() => _isLoading = true);
     try {
-      final response = await _apiService.resendOtp(
-        phoneNumber: widget.phoneNumber,
-        countryCode: widget.countryCode,
+      final response = await _apiService.resendResetOTP(
+        phoneNumber: '${widget.countryCode}${widget.phoneNumber}',
       );
       
       if (mounted) {
@@ -90,49 +90,16 @@ class _OtpPaswdPageState extends State<OtpPaswdPage> {
       return;
     }
 
-    setState(() => _isLoading = true);
-
-    try {
-      final verifyResponse = await _apiService.verifyOtp(
+    // Navigate to EnterNewPasswordPage with OTP and SessionID
+    navigateToPage(
+      context,
+      EnterNewPasswordPage(
         phoneNumber: widget.phoneNumber,
         countryCode: widget.countryCode,
         otp: _otpCode,
-      );
-
-      if (verifyResponse['isValid'] != true) {
-        _attemptsRemaining = verifyResponse['attemptsRemaining'];
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${verifyResponse['message'] ?? 'Invalid OTP'}${_attemptsRemaining != null ? '. Attempts remaining: $_attemptsRemaining' : ''}',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      // OTP verified, proceed to password reset
-      if (mounted) {
-        navigateToPage(
-          context,
-          EnterNewPasswordPage(
-            phoneNumber: widget.phoneNumber,
-            countryCode: widget.countryCode,
-          ),
-        );
-      }
-    } catch (e) {
-        final cleanError = e.toString().replaceAll('Exception: ', '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $cleanError')),
-        );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+        sessionId: widget.sessionId,
+      ),
+    );
   }
 
   @override
@@ -193,23 +160,31 @@ class _OtpPaswdPageState extends State<OtpPaswdPage> {
 
                 const SizedBox(height: 20),
 
-                // Resend OTP
                 // Resend OTP with Countdown Timer
                 Center(
-                  child: TextButton(
-                    onPressed: _isResendEnabled ? _resendOtp : null,
-                    child: Text(
-                      _isResendEnabled
-                          ? "Resend"
-                          : "Code is send, Resend in $_counter sec",
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: _isResendEnabled
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.outline,
-                      ),
-                    ),
-                  ),
+                  child: _isResendEnabled
+                      ? TextButton(
+                          onPressed: _isLoading ? null : _resendOtp,
+                          child: Text(
+                            "Resend OTP",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            "Resend OTP in ${(_counter ~/ 60).toString().padLeft(2, '0')}:${(_counter % 60).toString().padLeft(2, '0')}",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ),
                 )
               ],
             ),

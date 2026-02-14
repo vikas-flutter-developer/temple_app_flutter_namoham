@@ -31,6 +31,17 @@ class TempleModel {
   final String bankAccountNumber;
   final String bankIfsc;
   final String bankAccountHolder;
+  final List<String> savedPosts;
+  final List<String> savedReels;
+  final String adminVerificationStatus;
+  final String? adminRejectionReason;
+  final DateTime? adminVerifiedAt;
+  final DateTime? deactivatedAt;
+  final bool isDeactivated;
+  final DateTime? scheduledDeletionDate;
+  final String accountType;
+  final String userType;
+  final List<String> specialDays;
 
   TempleModel({
     required this.id,
@@ -62,6 +73,18 @@ class TempleModel {
     this.bankAccountNumber = '',
     this.bankIfsc = '',
     this.bankAccountHolder = '',
+
+    this.savedPosts = const [],
+    this.savedReels = const [],
+    this.adminVerificationStatus = 'pending',
+    this.adminRejectionReason,
+    this.adminVerifiedAt,
+    this.deactivatedAt,
+    this.isDeactivated = false,
+    this.scheduledDeletionDate,
+    this.accountType = 'temple',
+    this.userType = 'temple',
+    this.specialDays = const [],
   });
 
   factory TempleModel.fromJson(Map<String, dynamic> json) {
@@ -89,6 +112,10 @@ class TempleModel {
     String loc = '';
     if (json['address'] != null && json['address'].toString().isNotEmpty) {
       loc += json['address'];
+    }
+    if (json['city'] != null && json['city'].toString().isNotEmpty) {
+      if (loc.isNotEmpty) loc += ', ';
+      loc += json['city'];
     }
     if (json['state'] != null && json['state'].toString().isNotEmpty) {
       if (loc.isNotEmpty) loc += ', ';
@@ -132,10 +159,21 @@ class TempleModel {
       website: json['website'] ?? '',
       openTime: timings['openTime'] ?? '',
       closeTime: timings['closeTime'] ?? '',
+      specialDays: (timings['specialDays'] is List) ? (timings['specialDays'] as List).map((e) => e.toString()).toList() : [],
       bankName: bank['bankName'] ?? '',
       bankAccountNumber: bank['bankAccountNumber'] ?? '',
       bankIfsc: bank['ifscCode'] ?? '',
       bankAccountHolder: bank['accountHolderName'] ?? '',
+      savedPosts: (json['savedPosts'] is List) ? (json['savedPosts'] as List).map((e) => e.toString()).toList() : [],
+      savedReels: (json['savedReels'] is List) ? (json['savedReels'] as List).map((e) => e.toString()).toList() : [],
+      adminVerificationStatus: json['adminVerificationStatus'] ?? 'pending',
+      adminRejectionReason: json['adminRejectionReason'],
+      adminVerifiedAt: json['adminVerifiedAt'] != null ? DateTime.tryParse(json['adminVerifiedAt']) : null,
+      deactivatedAt: json['deactivatedAt'] != null ? DateTime.tryParse(json['deactivatedAt']) : null,
+      isDeactivated: json['isDeactivated'] ?? false,
+      scheduledDeletionDate: json['scheduledDeletionDate'] != null ? DateTime.tryParse(json['scheduledDeletionDate']) : null,
+      accountType: json['accountType'] ?? 'temple',
+      userType: json['userType'] ?? 'temple',
     );
   }
 }

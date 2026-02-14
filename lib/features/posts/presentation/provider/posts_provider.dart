@@ -22,9 +22,11 @@ class PostsProvider extends ChangeNotifier {
   String? _userType;
   String? _userId;
 
+  Set<String> _blockedIds = {};
+
   // Getters
   PostsStatus get status => _status;
-  List<PostEntity> get posts => _posts;
+  List<PostEntity> get posts => _posts.where((p) => !_blockedIds.contains(p.userId)).toList();
   String get errorMessage => _errorMessage;
   String? get userType => _userType;
   String? get userId => _userId;
@@ -42,7 +44,8 @@ class PostsProvider extends ChangeNotifier {
   bool canDeletePost(String postUserId) {
     if (_userType == 'Admin') return true;
     final type = _userType?.toLowerCase();
-    return (type == 'temple' || type == 'creator') && postUserId == _userId;
+    // Allow users, temples, and creators to delete their own posts
+    return (type == 'temple' || type == 'creator' || type == 'user') && postUserId == _userId;
   }
   
   Future<void> _loadUserInfo() async {
@@ -54,6 +57,9 @@ class PostsProvider extends ChangeNotifier {
 
   /// Load all posts
   Future<void> loadPosts() async {
+    // Ensure we have the latest user info (ID/Type) before checking permissions
+    await _loadUserInfo();
+    
     _status = PostsStatus.loading;
     notifyListeners();
 
@@ -87,6 +93,14 @@ class PostsProvider extends ChangeNotifier {
     }
 
     final String currentUserId = _userId!;
+    
+    // Attempt to get current user name for immediate UI update
+    String currentUserName = '';
+    try {
+       final prefs = await SharedPreferences.getInstance();
+       currentUserName = prefs.getString('user_name') ?? prefs.getString('full_name') ?? 'You';
+    } catch (_) {}
+
     // 1. Optimistic Update
     // Capture original state in case we need to revert
     final originalPosts = List<PostEntity>.from(_posts);
@@ -94,15 +108,29 @@ class PostsProvider extends ChangeNotifier {
     _posts = _posts.map((post) {
       if (post.id == postId) {
         final bool alreadyLiked = post.likedBy.contains(currentUserId);
-        final List<String> updatedLikedBy = alreadyLiked
-            ? post.likedBy.where((userId) => userId != currentUserId).toList()
-            : [...post.likedBy, currentUserId];
+        
+        List<String> updatedLikedBy;
+        List<String> updatedLikedByNames = List.from(post.likedByNames ?? []);
+
+        if (alreadyLiked) {
+           updatedLikedBy = post.likedBy.where((userId) => userId != currentUserId).toList();
+           // Attempt to remove user name if possible, or just 'You'
+           if (currentUserName.isNotEmpty) updatedLikedByNames.remove(currentUserName);
+           updatedLikedByNames.remove('You');
+        } else {
+           updatedLikedBy = [...post.likedBy, currentUserId];
+           if (currentUserName.isNotEmpty) {
+              // Prepend to show it first
+              updatedLikedByNames.insert(0, currentUserName);
+           }
+        }
 
         final int updatedLikes = alreadyLiked ? post.likes - 1 : post.likes + 1;
 
         return post.copyWith(
           likes: updatedLikes,
           likedBy: updatedLikedBy,
+          likedByNames: updatedLikedByNames,
         );
       }
       return post;
@@ -122,8 +150,6 @@ class PostsProvider extends ChangeNotifier {
         },
         (success) {
           print("LIKE SUCCESS");
-          // Optionally update with server response if needed, 
-          // but optimistic update is usually enough
         }
       );
     } catch (e) {
@@ -313,5 +339,10 @@ class PostsProvider extends ChangeNotifier {
        _isLoadingPostCount = false;
        notifyListeners();
      }
+  }
+
+  void updateBlockedIds(Set<String> blockedIds) {
+    _blockedIds = blockedIds;
+    notifyListeners();
   }
 }

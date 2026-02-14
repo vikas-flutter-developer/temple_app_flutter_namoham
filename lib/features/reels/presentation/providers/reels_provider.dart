@@ -30,12 +30,19 @@ class ReelsProvider extends ChangeNotifier {
 
   // Getters
   ReelsStatus get status => _status;
-  List<ReelModel> get reels => _reels;
+  List<ReelModel> get reels => _reels.where((r) => !_blockedIds.contains(r.userId)).toList();
   String get errorMessage => _errorMessage;
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
   String? get userId => _userId;
   String? get userType => _userType;
+  
+  Set<String> _blockedIds = {};
+  
+  void updateBlockedIds(Set<String> blockedIds) {
+    _blockedIds = blockedIds;
+    notifyListeners();
+  }
 
   /// Load user info from SharedPreferences
   Future<void> _loadUserInfo() async {
@@ -557,21 +564,13 @@ class ReelsProvider extends ChangeNotifier {
     }
   }
   
-  /// Validate if video URL is from Supabase storage only
+  /// Validate if video URL is a real video (not a placeholder)
   bool _isValidVideoUrl(String url) {
     if (url.isEmpty) return false;
     
-    // Only accept Supabase URLs
-    // Typical Supabase storage URLs contain 'supabase' in the domain
-    // Example: https://xyz.supabase.co/storage/v1/object/public/...
     final lowerUrl = url.toLowerCase();
     
-    if (!lowerUrl.contains('supabase')) {
-      print('REELS_PROVIDER: Warning: Non-Supabase URL encountered: $url. Allow for now.');
-      // return false; // DISABLED: Allow backend-served videos too
-    }
-    
-    // Additional check: Filter out common placeholder patterns even from Supabase
+    // Filter out common placeholder patterns
     final invalidPatterns = [
       'example.mp4',
       'test.mp4',
@@ -587,7 +586,7 @@ class ReelsProvider extends ChangeNotifier {
       }
     }
     
-    print('REELS_PROVIDER: Valid Supabase URL: $url');
+    print('REELS_PROVIDER: Valid video URL: $url');
     return true;
   }
 
@@ -603,8 +602,8 @@ class ReelsProvider extends ChangeNotifier {
       final reel = getReelById(reelId);
       if (reel == null) return false;
       
-      if (reel.userId != _userId) {
-        print('REELS_PROVIDER: Cannot delete - user is not owner');
+      if (reel.userId.trim() != _userId!.trim()) {
+        print('REELS_PROVIDER: Cannot delete - user is not owner. Reel owner: ${reel.userId}, Current user: $_userId');
         return false;
       }
       

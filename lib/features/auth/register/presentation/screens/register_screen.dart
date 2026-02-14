@@ -9,7 +9,7 @@ import 'package:flutter_user_app/widgets/custom_widgets/custom_appbar.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_button.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_dropdown_widget.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_textfield.dart';
-import 'package:flutter_user_app/core/services/image_upload_service.dart';
+import 'package:flutter_user_app/core/services/r2_upload_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -30,7 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Image picker
   final ImagePicker _picker = ImagePicker();
-  final ImageUploadService _imageUploadService = ImageUploadService();
+  final R2UploadService _r2UploadService = R2UploadService();
   
   // Profile picture
   File? _profileImage;
@@ -90,8 +90,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _isUploadingProfile = true;
         });
 
-        // Upload to Supabase
-        final imageUrl = await _imageUploadService.uploadImage(_profileImage!);
+        // Upload to R2
+        final imageUrl = await _r2UploadService.uploadFile(_profileImage!, 'profilePicture');
         
         if (imageUrl != null) {
           setState(() {
@@ -144,9 +144,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _isUploadingPhotos = true;
         });
 
-        // Upload all new photos to Supabase
+        // Upload all new photos to R2
         for (var photo in photosToAdd) {
-          final imageUrl = await _imageUploadService.uploadImage(File(photo.path));
+          final imageUrl = await _r2UploadService.uploadFile(File(photo.path), 'posts');
           if (imageUrl != null) {
             _photoUrls.add(imageUrl);
           }

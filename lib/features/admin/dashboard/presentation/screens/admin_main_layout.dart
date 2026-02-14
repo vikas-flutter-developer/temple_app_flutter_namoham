@@ -5,6 +5,7 @@ import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/a
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_reports_screen.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_messages_screen.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_account_management_screen.dart';
+import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_verification_screen.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
@@ -13,12 +14,39 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AdminMainLayout extends StatefulWidget {
   const AdminMainLayout({super.key});
 
+  static _AdminMainLayoutState? _currentState;
+
+  /// Call this from child screens to switch back to Dashboard (index 0)
+  static void switchToTab(int index) {
+    _currentState?._switchTab(index);
+  }
+
   @override
   State<AdminMainLayout> createState() => _AdminMainLayoutState();
 }
 
 class _AdminMainLayoutState extends State<AdminMainLayout> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    AdminMainLayout._currentState = this;
+  }
+
+  @override
+  void dispose() {
+    if (AdminMainLayout._currentState == this) {
+      AdminMainLayout._currentState = null;
+    }
+    super.dispose();
+  }
+
+  void _switchTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   final List<Widget> _screens = [
     const AdminDashboardScreen(),
@@ -27,6 +55,7 @@ class _AdminMainLayoutState extends State<AdminMainLayout> {
     const AdminMessagesScreen(),
     const AdminReportsScreen(),
     const AdminAccountManagementScreen(),
+    const AdminVerificationScreen(),
   ];
 
   @override
@@ -70,11 +99,12 @@ class _AdminMainLayoutState extends State<AdminMainLayout> {
                 _buildMenuItem(3, "Messages", Icons.message_outlined),
                 _buildMenuItem(4, "Reports", Icons.receipt_long_outlined),
                 _buildMenuItem(5, "Accounts", Icons.manage_accounts_outlined),
+                _buildMenuItem(6, "Verification", Icons.verified_user_outlined),
 
                 const Spacer(),
 
                 // Logout
-                _buildMenuItem(6, "Logout", Icons.help_outline, isLogout: true),
+                _buildMenuItem(7, "Logout", Icons.help_outline, isLogout: true),
                 const SizedBox(height: 40),
               ],
             ),

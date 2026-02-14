@@ -7,6 +7,7 @@ import 'package:flutter_user_app/features/reels/presentation/screens/profile_loa
 import 'package:flutter_user_app/features/reels/presentation/screens/create_reel_screen.dart';
 import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
+
 class ReelVideoWidget extends StatefulWidget {
   final ReelModel reel;
   final VideoPlayerController controller;
@@ -16,6 +17,8 @@ class ReelVideoWidget extends StatefulWidget {
   final VoidCallback onCommentPressed;
   final VoidCallback onSavePressed;
   final VoidCallback? onDeletePressed;
+  final VoidCallback? onBlockPressed;
+  final bool canCreateReel;
 
   const ReelVideoWidget({
     super.key,
@@ -27,6 +30,8 @@ class ReelVideoWidget extends StatefulWidget {
     required this.onCommentPressed,
     required this.onSavePressed,
     this.onDeletePressed,
+    this.onBlockPressed,
+    this.canCreateReel = false,
   });
 
   @override
@@ -340,42 +345,45 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                 onPressed: () {},
               ),
               const SizedBox(height: 18),
-              _ActionButton(
-                icon: Icons.add_circle_outline,
-                iconColor: Colors.white,
-                label: 'Create',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CreateReelScreen(),
-                    ),
-                  );
-                },
-              ),
-                if (widget.onDeletePressed != null) ...[
-                const SizedBox(height: 18),
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'delete' && widget.onDeletePressed != null) {
-                      widget.onDeletePressed!();
-                    }
-                  },
-                  color: Colors.white,
-                  icon: const Column(
-                    children: [
-                      Icon(Icons.more_vert, color: Colors.white, size: 32),
-                      Text(
-                        'More',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+              if (widget.canCreateReel)
+                _ActionButton(
+                  icon: Icons.add_circle_outline,
+                  iconColor: Colors.white,
+                  label: 'Create',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CreateReelScreen(),
                       ),
-                    ],
-                  ),
-                  itemBuilder: (context) => [
+                    );
+                  },
+                ),
+              const SizedBox(height: 18),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'delete' && widget.onDeletePressed != null) {
+                    _showDeleteConfirmation(context);
+                  } else if (value == 'block' && widget.onBlockPressed != null) {
+                    widget.onBlockPressed?.call();
+                  }
+                },
+                color: Colors.white,
+                icon: const Column(
+                  children: [
+                    Icon(Icons.more_vert, color: Colors.white, size: 32),
+                    Text(
+                      'More',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                itemBuilder: (context) => [
+                  if (widget.onDeletePressed != null)
                     const PopupMenuItem<String>(
                       value: 'delete',
                       child: Row(
@@ -386,9 +394,19 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ],
+                  if (widget.onBlockPressed != null)
+                     PopupMenuItem<String>(
+                      value: 'block',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.block, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Text('Hide', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
@@ -521,6 +539,31 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
   }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Reel?'),
+        content: const Text('Are you sure you want to delete this reel? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              widget.onDeletePressed?.call();
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 }
 
 class _ActionButton extends StatelessWidget {

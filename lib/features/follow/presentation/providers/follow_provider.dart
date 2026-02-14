@@ -38,9 +38,8 @@ class FollowProvider with ChangeNotifier {
 
   bool get canFollow {
     final type = _userType?.toLowerCase();
-    // Allow 'user' and 'creator' to follow
-    // Also handle 'Creator' or 'User' due to login saving variations
-    return type == 'user' || type == 'creator';
+    // Allow 'user', 'creator', and 'temple' to follow
+    return type == 'user' || type == 'creator' || type == 'temple';
   }
 
   Future<void> init() async {
@@ -267,29 +266,56 @@ class FollowProvider with ChangeNotifier {
     }
   }
 
-  // Value for the viewed profile's following count
+  // Value for the viewed profile's following list and count
+  List<FollowingModel> _viewedFollowing = [];
   int _viewedFollowingCount = 0;
   bool _isLoadingFollowing = false;
+  
+  List<FollowingModel> get viewedFollowing => _viewedFollowing;
   int get viewedFollowingCount => _viewedFollowingCount;
   bool get isLoadingFollowing => _isLoadingFollowing;
 
   Future<void> loadFollowing(String entityId) async {
     _isLoadingFollowing = true;
+    _setError(null);
     notifyListeners();
 
     try {
       final res = await _apiService.getFollowing(entityId);
-      // API returns { "following": [...], "count": 2 }
+      print('FOLLOW_PROVIDER: loadFollowing response keys: ${res.keys.toList()}');
+
+      List<FollowingModel> parsedList = [];
+
+      // 1. Schema: { following: [FollowingModel...] }
+      if (res['following'] != null && res['following'] is List) {
+        final list = res['following'] as List;
+        for (var item in list) {
+          try {
+             if (item is Map) {
+               final Map<String, dynamic> map = Map<String, dynamic>.from(item);
+               parsedList.add(FollowingModel.fromJson(map));
+             }
+          } catch (e) {
+             print('FOLLOW_PROVIDER: Failed to parse viewed following item: $e');
+          }
+        }
+      }
+      
+      // Handle count from response or list length
       if (res['count'] is num) {
         _viewedFollowingCount = (res['count'] as num).toInt();
-      } else if (res['following'] is List) {
-        _viewedFollowingCount = (res['following'] as List).length;
       } else {
-         _viewedFollowingCount = 0;
+        _viewedFollowingCount = parsedList.length;
       }
+      
+      // Update the list
+      _viewedFollowing = parsedList;
+      
     } catch (e) {
-      print('FOLLOW_PROVIDER: Error loading following count: $e');
+      print('FOLLOW_PROVIDER: Error loading following list: $e');
       _viewedFollowingCount = 0;
+      _viewedFollowing = [];
+      _setError(e.toString());
     } finally {
       _isLoadingFollowing = false;
       notifyListeners();

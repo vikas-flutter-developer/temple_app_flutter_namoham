@@ -72,8 +72,9 @@ class _LikedByTextState extends State<LikedByText> {
       
       for (String id in idsToFetch) {
         // FAST PATH: Check if it's me!
-        if (currentUserId != null && id == currentUserId && currentUserName != null && currentUserName.isNotEmpty) {
-           names.add(currentUserName);
+        if (currentUserId != null && id == currentUserId) {
+           // Always use "You" or specific name for the current user
+           names.add(currentUserName ?? 'You');
            continue;
         }
       

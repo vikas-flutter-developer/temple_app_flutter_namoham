@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_user_app/features/posts/presentation/widgets/comment_context_menu.dart';
 import 'package:like_button/like_button.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
@@ -26,12 +27,28 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
   String? replyingToUsername;
   final FocusNode _focusNode = FocusNode();
 
+  String _currentUserId = '';
+  String _currentUserName = '';
+  String _currentUserImage = '';
+
   @override
   void initState() {
     super.initState();
+    _loadUserInfo();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CommentProvider>().loadComments(widget.postId, initiallyExpanded: false);
     });
+  }
+
+  Future<void> _loadUserInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _currentUserId = prefs.getString('user_id') ?? '';
+        _currentUserName = prefs.getString('user_name') ?? prefs.getString('username') ?? 'You';
+        _currentUserImage = prefs.getString('user_image') ?? '';
+      });
+    }
   }
 
   @override
@@ -48,9 +65,9 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
     final newComment = PostCommentModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       postId: widget.postId,
-      userId: 'currentUser',
-      username: 'You',
-      userImage: 'https://via.placeholder.com/150',
+      userId: _currentUserId,
+      username: _currentUserName,
+      userImage: _currentUserImage,
       text: text,
       timestamp: DateTime.now().toIso8601String(),
       likes: 0,
@@ -431,7 +448,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                           style: TextStyle(color: theme.colorScheme.onSurface),
                           children: [
                             TextSpan(
-                              text: "${comment.username}:",
+                              text: "${comment.name ?? comment.username}:",
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
@@ -613,7 +630,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                                       color: theme.colorScheme.onSurface),
                                   children: [
                                     TextSpan(
-                                      text: reply.username,
+                                      text: reply.name ?? reply.username,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 13,

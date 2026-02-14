@@ -5,6 +5,7 @@ import 'package:flutter_user_app/features/admin/dashboard/data/models/dashboard_
 import 'package:flutter_user_app/features/admin/dashboard/presentation/widgets/admin_widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_app_ratings_screen.dart';
+import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_main_layout.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -114,6 +115,97 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
   }
 
+  Future<void> _handleDeactivateClient(ClientModel client) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Deactivate Account'),
+        content: Text(
+          'Are you sure you want to deactivate "${client.name}" (${client.type})?\n\n'
+          'The account will be disabled and can be reactivated later from Account Management.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Deactivate', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final response = await _apiService.adminDeactivateAccount(
+        accountType: client.type.toLowerCase(),
+        accountId: client.id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message'] ?? 'Account deactivated successfully'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        _loadData(refreshClientsOnly: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to deactivate: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleHardDeleteClient(ClientModel client) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('⚠️ Hard Delete Account'),
+        content: Text(
+          'This will PERMANENTLY delete "${client.name}" (${client.type}) '
+          'and all associated data.\n\n'
+          'This action CANNOT be undone. Are you absolutely sure?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete Permanently', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final response = await _apiService.hardDeleteAccount(
+        accountType: client.type.toLowerCase(),
+        accountId: client.id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message'] ?? 'Account deleted permanently'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        _loadData(refreshClientsOnly: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -133,11 +225,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
     }
     
-    return SingleChildScrollView(
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         children: [
           // Header
           AdminHeader(
+            onBackPressed: () => AdminMainLayout.switchToTab(0),
             filters: Row(
               children: [
                 _buildFilterBtn("All", 'all'),
@@ -398,7 +494,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const SizedBox(height: 16),
                 
                 AdminTable(
-                  columns: const ["USER ID", "USER NAME", "EMAIL", "PHONE", "DATE OF BIRTH", "LOCATION", "STATUS"],
+                  columns: const ["USER ID", "USER NAME", "EMAIL", "PHONE", "DATE OF BIRTH", "LOCATION", "STATUS", "ACTIONS"],
                   rows: _clients.map((client) => [
                     Text("ID: ${client.id.substring(0, 8)}...", style: const TextStyle(fontWeight: FontWeight.w500)),
                     Row(children: [
@@ -439,6 +535,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       const SizedBox(width: 8),
                       Text(client.status, style: const TextStyle(fontSize: 12)),
                     ]),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 18),
+                      onSelected: (value) {
+                        if (value == 'deactivate') {
+                          _handleDeactivateClient(client);
+                        } else if (value == 'delete') {
+                          _handleHardDeleteClient(client);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'deactivate',
+                          child: Row(
+                            children: [
+                              Icon(Icons.block, size: 16, color: Colors.orange),
+                              SizedBox(width: 8),
+                              Text('Deactivate', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_forever, size: 16, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Hard Delete', style: TextStyle(fontSize: 13, color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ]).toList(),
                 ),
 
@@ -447,6 +575,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

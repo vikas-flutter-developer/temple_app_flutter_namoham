@@ -31,11 +31,12 @@ class _ForgotPasswordNumPageState extends State<ForgotPasswordNumPage> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await _apiService.sendOtp(
-        phoneNumber: phoneController.text.trim(),
-        countryCode: _countryCode,
-        purpose: 'forgot_password',
+      final response = await _apiService.requestPasswordReset(
+        phoneNumber: '$_countryCode${phoneController.text.trim()}',
+        userType: 'user', // Defaulting to user, or should we ask? user request says "user" in json.
       );
+
+      final sessionId = response['sessionId'];
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -46,6 +47,7 @@ class _ForgotPasswordNumPageState extends State<ForgotPasswordNumPage> {
           OtpPaswdPage(
             phoneNumber: phoneController.text.trim(),
             countryCode: _countryCode,
+            sessionId: sessionId,
           ),
         );
       }

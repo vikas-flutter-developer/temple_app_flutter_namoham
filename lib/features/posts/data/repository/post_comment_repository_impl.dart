@@ -22,19 +22,7 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
       
       // Convert to PostCommentModel
       final comments = commentsData.map((json) {
-        return PostCommentModel(
-          id: json['_id'] ?? json['id'] ?? '',
-          postId: postId,
-          userId: json['userId'] ?? '',
-          username: json['username'] ?? '',
-          userImage: json['userImage'] ?? '',
-          text: json['text'] ?? '',
-          timestamp: json['timestamp'] ?? '',
-          replies: _repliesStore[json['_id']] ?? [], // Local replies
-          likes: json['likes'] ?? 0,
-          likedBy: json['likedBy'] != null ? List<String>.from(json['likedBy']) : [],
-          isExpanded: false,
-        );
+        return PostCommentModel.fromJson(json).copyWith(postId: postId);
       }).toList();
       
       return Right(comments);
@@ -56,21 +44,17 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
       final response = await apiService.addComment(comment.postId, comment.text);
       
       // Parse the response
+      // Response structure: { "message": "Comment added", "comment": { ... } }
       final commentData = response['comment'];
-      final newComment = PostCommentModel(
-        id: commentData['_id'] ?? commentData['id'] ?? comment.id,
+      
+      if (commentData == null) {
+        throw Exception('Invalid server response: missing comment data');
+      }
+
+      // Create model from response data
+      // API response might not have postId, so we inject it from the original request
+      final newComment = PostCommentModel.fromJson(commentData).copyWith(
         postId: comment.postId,
-        userId: commentData['userId'] ?? comment.userId,
-        username: commentData['username'] ?? comment.username,
-        userImage: commentData['userImage'] ?? comment.userImage,
-        text: commentData['text'] ?? comment.text,
-        timestamp: commentData['timestamp'] ?? comment.timestamp,
-        replies: [],
-        likes: commentData['likes'] ?? 0,
-        likedBy: commentData['likedBy'] != null 
-            ? List<String>.from(commentData['likedBy']) 
-            : [],
-        isExpanded: false,
       );
 
       return Right(newComment);
@@ -105,6 +89,7 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
         userId: replyData['userId'] ?? reply.userId,
         username: replyData['username'] ?? reply.username,
         userImage: replyData['userImage'] ?? reply.userImage,
+        name: replyData['name'] ?? reply.name, // Added name
         text: replyData['text'] ?? reply.text,
         timestamp: replyData['timestamp'] ?? reply.timestamp,
         replies: [],
@@ -145,6 +130,7 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
             userId: commentData['userId'] ?? '',
             username: commentData['username'] ?? '',
             userImage: commentData['userImage'] ?? '',
+            name: commentData['name'], // Added name
             text: commentData['text'] ?? '',
             timestamp: commentData['timestamp'] ?? '',
             replies: [],
@@ -165,6 +151,7 @@ class PostCommentRepositoryImpl implements PostCommentRepository {
             userId: '',
             username: '',
             userImage: '',
+            name: null, // Added name
             text: '',
             timestamp: '',
             replies: [],

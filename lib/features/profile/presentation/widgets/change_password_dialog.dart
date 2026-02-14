@@ -60,9 +60,17 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
 
     try {
       print('CHANGE_PASSWORD: Requesting OTP for ${widget.email} (${widget.userType})');
+      
+      final String? effectiveEmail = widget.email.trim().isEmpty ? null : widget.email.trim();
+      final String cleanPhoneNumber = widget.phoneNumber.replaceAll(' ', '');
+      
+      // Ensure userType is lowercase for API consistency
+      final String apiUserType = widget.userType.toLowerCase();
+
       final response = await _apiService.requestPasswordReset(
-        email: widget.email,
-        userType: widget.userType,
+        email: effectiveEmail,
+        phoneNumber: cleanPhoneNumber,
+        userType: apiUserType,
       );
 
       print('CHANGE_PASSWORD: OTP Response: $response');
@@ -106,10 +114,16 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
 
     try {
       print('CHANGE_PASSWORD: Resetting password...');
+      
+      final String? effectiveEmail = widget.email.trim().isEmpty ? null : widget.email.trim();
+      // Ensure we use the cleaned phone number that was used to send OTP
+      final String cleanPhoneNumber = _displayPhoneNumber.replaceAll(' ', '');
+      final String apiUserType = widget.userType.toLowerCase();
+
       final response = await _apiService.resetPasswordWithOTP(
-        email: widget.email,
-        userType: widget.userType,
-        phoneNumber: _displayPhoneNumber, 
+        email: effectiveEmail,
+        userType: apiUserType,
+        phoneNumber: cleanPhoneNumber, 
         otp: _otpController.text.trim(),
         newPassword: _passwordController.text.trim(),
         sessionId: _sessionId,
@@ -148,9 +162,15 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
 
     try {
       print('CHANGE_PASSWORD: Resending OTP...');
+      
+      final String? effectiveEmail = widget.email.trim().isEmpty ? null : widget.email.trim();
+      final String cleanPhoneNumber = widget.phoneNumber.replaceAll(' ', '');
+      final String apiUserType = widget.userType.toLowerCase();
+
       final response = await _apiService.resendResetOTP(
-        email: widget.email,
-        userType: widget.userType,
+        email: effectiveEmail,
+        phoneNumber: cleanPhoneNumber,
+        userType: apiUserType,
       );
 
       print('CHANGE_PASSWORD: Resend Response: $response');
@@ -176,123 +196,127 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Change Password',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Change Password',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              if (_errorMessage != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(color: Colors.red.shade800, fontSize: 13),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () => Navigator.pop(context),
+
+              if (_successMessage != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Text(
+                    _successMessage!,
+                    style: TextStyle(color: Colors.green.shade800, fontSize: 13),
+                  ),
+                ),
+
+              if (_step == 0) ...[
+                Text(
+                  'We will send a One Time Password (OTP) to your registered phone number:',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _displayPhoneNumber,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 24),
+                CustomButton(
+                  labelText: _isLoading ? 'Sending...' : 'Send OTP',
+                  onPressed: _isLoading ? () {} : _sendOtp,
+                ),
+              ] else ...[
+                Text(
+                  'Enter the OTP sent to $_displayPhoneNumber',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                
+                CustomTextField(
+                  labelText: 'OTP', 
+                  controller: _otpController, 
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                CustomTextField(
+                  labelText: 'New Password', 
+                  controller: _passwordController,
+                  obscure: true,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                CustomButton(
+                  labelText: _isLoading ? 'Verifying...' : 'Change Password',
+                  onPressed: _isLoading ? () {} : () {
+                    if (_passwordController.text.length < 3) {
+                      setState(() => _errorMessage = 'Password must be at least 3 characters');
+                      return;
+                    }
+                    _verifyAndReset();
+                  },
+                ),
+                const SizedBox(height: 12),
+                
+                TextButton(
+                  onPressed: _isLoading ? null : _resendOtp,
+                  child: const Text('Resend OTP'),
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            
-            if (_errorMessage != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
-                ),
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Colors.red.shade800, fontSize: 13),
-                ),
-              ),
-
-            if (_successMessage != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
-                ),
-                child: Text(
-                  _successMessage!,
-                  style: TextStyle(color: Colors.green.shade800, fontSize: 13),
-                ),
-              ),
-
-            if (_step == 0) ...[
-              Text(
-                'We will send a One Time Password (OTP) to your registered phone number:',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _displayPhoneNumber,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 24),
-              CustomButton(
-                labelText: _isLoading ? 'Sending...' : 'Send OTP',
-                onPressed: _isLoading ? () {} : _sendOtp,
-              ),
-            ] else ...[
-              Text(
-                'Enter the OTP sent to $_displayPhoneNumber',
-                style: TextStyle(color: Colors.grey[600], fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              
-              CustomTextField(
-                labelText: 'OTP', 
-                controller: _otpController, 
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(6),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              CustomTextField(
-                labelText: 'New Password', 
-                controller: _passwordController,
-                obscure: true,
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(10),
-                ],
-              ),
-              const SizedBox(height: 24),
-              
-              CustomButton(
-                labelText: _isLoading ? 'Verifying...' : 'Change Password',
-                onPressed: _isLoading ? () {} : () {
-                  if (_passwordController.text.length < 3) {
-                    setState(() => _errorMessage = 'Password must be at least 3 characters');
-                    return;
-                  }
-                  _verifyAndReset();
-                },
-              ),
-              const SizedBox(height: 12),
-              
-              TextButton(
-                onPressed: _isLoading ? null : _resendOtp,
-                child: const Text('Resend OTP'),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );

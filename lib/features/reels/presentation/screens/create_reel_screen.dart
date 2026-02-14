@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/services/video_upload_service.dart';
+import '../../../../core/services/r2_upload_service.dart';
 import '../../../../core/api/api_service.dart';
 
 class CreateReelScreen extends StatefulWidget {
@@ -15,7 +15,7 @@ class CreateReelScreen extends StatefulWidget {
 
 class _CreateReelScreenState extends State<CreateReelScreen> {
   final _captionController = TextEditingController();
-  final _videoUploadService = VideoUploadService();
+  final _r2UploadService = R2UploadService();
   final _apiService = ApiService.create();
   final _imagePicker = ImagePicker();
 
@@ -135,9 +135,9 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
         throw Exception('Please login to create reel');
       }
 
-      // Upload video to Supabase
+      // Upload video to R2
       setState(() => _uploadProgress = 0.3);
-      final videoUrl = await _videoUploadService.uploadVideo(_videoFile!);
+      final videoUrl = await _r2UploadService.uploadFile(_videoFile!, 'reels');
 
       if (videoUrl == null) {
         throw Exception('Unable to upload video. Please check your internet connection.');

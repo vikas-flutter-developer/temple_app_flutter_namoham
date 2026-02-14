@@ -256,24 +256,32 @@ class _AdminMessagesScreenState extends State<AdminMessagesScreen> {
 
                       // Conversations List
                       Expanded(
-                        child: _filteredConversations.isEmpty
-                            ? Center(
-                                child: Text(
-                                  _searchQuery.isEmpty
-                                      ? 'No support messages yet'
-                                      : 'No results found',
-                                  style: TextStyle(color: Colors.grey[600]),
+                        child: RefreshIndicator(
+                          onRefresh: _loadConversations,
+                          child: _filteredConversations.isEmpty
+                              ? ListView(
+                                  children: [
+                                    const SizedBox(height: 100),
+                                    Center(
+                                      child: Text(
+                                        _searchQuery.isEmpty
+                                            ? 'No support messages yet'
+                                            : 'No results found',
+                                        style: TextStyle(color: Colors.grey[600]),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : ListView.builder(
+                                  itemCount: _filteredConversations.length,
+                                  itemBuilder: (context, index) {
+                                    final conv = _filteredConversations[index];
+                                    final isSelected = _selectedConversation?['id'] == conv['id'];
+                                    
+                                    return _buildConversationItem(conv, isSelected);
+                                  },
                                 ),
-                              )
-                            : ListView.builder(
-                                itemCount: _filteredConversations.length,
-                                itemBuilder: (context, index) {
-                                  final conv = _filteredConversations[index];
-                                  final isSelected = _selectedConversation?['id'] == conv['id'];
-                                  
-                                  return _buildConversationItem(conv, isSelected);
-                                },
-                              ),
+                        ),
                       ),
                     ],
                   ),

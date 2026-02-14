@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/core/config/app_config.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
-import 'package:flutter_user_app/features/auth/login/presentation/screens/forgot_password_num_page.dart';
+import 'package:flutter_user_app/features/auth/login/presentation/screens/forgot_password_otp_page.dart';
 import 'package:flutter_user_app/features/home/presentation/screens/home_page.dart';
 import 'package:flutter_user_app/features/auth/register/presentation/screens/register_screen.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_main_layout.dart';
@@ -12,6 +12,7 @@ import 'package:flutter_user_app/widgets/custom_widgets/custom_text_widget.dart'
 import 'package:flutter_user_app/widgets/custom_widgets/custom_textfield.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -213,9 +214,33 @@ class _LoginPageState extends State<LoginPage> {
         navigateToPageAndRemoveUntil(context, HomePage());
       }
     } catch (e) {
-        final cleanError = e.toString().replaceAll('Exception: ', '');
+        String errorMessage = e.toString().replaceAll('Exception: ', '');
+        
+        // Attempt to extract friendly message from JSON response
+        if (errorMessage.contains('{') && errorMessage.contains('}')) {
+           try {
+             final startIndex = errorMessage.indexOf('{');
+             final endIndex = errorMessage.lastIndexOf('}');
+             final jsonString = errorMessage.substring(startIndex, endIndex + 1);
+             
+             final errorMap = json.decode(jsonString);
+             if (errorMap is Map && errorMap['message'] != null) {
+               errorMessage = errorMap['message'];
+             }
+           } catch (_) {
+             // If parsing fails, rely on basic cleanup
+           }
+        } 
+        
+        // Clean up "Login failed: " prefix if still present
+        errorMessage = errorMessage.replaceAll('Login failed: ', '');
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login Failed: $cleanError')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
     } finally {
       if (mounted) {
@@ -354,8 +379,59 @@ class _LoginPageState extends State<LoginPage> {
                           ],
                         ),
                         TextButton(
-                          onPressed: () {
-                            navigateToPage(context, ForgotPasswordNumPage());
+                          onPressed: () async {
+                            final email = _emailController.text.trim();
+                            if (email.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please enter your email first')),
+                              );
+                              return;
+                            }
+
+                            // Derive userType from selected login type
+                            String forgotUserType = 'user';
+                            if (_selectedLoginType == 'Temple Login') forgotUserType = 'temple';
+                            if (_selectedLoginType == 'Creator Login') forgotUserType = 'creator';
+
+                            setState(() => _isLoading = true);
+                            try {
+                              final response = await _apiService.requestPasswordReset(
+                                email: email,
+                                userType: forgotUserType,
+                              );
+
+                              final phoneNumber = response['phoneNumber'] as String? ?? '';
+                              final sessionId = response['sessionId'] as String? ?? '';
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(response['message'] ?? 'OTP sent to your phone'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                                navigateToPage(
+                                  context,
+                                  ForgotPasswordOtpPage(
+                                    email: email,
+                                    userType: forgotUserType,
+                                    phoneNumber: phoneNumber,
+                                    sessionId: sessionId,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.toString().replaceAll('Exception: ', '')),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) setState(() => _isLoading = false);
+                            }
                           },
                           child: Text(
                             "Forgot Password?",

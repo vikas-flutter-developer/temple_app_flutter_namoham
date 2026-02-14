@@ -241,120 +241,125 @@ class _AdminAppRatingsScreenState extends State<AdminAppRatingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC), // Admin background color
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Reusing AdminHeader but customized for Ratings
-            AdminHeader(
-              title: "App Ratings",
-              showSearch: false, // Or implement search later
-              filters: Row(
-                children: [
-                   _buildSortDropdown(),
-                ],
+      body: RefreshIndicator(
+        onRefresh: _loadRatings,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              // Reusing AdminHeader but customized for Ratings
+              AdminHeader(
+                onBackPressed: () => Navigator.pop(context),
+                title: "App Ratings",
+                showSearch: false, // Or implement search later
+                filters: Row(
+                  children: [
+                     _buildSortDropdown(),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Stats Cards
-                  if (_stats != null)
-                    Row(
-                      children: [
-                        StatCard(
-                          title: "Average Rating",
-                          value: _stats!.averageRating.toStringAsFixed(1),
-                          icon: Icons.star,
-                          iconColor: Colors.amber,
-                          iconBgColor: Colors.amber.withOpacity(0.1),
-                        ),
-                        const SizedBox(width: 16),
-                        StatCard(
-                          title: "Total Reviews",
-                          value: _stats!.totalRatings.toString(),
-                          icon: Icons.reviews,
-                          iconColor: Colors.blue,
-                          iconBgColor: Colors.blue.withOpacity(0.1),
-                        ),
-                      ],
-                    ),
-                  
-                  const SizedBox(height: 24),
-
-                  // Ratings Table
-                  if (_isLoading)
-                     const Center(child: CircularProgressIndicator())
-                  else if (_error != null)
-                     Center(child: Text('Error: $_error', style: const TextStyle(color: Colors.red)))
-                  else if (_ratings.isEmpty)
-                     const Center(
-                       child: Padding(
-                         padding: EdgeInsets.all(32.0),
-                         child: Text("No ratings found.", style: TextStyle(color: Colors.grey)),
-                       ),
-                     )
-                  else
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Stats Cards
+                    if (_stats != null)
+                      Row(
                         children: [
-                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "Latest Reviews (${_pagination?.total ?? 0})", 
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                           ),
-                           const SizedBox(height: 24),
-                           
-                           ListView.separated(
-                             shrinkWrap: true,
-                             physics: const NeverScrollableScrollPhysics(),
-                             itemCount: _ratings.length,
-                             separatorBuilder: (_, __) => const Divider(height: 32),
-                             itemBuilder: (context, index) {
-                               final rating = _ratings[index];
-                               return _buildRatingItem(rating);
-                             },
-                           ),
-
-                           const SizedBox(height: 24),
-                           // Pagination
-                           if (_pagination != null)
-                             Row(
-                               mainAxisAlignment: MainAxisAlignment.end,
-                               children: [
-                                 IconButton(
-                                   icon: const Icon(Icons.chevron_left),
-                                   onPressed: _pagination!.page > 1 ? () => _onPageChanged(_pagination!.page - 1) : null,
-                                 ),
-                                 Text("Page ${_pagination!.page} of ${_pagination!.totalPages}"),
-                                 IconButton(
-                                   icon: const Icon(Icons.chevron_right),
-                                   onPressed: _pagination!.page < _pagination!.totalPages ? () => _onPageChanged(_pagination!.page + 1) : null,
-                                 ),
-                               ],
-                             ),
+                          StatCard(
+                            title: "Average Rating",
+                            value: _stats!.averageRating.toStringAsFixed(1),
+                            icon: Icons.star,
+                            iconColor: Colors.amber,
+                            iconBgColor: Colors.amber.withOpacity(0.1),
+                          ),
+                          const SizedBox(width: 16),
+                          StatCard(
+                            title: "Total Reviews",
+                            value: _stats!.totalRatings.toString(),
+                            icon: Icons.reviews,
+                            iconColor: Colors.blue,
+                            iconBgColor: Colors.blue.withOpacity(0.1),
+                          ),
                         ],
                       ),
-                    ),
-                  
-                  const SizedBox(height: 40),
-                ],
+                    
+                    const SizedBox(height: 24),
+
+                    // Ratings Table
+                    if (_isLoading)
+                       const Center(child: CircularProgressIndicator())
+                    else if (_error != null)
+                       Center(child: Text('Error: $_error', style: const TextStyle(color: Colors.red)))
+                    else if (_ratings.isEmpty)
+                       const Center(
+                         child: Padding(
+                           padding: EdgeInsets.all(32.0),
+                           child: Text("No ratings found.", style: TextStyle(color: Colors.grey)),
+                         ),
+                       )
+                    else
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  "Latest Reviews (${_pagination?.total ?? 0})", 
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                             ),
+                             const SizedBox(height: 24),
+                             
+                             ListView.separated(
+                               shrinkWrap: true,
+                               physics: const NeverScrollableScrollPhysics(),
+                               itemCount: _ratings.length,
+                               separatorBuilder: (_, __) => const Divider(height: 32),
+                               itemBuilder: (context, index) {
+                                 final rating = _ratings[index];
+                                 return _buildRatingItem(rating);
+                               },
+                             ),
+
+                             const SizedBox(height: 24),
+                             // Pagination
+                             if (_pagination != null)
+                               Row(
+                                 mainAxisAlignment: MainAxisAlignment.end,
+                                 children: [
+                                   IconButton(
+                                     icon: const Icon(Icons.chevron_left),
+                                     onPressed: _pagination!.page > 1 ? () => _onPageChanged(_pagination!.page - 1) : null,
+                                   ),
+                                   Text("Page ${_pagination!.page} of ${_pagination!.totalPages}"),
+                                   IconButton(
+                                     icon: const Icon(Icons.chevron_right),
+                                     onPressed: _pagination!.page < _pagination!.totalPages ? () => _onPageChanged(_pagination!.page + 1) : null,
+                                   ),
+                                 ],
+                               ),
+                          ],
+                        ),
+                      ),
+                    
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

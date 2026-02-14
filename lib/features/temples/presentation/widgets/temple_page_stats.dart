@@ -4,6 +4,7 @@ import 'package:flutter_user_app/features/temples/data/models/temple_model.dart'
 import 'package:provider/provider.dart';
 import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
+import 'package:flutter_user_app/features/follow/presentation/screens/following_screen.dart';
 
 class ProfileStats extends StatefulWidget {
   final TempleModel profile;
@@ -81,7 +82,18 @@ class _ProfileStatsState extends State<ProfileStats> {
                  return _buildStat(
                   '${followProvider.isLoadingFollowing ? "..." : count}', 
                   l10n.following, 
-                  context
+                  context,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FollowingScreen(
+                          entityId: widget.profile.id,
+                          title: '${widget.profile.name} ${l10n.following}',
+                        ),
+                      ),
+                    );
+                  }
                 );
               },
             ),
@@ -100,10 +112,10 @@ class _ProfileStatsState extends State<ProfileStats> {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Colors.black87, // Strong black for numbers
+            // color: Colors.black87, // Removed hardcoded color
           ),
         ),
         const SizedBox(height: 4),
@@ -111,7 +123,7 @@ class _ProfileStatsState extends State<ProfileStats> {
           label,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey.shade600, // Grey for label
+            // color: Colors.grey.shade600, // Removed hardcoded color
             fontWeight: FontWeight.normal,
           ),
         ),

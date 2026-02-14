@@ -7,9 +7,12 @@ import '../../../../core/api/api_service.dart';
 import '../../../../widgets/custom_widgets/custom_page_bar.dart';
 import '../../data/models/reel_model.dart';
 import '../providers/reels_provider.dart';
+import 'package:flutter_user_app/features/block/presentation/providers/block_provider.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../widgets/reel_video_widget.dart';
+import '../widgets/comments_sheet.dart'; // Added import
 import 'create_reel_screen.dart';
+import 'package:flutter_user_app/features/block/presentation/widgets/block_confirmation_dialog.dart';
 
 class VideosScreen extends StatelessWidget {
   final List<ReelModel>? initialReels;
@@ -98,8 +101,11 @@ class _VideosViewState extends State<_VideosView> {
   @override
   void dispose() {
     _pageController.dispose();
-    // Dispose all video controllers
-    for (final controller in _controllers.values) {
+    // Dispose all video controllers safely
+    // Clear the map first so listeners know we are disposing
+    final controllersToDispose = _controllers.values.toList();
+    _controllers.clear();
+    for (final controller in controllersToDispose) {
       controller.dispose();
     }
     super.dispose();
@@ -145,6 +151,8 @@ class _VideosViewState extends State<_VideosView> {
     // Auto-scroll listener
     controller.addListener(() {
       if (!mounted) return;
+      // Safety check: if controller is removed from map (during dispose), stop
+      if (!_controllers.containsKey(reel.id)) return;
       
       final value = controller.value;
       if (value.duration > Duration.zero && value.position >= value.duration) {
@@ -294,7 +302,34 @@ class _VideosViewState extends State<_VideosView> {
           }
 
           if (provider.reels.isEmpty) {
-            return const Center(child: Text('No reels available'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('No reels available', style: TextStyle(color: Colors.white)),
+                  if (_canCreateReel()) ...[
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CreateReelScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Create Reel'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF29D0FF),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
           }
 
             return RefreshIndicator(
@@ -387,6 +422,7 @@ class _VideosViewState extends State<_VideosView> {
                       controller: controller,
                       isLiked: reel.isLikedBy(provider.userId),
                       isSaved: reel.isSaved ?? false,
+                      canCreateReel: _canCreateReel(),
                       onLikePressed: () => provider.toggleLike(reel.id),
                       onCommentPressed: () => _showCommentsSheet(context, reel),
                       onSavePressed: () {
@@ -401,8 +437,15 @@ class _VideosViewState extends State<_VideosView> {
                           ),
                         );
                       },
-                      onDeletePressed: provider.userId == reel.userId
+                      // Delete available for Owner (User/Creator/Temple)
+                      onDeletePressed: (provider.userId?.trim() == reel.userId.trim())
                           ? () => _confirmDelete(context, provider, reel)
+                          : null,
+                      
+                      // Block available for User, Creator, and Temple on OTHERS' content
+                      onBlockPressed: ((provider.userId?.trim() != reel.userId.trim()) &&
+                              (_userType.toLowerCase() == 'user' || _userType.toLowerCase() == 'creator' || _userType.toLowerCase() == 'temple'))
+                          ? () => _handleBlock(context, reel)
                           : null,
                     );
                   },
@@ -425,15 +468,56 @@ class _VideosViewState extends State<_VideosView> {
   }
 
   void _showCommentsSheet(BuildContext context, ReelModel reel) {
+    // Capture provider before showing sheet to avoid "deactivated widget" error
+    // if the context is lost or widget is disposing.
     final provider = context.read<ReelsProvider>();
     
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => _ReelCommentsSheet(
-        reel: reel,
-        provider: provider,
+      builder: (sheetContext) => ChangeNotifierProvider.value(
+        value: provider,
+        child: CommentsSheet(
+          reelId: reel.id,
+          reelOwnerId: reel.userId,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleBlock(BuildContext context, ReelModel reel) async {
+    final theme = Theme.of(context);
+    
+    showDialog(
+      context: context,
+      builder: (dialogContext) => BlockConfirmationDialog(
+        username: reel.username,
+        onBlock: () async {
+          final blockProvider = Provider.of<BlockProvider>(context, listen: false);
+          final reelsProvider = Provider.of<ReelsProvider>(context, listen: false);
+          
+          final success = await blockProvider.blockEntity(
+            entityId: reel.userId,
+            entityType: reel.userType,
+            entityName: reel.username,
+            entityImage: reel.userImage,
+          );
+
+          if (mounted) {
+            if (success) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${reel.username} hidden')),
+              );
+              // Refresh logic is handled by provider filter
+              reelsProvider.loadReels();
+            } else {
+               ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to block user')),
+              );
+            }
+          }
+        },
       ),
     );
   }
@@ -472,218 +556,5 @@ class _VideosViewState extends State<_VideosView> {
   }
 }
 
-class _ReelCommentsSheet extends StatefulWidget {
-  final ReelModel reel;
-  final ReelsProvider provider;
 
-  const _ReelCommentsSheet({
-    required this.reel,
-    required this.provider,
-  });
-
-  @override
-  State<_ReelCommentsSheet> createState() => _ReelCommentsSheetState();
-}
-
-class _ReelCommentsSheetState extends State<_ReelCommentsSheet> {
-  final TextEditingController _commentController = TextEditingController();
-  List<ReelComment> _comments = [];
-  bool _isLoading = true;
-  bool _isSubmitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadComments();
-  }
-
-  Future<void> _loadComments() async {
-    setState(() => _isLoading = true);
-    final comments = await widget.provider.getComments(widget.reel.id);
-    if (mounted) {
-      setState(() {
-        _comments = comments;
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _submitComment() async {
-    if (_commentController.text.trim().isEmpty) return;
-    
-    setState(() => _isSubmitting = true);
-    
-    final success = await widget.provider.addComment(
-      widget.reel.id,
-      _commentController.text.trim(),
-    );
-    
-    if (success && mounted) {
-      _commentController.clear();
-      await _loadComments();
-    }
-    
-    if (mounted) {
-      setState(() => _isSubmitting = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          // Handle
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.outline.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'Comments (${_comments.length})',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          
-          const Divider(height: 1),
-          
-          // Comments list
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _comments.isEmpty
-                    ? const Center(child: Text('No comments yet'))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _comments.length,
-                        itemBuilder: (context, index) {
-                          final comment = _comments[index];
-                          return _CommentTile(comment: comment);
-                        },
-                      ),
-          ),
-          
-          // Comment input
-          Container(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 8,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            ),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              border: Border(top: BorderSide(color: theme.dividerColor)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    decoration: const InputDecoration(
-                      hintText: 'Add a comment...',
-                      border: InputBorder.none,
-                    ),
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _submitComment(),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _isSubmitting ? null : _submitComment,
-                  icon: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(Icons.send, color: theme.colorScheme.primary),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CommentTile extends StatelessWidget {
-  final ReelComment comment;
-
-  const _CommentTile({required this.comment});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: theme.colorScheme.primaryContainer,
-            backgroundImage: comment.userImage.isNotEmpty
-                ? NetworkImage(comment.userImage)
-                : null,
-            child: comment.userImage.isEmpty
-                ? Text(
-                    comment.username.isNotEmpty
-                        ? comment.username[0].toUpperCase()
-                        : '?',
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  comment.username,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  comment.text,
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 

@@ -15,6 +15,7 @@ import 'package:flutter_user_app/features/profile/presentation/screens/privacy_p
 import 'package:flutter_user_app/features/profile/presentation/screens/terms_conditions_screen.dart';
 import 'package:flutter_user_app/features/events/presentation/screens/events_screen.dart';
 import '../../../../widgets/custom_widgets/custom_network_image.dart';
+import 'package:flutter_user_app/features/profile/presentation/screens/reminder_page.dart';
 import 'package:flutter_user_app/features/messages/presentation/screens/conversations_screen.dart';
 import 'package:flutter_user_app/features/temples/presentation/screens/temple_donation_screen.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_page_bar.dart';
@@ -27,6 +28,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_user_app/features/app_ratings/presentation/screens/app_rating_screen.dart';
 import 'package:flutter_user_app/features/profile/presentation/screens/request_delete_account_screen.dart';
+import 'package:flutter_user_app/features/block/presentation/screens/block_list_screen.dart';
 import 'profile_edit_screen.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -370,6 +372,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
 
                   ProfileItemsWidget(
+                    icon: Icons.block,
+                    title: 'Block List',
+                    subtitle: 'Manage blocked accounts',
+                    onTap: () {
+                      navigateToPage(context, const BlockListScreen());
+                    },
+                  ),
+
+                  ProfileItemsWidget(
                     icon: Icons.bookmark,
                     title: l10n.savedPost,
                     subtitle: l10n.savedPhotosVideos,
@@ -405,8 +416,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.money,
                     title: l10n.donation,
                     subtitle: l10n.donationHistory,
-                    onTap: () {
-                      navigateToPage(context, DonationScreen());
+                    onTap: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      final userId = prefs.getString('user_id') ?? '';
+                      if (context.mounted) {
+                        navigateToPage(context, DonationScreen(recipientId: userId));
+                      }
                     },
                   ),
 
@@ -414,7 +429,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.alarm,
                     title: 'Event Reminder',
                     subtitle: 'Saved Events For Reminder',
-                    onTap: _showComingSoonToast,
+                    onTap: () {
+                      navigateToPage(context, const ReminderScreen());
+                    },
                   ),
 
                   if (isTemple || isCreator)

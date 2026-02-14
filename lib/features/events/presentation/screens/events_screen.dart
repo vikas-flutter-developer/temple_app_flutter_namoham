@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -31,7 +32,7 @@ class _EventsView extends StatefulWidget {
   State<_EventsView> createState() => _EventsViewState();
 }
 
-class _EventsViewState extends State<_EventsView> {
+class _EventsViewState extends State<_EventsView> with WidgetsBindingObserver {
   // Sorting state
   String _sortBy = 'date'; // 'date' or 'time'
   bool _sortAscending = true;
@@ -40,10 +41,47 @@ class _EventsViewState extends State<_EventsView> {
   String? _currentUserId;
   String? _currentUserType;
 
+  // Auto-refresh timer
+  Timer? _refreshTimer;
+  static const _refreshInterval = Duration(seconds: 30);
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadCurrentUser();
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh when app comes back to foreground
+      _refreshEvents();
+      _startAutoRefresh();
+    } else if (state == AppLifecycleState.paused) {
+      _refreshTimer?.cancel();
+    }
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+      _refreshEvents();
+    });
+  }
+
+  void _refreshEvents() {
+    if (mounted) {
+      Provider.of<EventsProvider>(context, listen: false).fetchEvents();
+    }
   }
 
   Future<void> _loadCurrentUser() async {
@@ -51,7 +89,6 @@ class _EventsViewState extends State<_EventsView> {
     if (mounted) {
       setState(() {
         _currentUserId = prefs.getString('user_id');
-        // Standardize type to lowercase for comparison
         _currentUserType = prefs.getString('user_type')?.toLowerCase();
       });
     }
@@ -70,7 +107,6 @@ class _EventsViewState extends State<_EventsView> {
             : b.eventDate!.compareTo(a.eventDate!);
       });
     } else {
-      // Sort by time (using eventTime string)
       sorted.sort((a, b) {
         final timeCompare = a.eventTime.compareTo(b.eventTime);
         return _sortAscending ? timeCompare : -timeCompare;
@@ -90,7 +126,6 @@ class _EventsViewState extends State<_EventsView> {
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         actions: [
-          // Sort button
           Consumer<EventsProvider>(
             builder: (context, provider, child) {
               if (provider.events.isEmpty) return const SizedBox.shrink();
@@ -170,30 +205,49 @@ class _EventsViewState extends State<_EventsView> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (provider.error != null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Error: ${provider.error}'),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () => provider.fetchEvents(),
-                      child: const Text('Retry'),
-                    )
-                  ],
-                ),
+          if (provider.error != null && provider.events.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: () => provider.fetchEvents(),
+              child: ListView(
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Error: ${provider.error}'),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: () => provider.fetchEvents(),
+                              child: const Text('Retry'),
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
           }
 
           if (provider.events.isEmpty) {
-            return const Center(child: Text('No events available'));
+            return RefreshIndicator(
+              onRefresh: () => provider.fetchEvents(),
+              child: ListView(
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: const Center(child: Text('No events available')),
+                  ),
+                ],
+              ),
+            );
           }
 
-          // Apply sorting
           final sortedEvents = _sortEvents(provider.events);
 
           return RefreshIndicator(
@@ -213,7 +267,6 @@ class _EventsViewState extends State<_EventsView> {
 
                 return InkWell(
                   onTap: () {
-                    // EventsProvider is scoped to this route, so pass it to the next route.
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -222,7 +275,10 @@ class _EventsViewState extends State<_EventsView> {
                           child: EventDetailScreen(event: event),
                         ),
                       ),
-                    );
+                    ).then((_) {
+                      // Auto-refresh when returning from detail screen
+                      _refreshEvents();
+                    });
                   },
                   child: Card(
                     color: theme.colorScheme.surfaceContainer,
@@ -339,12 +395,12 @@ class _EventsViewState extends State<_EventsView> {
                       MaterialPageRoute(
                         builder: (_) => CreateEventScreen(
                           organizerId: _currentUserId!,
-                          organizerType: _currentUserType!, // Already lowercased in _loadCurrentUser
+                          organizerType: _currentUserType!,
                         ),
                       ),
                     ).then((value) {
                       if (value == true) {
-                        provider.fetchEvents();
+                        _refreshEvents();
                       }
                     });
                   },

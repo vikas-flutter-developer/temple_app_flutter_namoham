@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
-import 'package:flutter_user_app/features/auth/register/presentation/screens/add_account_page.dart';
+import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_appbar.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_button.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_text_widget.dart';
@@ -61,9 +61,21 @@ class _OtpPageState extends State<OtpPage> {
   Future<void> _resendOtp() async {
     setState(() => _isLoading = true);
     try {
-      final response = await _apiService.resendOtp(
+      // Determine userType from registerType
+      String userType = 'user';
+      final registerType = widget.registrationData['registerType'];
+      if (registerType == 'Temple Register') {
+        userType = 'temple';
+      } else if (registerType == 'Creator Register') {
+        userType = 'creator';
+      }
+
+      final email = widget.registrationData['email'] ?? '';
+
+      final response = await _apiService.sendRegistrationOTP(
         phoneNumber: widget.phoneNumber,
-        countryCode: widget.countryCode,
+        email: email,
+        userType: userType,
       );
       
       if (mounted) {
@@ -97,32 +109,8 @@ class _OtpPageState extends State<OtpPage> {
     setState(() => _isLoading = true);
 
     try {
-      // First verify OTP
-      final verifyResponse = await _apiService.verifyOtp(
-        phoneNumber: widget.phoneNumber,
-        countryCode: widget.countryCode,
-        otp: _otpCode,
-      );
-
-      if (verifyResponse['isValid'] != true) {
-        // OTP verification failed
-        _attemptsRemaining = verifyResponse['attemptsRemaining'];
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${verifyResponse['message'] ?? 'Invalid OTP'}${_attemptsRemaining != null ? '. Attempts remaining: $_attemptsRemaining' : ''}',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      // OTP verified, proceed with registration
+      // OTP is verified as part of the registration call itself
       final type = widget.registrationData['registerType'];
-
-      // Add OTP to registration data
       final otp = _otpCode;
 
       if (type == 'User Register') {
@@ -160,11 +148,36 @@ class _OtpPageState extends State<OtpPage> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration Successful!')),
-        );
-        // Navigate to success page/next step
-        navigateToPage(context, AddAccountPage());
+        // Show appropriate message based on account type
+        if (type == 'Temple Register' || type == 'Creator Register') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.verified_outlined, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '🎉 Registration successful! Your account has been sent for admin verification. You\'ll be notified once approved.',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF2196F3),
+              duration: const Duration(seconds: 5),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Registration Successful!')),
+          );
+        }
+        // Navigate to login page after successful registration
+        navigateToPageAndRemoveUntil(context, const LoginPage());
       }
     } catch (e) {
       if (mounted) {
@@ -189,7 +202,7 @@ class _OtpPageState extends State<OtpPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const Color cyanColor = Color(0x0000BCD4); // Bright cyan from design
+    const Color cyanColor = Color(0xFF00BCD4); // Bright cyan from design
     
     return Scaffold(
       backgroundColor: Colors.white,

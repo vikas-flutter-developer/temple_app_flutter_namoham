@@ -5,7 +5,7 @@ import 'package:flutter_user_app/widgets/custom_widgets/custom_button.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_dropdown_widget.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_textfield.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
-import 'package:flutter_user_app/core/services/photo_upload_service.dart';
+import 'package:flutter_user_app/core/services/r2_upload_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -50,6 +50,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final TextEditingController _websiteController = TextEditingController();
   final TextEditingController _openTimeController = TextEditingController();
   final TextEditingController _closeTimeController = TextEditingController();
+  final TextEditingController _specialDaysController = TextEditingController();
   final TextEditingController _bankHolderController = TextEditingController();
   final TextEditingController _bankAcctController = TextEditingController();
   final TextEditingController _ifscController = TextEditingController();
@@ -84,12 +85,42 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       // Call GET /auth/profile endpoint
       final profileData = await _apiService.getProfile();
       
-      print('EDIT_PROFILE: API Response: $profileData');
+      print('EDIT_PROFILE: API Response keys: ${profileData.keys.toList()}');
       
       // Extract user object from response
       final user = profileData['user'] ?? profileData;
       
-      print('EDIT_PROFILE: User data: $user');
+      print('EDIT_PROFILE: User data keys: ${user is Map ? user.keys.toList() : 'not a map'}');
+      
+      // Find bankDetails from multiple possible locations in the response
+      Map<String, dynamic>? bankDetails;
+      if (user is Map && user['bankDetails'] != null && user['bankDetails'] is Map) {
+        bankDetails = user['bankDetails'] as Map<String, dynamic>;
+        print('EDIT_PROFILE: Found bankDetails inside user: $bankDetails');
+      } else if (profileData['bankDetails'] != null && profileData['bankDetails'] is Map) {
+        bankDetails = profileData['bankDetails'] as Map<String, dynamic>;
+        print('EDIT_PROFILE: Found bankDetails at root level: $bankDetails');
+      } else if (profileData['data'] != null && profileData['data'] is Map) {
+        final data = profileData['data'] as Map<String, dynamic>;
+        if (data['bankDetails'] != null && data['bankDetails'] is Map) {
+          bankDetails = data['bankDetails'] as Map<String, dynamic>;
+          print('EDIT_PROFILE: Found bankDetails inside data: $bankDetails');
+        }
+      }
+      
+      if (bankDetails == null) {
+        print('EDIT_PROFILE: WARNING - No bankDetails found in API response, checking local cache...');
+        // Fallback: load bank details from local cache
+        final cachedBank = prefs.getString('cached_bank_details');
+        if (cachedBank != null && cachedBank.isNotEmpty) {
+          try {
+            bankDetails = json.decode(cachedBank) as Map<String, dynamic>;
+            print('EDIT_PROFILE: Loaded bankDetails from local cache: $bankDetails');
+          } catch (e) {
+            print('EDIT_PROFILE: Error parsing cached bank details: $e');
+          }
+        }
+      }
       
       setState(() {
         // Populate all fields from API response
@@ -115,17 +146,24 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         if (user['bio'] != null) _bioController.text = user['bio'];
         if (user['profilePic'] != null) _remotePhotoUrl = user['profilePic'];
         
-        print('EDIT_PROFILE: Loaded from API - Name: ${_nameController.text}, Email: ${_emailController.text}');
-        print('EDIT_PROFILE: City: ${_cityController.text}, State: ${_stateController.text}, Country: ${_countryController.text}, Zip: ${_zipController.text}');
-        print('EDIT_PROFILE: DOB: ${_dobController.text}, ProfilePic: $_remotePhotoUrl');
-
-         // Populate specialized data based on user type
-        if (_userType.toLowerCase() == 'temple') {
-           _populateTempleDataFromMap(user);
-        } else if (_userType.toLowerCase() == 'creator') {
-           _populateCreatorDataFromMap(user);
+        // Populate bank details from wherever we found them
+        if (bankDetails != null) {
+          if (bankDetails['bankName'] != null) _bankNameController.text = bankDetails['bankName'].toString();
+          if (bankDetails['accountHolderName'] != null) _bankHolderController.text = bankDetails['accountHolderName'].toString();
+          if (bankDetails['bankAccountNumber'] != null) _bankAcctController.text = bankDetails['bankAccountNumber'].toString();
+          if (bankDetails['ifscCode'] != null) _ifscController.text = bankDetails['ifscCode'].toString();
+          print('EDIT_PROFILE: Bank details populated - Bank: ${_bankNameController.text}, Holder: ${_bankHolderController.text}, Acct: ${_bankAcctController.text}, IFSC: ${_ifscController.text}');
         }
+        
+        print('EDIT_PROFILE: Loaded from API - Name: ${_nameController.text}, Email: ${_emailController.text}');
       });
+
+      // Populate specialized data based on user type (outside setState to avoid nested setState)
+      if (_userType.toLowerCase() == 'temple') {
+        _populateTempleDataFromMap(user);
+      } else if (_userType.toLowerCase() == 'creator') {
+        _populateCreatorDataFromMap(user);
+      }
     } catch (e, stackTrace) {
       print('EDIT_PROFILE: Error loading from API: $e');
       print('EDIT_PROFILE: Stack trace: $stackTrace');
@@ -271,16 +309,25 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
            final timings = data['timings'] as Map<String, dynamic>;
            if (timings['openTime'] != null) _openTimeController.text = timings['openTime'];
            if (timings['closeTime'] != null) _closeTimeController.text = timings['closeTime'];
+           
+           // Handle Special Days
+           if (timings['specialDays'] != null) {
+              if (timings['specialDays'] is List) {
+                _specialDaysController.text = (timings['specialDays'] as List).join(', ');
+              } else if (timings['specialDays'] is String) {
+                _specialDaysController.text = timings['specialDays'];
+              }
+           }
          }
          
          // Bank details  
-         if (data['bankDetails'] != null && data['bankDetails'] is Map) {
-           final bank = data['bankDetails'] as Map<String, dynamic>;
-           if (bank['bankName'] != null) _bankNameController.text = bank['bankName'];
-           if (bank['accountHolderName'] != null) _bankHolderController.text = bank['accountHolderName'];
-           if (bank['bankAccountNumber'] != null) _bankAcctController.text = bank['bankAccountNumber'];
-           if (bank['ifscCode'] != null) _ifscController.text = bank['ifscCode'];
-         }
+           if (data['bankDetails'] != null && data['bankDetails'] is Map) {
+             final bank = data['bankDetails'] as Map<String, dynamic>;
+             if (bank['bankName'] != null) _bankNameController.text = bank['bankName'].toString();
+             if (bank['accountHolderName'] != null) _bankHolderController.text = bank['accountHolderName'].toString();
+             if (bank['bankAccountNumber'] != null) _bankAcctController.text = bank['bankAccountNumber'].toString();
+             if (bank['ifscCode'] != null) _ifscController.text = bank['ifscCode'].toString();
+           }
          
          if (data['profilePic'] != null && data['profilePic'].toString().isNotEmpty) {
            _remotePhotoUrl = data['profilePic'];
@@ -361,8 +408,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('profile_photo_path', croppedPath);
 
-          final photoUploadService = PhotoUploadService();
-          final photoUrl = await photoUploadService.uploadProfilePhoto(File(croppedPath));
+          final r2UploadService = R2UploadService();
+          final photoUrl = await r2UploadService.uploadFile(File(croppedPath), 'profilePicture');
 
         if (photoUrl != null) {
           if (mounted) {
@@ -472,18 +519,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       Map<String, dynamic> response;
 
-      // Type Specific Data and API Calls
+      // Type Specific Data
       if (_userType == 'creator' || _userType == 'Creator') {
-        // Creator Specific Fields
         if (_titleController.text.isNotEmpty) profileData['title'] = _titleController.text.trim();
         if (_bioController.text.isNotEmpty) profileData['bio'] = _bioController.text.trim();
         if (_descController.text.isNotEmpty) profileData['description'] = _descController.text.trim();
         if (_dobController.text.isNotEmpty) profileData['dob'] = _dobController.text.trim();
-        
-        // Use Creator Name instead of Full Name if required by backend
         profileData['creatorName'] = _nameController.text.trim();
         
-        // Bank Details for Creator
         if (_bankAcctController.text.isNotEmpty) {
           profileData['bankDetails'] = {
             'accountHolderName': _bankHolderController.text.trim(),
@@ -492,23 +535,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             'bankName': _bankNameController.text.trim(),
           };
         }
-
-        response = await _apiService.updateCreatorProfile(userId, profileData);
-
       } else if (_userType == 'temple' || _userType == 'Temple') {
-        // Temple Specific Fields
         if (_descController.text.isNotEmpty) profileData['description'] = _descController.text.trim();
         if (_websiteController.text.isNotEmpty) profileData['website'] = _websiteController.text.trim();
         
-        // Timings
-        if (_openTimeController.text.isNotEmpty || _closeTimeController.text.isNotEmpty) {
+        if (_openTimeController.text.isNotEmpty || _closeTimeController.text.isNotEmpty || _specialDaysController.text.isNotEmpty) {
            profileData['timings'] = {
              'openTime': _openTimeController.text.trim(),
              'closeTime': _closeTimeController.text.trim(),
+             'specialDays': _specialDaysController.text.isNotEmpty 
+                 ? _specialDaysController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() 
+                 : [],
            };
         }
 
-        // Bank Details
         if (_bankAcctController.text.isNotEmpty) {
           profileData['bankDetails'] = {
             'accountHolderName': _bankHolderController.text.trim(),
@@ -517,26 +557,39 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             'bankName': _bankNameController.text.trim(),
           };
         }
-        
-        // Use Temple Name
         profileData['templeName'] = _nameController.text.trim();
-
-        response = await _apiService.updateTempleProfile(userId, profileData);
-
       } else {
-        // User specific
         if (_dobController.text.isNotEmpty) profileData['dob'] = _dobController.text.trim();
-        
+      }
+
+      // Debug: Log the data being sent
+      print('EDIT_PROFILE: Saving profile data: $profileData');
+      if (profileData.containsKey('bankDetails')) {
+        print('EDIT_PROFILE: Bank details included: ${profileData['bankDetails']}');
+      }
+
+      // Use type-specific API calls to ensure backend routes correctly
+      if (_userType == 'temple' || _userType == 'Temple') {
+        response = await _apiService.updateTempleProfile(userId, profileData);
+      } else if (_userType == 'creator' || _userType == 'Creator') {
+        response = await _apiService.updateCreatorProfile(userId, profileData);
+      } else {
         response = await _apiService.updateProfile(userId, profileData);
+      }
+
+      print('EDIT_PROFILE: Save response: $response');
+
+      // Cache bank details locally since the API doesn't return them in GET /auth/profile
+      if (profileData.containsKey('bankDetails') && profileData['bankDetails'] != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_bank_details', json.encode(profileData['bankDetails']));
+        print('EDIT_PROFILE: Bank details cached locally');
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(response['message'] ?? 'Profile updated successfully!'), backgroundColor: Colors.green),
         );
-
-        // Update Local Cache (SharedPreferences) update logic REMOVED as per request.
-        // We now rely purely on the backend.
         Navigator.pop(context);
       }
     } catch (e) {
@@ -574,6 +627,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _websiteController.dispose();
     _openTimeController.dispose();
     _closeTimeController.dispose();
+    _specialDaysController.dispose();
     _bankHolderController.dispose();
     _bankAcctController.dispose();
     _ifscController.dispose();
@@ -584,8 +638,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isTemple = _userType == 'temple';
-    final isCreator = _userType == 'creator';
+    final isTemple = _userType.toLowerCase() == 'temple';
+    final isCreator = _userType.toLowerCase() == 'creator';
 
     return Scaffold(
       appBar: AppBar(
@@ -724,14 +778,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 const SizedBox(height: 16),
                 CustomTextField(labelText: 'Description', controller: _descController, maxLines: 3),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(child: CustomTextField(labelText: 'Open Time', controller: _openTimeController)),
-                    const SizedBox(width: 16),
-                    Expanded(child: CustomTextField(labelText: 'Close Time', controller: _closeTimeController)),
-                  ],
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(child: CustomTextField(labelText: 'Open Time', controller: _openTimeController)),
+                      const SizedBox(width: 16),
+                      Expanded(child: CustomTextField(labelText: 'Close Time', controller: _closeTimeController)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(labelText: 'Special Days (comma separated)', controller: _specialDaysController),
+                  const SizedBox(height: 24),
 
                 _buildSectionTitle(theme, 'Bank Details (For Donations)'),
                 CustomTextField(labelText: 'Bank Name', controller: _bankNameController),

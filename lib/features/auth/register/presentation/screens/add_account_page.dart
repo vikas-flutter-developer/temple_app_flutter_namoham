@@ -30,23 +30,63 @@ class _AddAccountPageState extends State<AddAccountPage> {
   Future<void> _loadBankDetails() async {
     try {
       final profileData = await _apiService.getProfile();
-      final user = profileData['user'] ?? profileData;
       
-      if (user['bankDetails'] != null && user['bankDetails'] is Map) {
-        final bank = user['bankDetails'] as Map<String, dynamic>;
+      print('BANK_ACCOUNT: API Response keys: ${profileData.keys.toList()}');
+      
+      // Handle various API response structures - check ALL possible locations
+      Map<String, dynamic>? bank;
+      
+      // Check inside 'user' first (most common)
+      if (profileData.containsKey('user') && profileData['user'] != null) {
+        final user = profileData['user'];
+        if (user is Map && user['bankDetails'] != null && user['bankDetails'] is Map) {
+          bank = user['bankDetails'] as Map<String, dynamic>;
+          print('BANK_ACCOUNT: Found bankDetails inside user: $bank');
+        }
+      }
+      
+      // Check at root level
+      if (bank == null && profileData.containsKey('bankDetails') && profileData['bankDetails'] != null) {
+        if (profileData['bankDetails'] is Map) {
+          bank = profileData['bankDetails'] as Map<String, dynamic>;
+          print('BANK_ACCOUNT: Found bankDetails at root level: $bank');
+        }
+      }
+      
+      // Check inside 'data'
+      if (bank == null && profileData.containsKey('data') && profileData['data'] != null) {
+        final data = profileData['data'];
+        if (data is Map) {
+          if (data['bankDetails'] != null && data['bankDetails'] is Map) {
+            bank = data['bankDetails'] as Map<String, dynamic>;
+            print('BANK_ACCOUNT: Found bankDetails inside data: $bank');
+          } else if (data.containsKey('user') && data['user'] is Map) {
+            final user = data['user'];
+            if (user['bankDetails'] != null && user['bankDetails'] is Map) {
+              bank = user['bankDetails'] as Map<String, dynamic>;
+              print('BANK_ACCOUNT: Found bankDetails inside data.user: $bank');
+            }
+          }
+        }
+      }
+
+      if (bank != null) {
         setState(() {
-          _accountHolderName = bank['accountHolderName'] ?? '';
-          _bankAccountNumber = bank['bankAccountNumber'] ?? '';
-          _ifscCode = bank['ifscCode'] ?? '';
-          _bankName = bank['bankName'] ?? '';
+          _accountHolderName = bank!['accountHolderName'] ?? '';
+          _bankAccountNumber = bank!['bankAccountNumber'] ?? '';
+          _ifscCode = bank!['ifscCode'] ?? '';
+          _bankName = bank!['bankName'] ?? '';
           _isLoading = false;
         });
+        print('BANK_ACCOUNT: Loaded - Bank: $_bankName, Holder: $_accountHolderName');
       } else {
+        print('BANK_ACCOUNT: WARNING - No bankDetails found in API response');
         setState(() {
           _isLoading = false;
         });
       }
     } catch (e) {
+      print('BANK_ACCOUNT: Error loading bank details: $e');
       setState(() {
         _errorMessage = 'Failed to load bank details';
         _isLoading = false;

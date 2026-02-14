@@ -13,7 +13,13 @@ import 'package:flutter_user_app/widgets/custom_widgets/custom_page_bar.dart';
 import 'package:flutter_user_app/features/posts/presentation/screens/post_screen.dart';
 import 'package:flutter_user_app/features/reels/presentation/screens/video_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter_user_app/features/events/data/models/event_model.dart';
+import 'package:flutter_user_app/features/events/presentation/screens/event_detail_screen.dart';
+import 'package:flutter_user_app/core/services/notification_service.dart';
+import 'package:flutter_user_app/features/events/presentation/widgets/event_reminder_dialog.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -38,9 +44,131 @@ class _HomePageState extends State<HomePage>
     );
     
     // Load posts using the global provider
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       Provider.of<PostsProvider>(context, listen: false).loadPosts();
+      
+      // Initialize Notifications
+      final notificationService = NotificationService();
+      await notificationService.initialize();
+      await notificationService.requestPermissions();
+      
+      _checkUpcomingReminders();
     });
+  }
+
+  Future<void> _checkUpcomingReminders() async {
+    // Only check once per session or day to avoid spamming? 
+    // For now, check every launch as requested "pop up message about the event reminder"
+    
+    try {
+      final apiService = ApiService.create(); // Or use provider if available
+      final rawEvents = await apiService.getMyUpcomingEvents();
+      
+      final today = DateTime.now();
+      final eventsToday = rawEvents.map((e) => EventModel.fromJson(e)).where((event) {
+        final eventDate = event.eventDate; 
+        return eventDate.year == today.year && 
+               eventDate.month == today.month && 
+               eventDate.day == today.day;
+      }).toList();
+
+      if (eventsToday.isNotEmpty && mounted) {
+        // Show dialog
+        _showReminderDialog(eventsToday);
+        
+        // Schedule Local Notifications
+        final notificationService = NotificationService();
+        for (var event in eventsToday) {
+           _scheduleEventNotification(notificationService, event);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error checking reminders: $e");
+    }
+  }
+
+  Future<void> _scheduleEventNotification(NotificationService service, EventModel event) async {
+    try {
+      // Parse event time (assuming "HH:mm" format or similar in eventTime string)
+      // If eventTime is "07:00 PM", we need to parse it combined with eventDate
+      // For simplicity, let's assume we can parse it or it's standard.
+      // If parsing fails, we skip.
+      
+      // Basic parsing logic (adapt as needed based on actual date format)
+      // EventModel has eventDate (DateTime). We need the time component.
+      // If event.eventTime is a string like "10:30 AM", we need to parse it.
+      
+      // Let's rely on eventDate if it has time, otherwise try to parse eventTime string
+      DateTime scheduledTime = event.eventDate;
+      
+      // If eventDate is just date (midnight), we try to add time
+      if (scheduledTime.hour == 0 && scheduledTime.minute == 0 && event.eventTime.isNotEmpty) {
+         try {
+           // Parse "10:30 AM" or "19:30"
+           final format = DateFormat.jm(); // 5:00 PM
+           final time = format.parse(event.eventTime.trim());
+           scheduledTime = DateTime(
+             scheduledTime.year, 
+             scheduledTime.month, 
+             scheduledTime.day,
+             time.hour,
+             time.minute
+           );
+         } catch (e) {
+           // Try 24 hour format
+           try {
+              final parts = event.eventTime.split(':');
+              if (parts.length >= 2) {
+                 final hour = int.parse(parts[0]);
+                 final minute = int.parse(parts[1].split(' ')[0]); // Handle potential garbage
+                 scheduledTime = DateTime(
+                   scheduledTime.year, 
+                   scheduledTime.month, 
+                   scheduledTime.day,
+                   hour, 
+                   minute
+                 );
+              }
+           } catch (_) {}
+         }
+      }
+
+      // Schedule for 1 hour before
+      final oneHourBefore = scheduledTime.subtract(const Duration(hours: 1));
+      if (oneHourBefore.isAfter(DateTime.now())) {
+        await service.scheduleNotification(
+          id: event.id.hashCode,
+          title: "Upcoming Event: ${event.eventName}",
+          body: "Your event starts in 1 hour at ${event.location}",
+          scheduledTime: oneHourBefore,
+          payload: event.id,
+        );
+      }
+      
+      // Schedule for Start Time
+      if (scheduledTime.isAfter(DateTime.now())) {
+         await service.scheduleNotification(
+          id: event.id.hashCode + 1,
+          title: "Event Starting Now!",
+          body: "${event.eventName} is starting now at ${event.location}",
+          scheduledTime: scheduledTime,
+          payload: event.id,
+        );
+      }
+      
+    } catch (e) {
+      debugPrint("Failed to schedule notification for event ${event.id}: $e");
+    }
+  }
+
+  void _showReminderDialog(List<EventModel> events) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (context) {
+        return EventReminderDialog(events: events);
+      },
+    );
   }
 
   @override

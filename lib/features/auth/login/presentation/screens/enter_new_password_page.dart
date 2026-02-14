@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_appbar.dart';
@@ -9,11 +10,15 @@ import 'package:flutter_user_app/widgets/custom_widgets/custom_textfield.dart';
 class EnterNewPasswordPage extends StatefulWidget {
   final String phoneNumber;
   final String countryCode;
+  final String otp;
+  final String? sessionId;
 
   const EnterNewPasswordPage({
     super.key,
     required this.phoneNumber,
     required this.countryCode,
+    required this.otp,
+    this.sessionId,
   });
 
   @override
@@ -24,19 +29,75 @@ class _EnterNewPasswordPageState extends State<EnterNewPasswordPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  final ApiService _apiService = ApiService.create();
+  bool _isLoading = false;
 
-  // Password check
-  void confirmPassword() {
-    if (_passwordController.text != _confirmPasswordController.text) {
+  Future<void> _handleResetPassword() async {
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (password.isEmpty || confirmPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in both fields'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Passwords do not match'),
           backgroundColor: Colors.red,
         ),
       );
-    } else {
-      // Implement password change logic
-      navigateToPage(context, LoginPage());
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password must be at least 6 characters'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await _apiService.resetPasswordWithOTP(
+        phoneNumber: '${widget.countryCode}${widget.phoneNumber}',
+        otp: widget.otp,
+        newPassword: password,
+        sessionId: widget.sessionId,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message'] ?? 'Password reset successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        navigateToPageAndRemoveUntil(context, const LoginPage());
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -78,8 +139,12 @@ class _EnterNewPasswordPageState extends State<EnterNewPasswordPage> {
                     const SizedBox(height: 30),
 
                     // Submit Button
-                    CustomButton(
-                        labelText: 'Save Password', onPressed: confirmPassword)
+                    _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : CustomButton(
+                            labelText: 'Save Password',
+                            onPressed: _handleResetPassword,
+                          ),
                   ],
                 ),
               ),
@@ -88,5 +153,12 @@ class _EnterNewPasswordPageState extends State<EnterNewPasswordPage> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 }

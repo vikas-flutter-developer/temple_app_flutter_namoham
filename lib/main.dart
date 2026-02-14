@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_user_app/l10n/app_localizations.dart';
+import 'package:workmanager/workmanager.dart';
+import 'package:flutter_user_app/core/services/background_service.dart';
 import 'package:flutter_user_app/core/provider/theme_provider.dart';
 import 'package:flutter_user_app/core/providers/locale_provider.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
@@ -21,6 +23,9 @@ import 'package:flutter_user_app/features/follow/presentation/providers/follow_p
 import 'package:flutter_user_app/core/deep_links/deep_link_handler.dart';
 import 'package:flutter_user_app/features/events/presentation/providers/events_provider.dart';
 import 'package:flutter_user_app/features/reels/presentation/providers/reels_provider.dart';
+import 'package:flutter_user_app/features/block/presentation/providers/block_provider.dart';
+import 'package:flutter_user_app/features/notifications/presentation/providers/notification_provider.dart';
+import 'package:flutter/foundation.dart'; // Required for kDebugMode
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -28,6 +33,23 @@ void main() async {
   // Ensure Flutter is initialized and preserve splash screen
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  // Initialize Background Service
+  // This needs to be called before runApp
+  await Workmanager().initialize(
+    callbackDispatcher, 
+    isInDebugMode: kDebugMode // true for testing, change to false for prod
+  );
+  
+  // Register Periodic Task
+  await Workmanager().registerPeriodicTask(
+    "1", 
+    taskName, 
+    frequency: const Duration(minutes: 15), // Minimum is 15 mins
+    constraints: Constraints(
+      networkType: NetworkType.connected, 
+    ),
+  );
 
   // Initialize environment variables from .env file
   await AppConfig.initialize();
@@ -68,6 +90,17 @@ void main() async {
         ChangeNotifierProvider<LocaleProvider>.value(
           value: localeProvider,
         ),
+        ChangeNotifierProxyProvider<ApiService, BlockProvider>(
+          create: (context) {
+            final provider = BlockProvider(
+              Provider.of<ApiService>(context, listen: false),
+            );
+            provider.loadBlockList();
+            return provider;
+          },
+          update: (context, apiService, previous) =>
+              previous ?? BlockProvider(apiService),
+        ),
         ChangeNotifierProxyProvider<ApiService, PostProvider>(
           create: (context) => PostProvider(
             Provider.of<ApiService>(context, listen: false),
@@ -89,26 +122,35 @@ void main() async {
           update: (context, apiService, previous) =>
               previous ?? EventsProvider(apiService),
         ),
-        ChangeNotifierProxyProvider<ApiService, ReelsProvider>(
+        ChangeNotifierProxyProvider2<ApiService, BlockProvider, ReelsProvider>(
           create: (context) => ReelsProvider(
             Provider.of<ApiService>(context, listen: false),
           ),
-          update: (context, apiService, previous) =>
-              previous ?? ReelsProvider(apiService),
+          update: (context, apiService, blockProvider, previous) {
+            final provider = previous ?? ReelsProvider(apiService);
+            provider.updateBlockedIds(blockProvider.blockedIds);
+            return provider;
+          },
         ),
-        ChangeNotifierProxyProvider<ApiService, PostsProvider>(
+        ChangeNotifierProxyProvider2<ApiService, BlockProvider, PostsProvider>(
           create: (context) {
             final apiService = Provider.of<ApiService>(context, listen: false);
             final repository = PostRepositoryImpl(apiService: apiService);
             final usecase = GetPostsUsecase(repository);
             return PostsProvider(usecase, repository);
           },
-          update: (context, apiService, previous) {
-            if (previous != null) return previous;
-            final repository = PostRepositoryImpl(apiService: apiService);
-            final usecase = GetPostsUsecase(repository);
-            return PostsProvider(usecase, repository);
+          update: (context, apiService, blockProvider, previous) {
+            final provider = previous ?? (() {
+              final repository = PostRepositoryImpl(apiService: apiService);
+              final usecase = GetPostsUsecase(repository);
+              return PostsProvider(usecase, repository);
+            })();
+            provider.updateBlockedIds(blockProvider.blockedIds);
+            return provider;
           }
+        ),
+        ChangeNotifierProvider<NotificationProvider>(
+          create: (_) => NotificationProvider(),
         ),
       ],
       child: const MainApp(),

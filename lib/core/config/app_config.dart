@@ -5,18 +5,37 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class AppConfig {
   // Backend API Configuration - NO FALLBACK (requires .env file)
   static String get baseUrl {
-    final url = dotenv.env['BASE_URL'];
-    if (url == null || url.isEmpty) {
-      throw Exception('BASE_URL not found in .env file. Please configure your .env file.');
+    try {
+      final url = dotenv.env['BASE_URL'];
+      if (url != null && url.isNotEmpty) {
+        return url;
+      }
+    } catch (_) {
+      // dotenv not initialized
     }
-    return url;
+    
+    // Fallback for production (Render)
+    return 'https://templebackend-178841694490.europe-west1.run.app/api';
   }
 
 
 
   // Admin credentials (for development auto-fill)
-  static String get adminUsername => dotenv.env['ADMIN_USERNAME'] ?? '';
-  static String get adminPassword => dotenv.env['ADMIN_PASSWORD'] ?? '';
+  static String get adminUsername {
+    try {
+      return dotenv.env['ADMIN_USERNAME'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static String get adminPassword {
+    try {
+      return dotenv.env['ADMIN_PASSWORD'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
 
   /// Initialize environment variables
   /// Call this before runApp() in main.dart

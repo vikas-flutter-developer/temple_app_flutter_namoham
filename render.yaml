@@ -1,7 +1,5 @@
 services:
-  - type: static
+  - type: static_site
     name: temple-admin-website
-    env: static
     buildCommand: "./render-build.sh"
     publishPath: build/web
-    autoDeploy: true

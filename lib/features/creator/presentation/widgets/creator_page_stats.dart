@@ -45,46 +45,51 @@ class _CreatorProfileStatsState extends State<CreatorProfileStats> {
       padding: const EdgeInsets.only(bottom: 4),
       child: IntrinsicHeight(
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Consumer<PostsProvider>(
-              builder: (context, postsProvider, child) {
-                final count = postsProvider.userPostCount;
-                return _buildStat(
-                  '${postsProvider.isLoadingPostCount ? "..." : count}', 
-                  l10n.posts, 
-                  context
-                );
-              },
+            Expanded(
+              child: Consumer<PostsProvider>(
+                builder: (context, postsProvider, child) {
+                  final count = postsProvider.userPostCount;
+                  return _buildStat(
+                    '${postsProvider.isLoadingPostCount ? "..." : count}', 
+                    l10n.posts, 
+                    context
+                  );
+                },
+              ),
             ),
             
             VerticalDivider(color: Colors.grey.shade300, width: 1, indent: 8, endIndent: 8),
             
-            Consumer<FollowProvider>(
-              builder: (context, followProvider, child) {
-                 final count = followProvider.followersCount;
-                 return _buildStat(
-                  '${followProvider.isLoadingFollowers ? "..." : count}', 
-                  l10n.followers, 
-                  context, 
-                  onTap: widget.onFollowersTap
-                );
-              },
+            Expanded(
+              child: Consumer<FollowProvider>(
+                builder: (context, followProvider, child) {
+                   final count = followProvider.followersCount;
+                   return _buildStat(
+                    '${followProvider.isLoadingFollowers ? "..." : count}', 
+                    l10n.followers, 
+                    context, 
+                    onTap: widget.onFollowersTap
+                  );
+                },
+              ),
             ),
             
             VerticalDivider(color: Colors.grey.shade300, width: 1, indent: 8, endIndent: 8),
             
-             Consumer<FollowProvider>(
-              builder: (context, followProvider, child) {
-                 final count = followProvider.viewedFollowingCount;
-                 return _buildStat(
-                  '${followProvider.isLoadingFollowing ? "..." : count}', 
-                  l10n.following, 
-                  context,
-                  onTap: widget.onFollowingTap
-                );
-              },
-            ),
+             Expanded(
+               child: Consumer<FollowProvider>(
+                builder: (context, followProvider, child) {
+                   final count = followProvider.viewedFollowingCount;
+                   return _buildStat(
+                    '${followProvider.isLoadingFollowing ? "..." : count}', 
+                    l10n.following, 
+                    context,
+                    onTap: widget.onFollowingTap
+                  );
+                },
+              ),
+             ),
           ],
         ),
       ),
@@ -124,7 +129,7 @@ class _CreatorProfileStatsState extends State<CreatorProfileStats> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
         child: child,
       ),
     );

@@ -1,4 +1,4 @@
-package com.example.temple
+package com.abhitreader.temple
 
 import io.flutter.embedding.android.FlutterActivity
 

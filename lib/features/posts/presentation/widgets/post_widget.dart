@@ -264,15 +264,19 @@ class _PostWidgetState extends State<PostWidget>
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.only(left: 8.0, right: 8, bottom: 8),
+      padding: const EdgeInsets.only(left: 0.0, right: 0.0, top: 0.0, bottom: 0.0),
       child: Card(
+        margin: EdgeInsets.zero,
         color: theme.colorScheme.surfaceContainer,
-        elevation: 1,
+        elevation: 0,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            Transform.translate(
+              offset: const Offset(0, -4.0),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
               child: Row(
                 children: [
                   InkWell(
@@ -383,8 +387,9 @@ class _PostWidgetState extends State<PostWidget>
                 ],
               ),
             ),
-            // Wrap the image area with a Stack to overlay the animation
-            Stack(
+          ),
+          // Wrap the image area with a Stack to overlay the animation
+          Stack(
               alignment: Alignment.center,
               children: [
                 GestureDetector(
@@ -397,9 +402,9 @@ class _PostWidgetState extends State<PostWidget>
                   child: SizedBox(
                     height: 320,
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 10, right: 10),
+                      padding: const EdgeInsets.only(left: 0, right: 0),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.zero,
                         child: widget.postModel.imageUrls.isEmpty
                             ? _postImagePlaceholder(theme)
                             : PageView.builder(
@@ -445,7 +450,7 @@ class _PostWidgetState extends State<PostWidget>
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
               child: Row(
                 children: [
                   LikeButton(
@@ -575,7 +580,7 @@ class _PostWidgetState extends State<PostWidget>
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
                   Expanded(
@@ -622,9 +627,9 @@ class _PostWidgetState extends State<PostWidget>
             ),
             const SizedBox(height: 0),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Transform.translate(
-                offset: const Offset(0, -8),
+                offset: const Offset(0, -4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -670,7 +675,7 @@ class _PostWidgetState extends State<PostWidget>
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 6),
           ],
         ),
       ),

@@ -48,3 +48,10 @@ app.*.map.json
 .env
 *.env
 !.env.example
+
+# Custom exclusions
+node_modules/
+temple_web_dist.zip
+analyze_final.txt
+analyze_output.txt
+*.log

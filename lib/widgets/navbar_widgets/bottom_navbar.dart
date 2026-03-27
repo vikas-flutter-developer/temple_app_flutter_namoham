@@ -32,15 +32,17 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
 
     final isReels = widget.selectedIndex == 2;
     
-    return SafeArea(
-      child: Material(
-        color: Colors.transparent, // Important for transparency
-        child: Container(
-          height: 65,
-          margin: isReels ? const EdgeInsets.only(bottom: 10, left: 10, right: 10) : null,
-          decoration: BoxDecoration(
-            color: isReels ? Colors.black.withOpacity(0.3) : theme.colorScheme.surface,
-            borderRadius: isReels ? BorderRadius.circular(30) : null,
+    return Container(
+      color: isReels ? Colors.transparent : theme.colorScheme.surface,
+      child: SafeArea(
+        child: Material(
+          color: Colors.transparent, // Important for transparency
+          child: Container(
+            height: 65,
+            margin: isReels ? const EdgeInsets.only(bottom: 8, left: 10, right: 10) : null,
+            decoration: BoxDecoration(
+              color: isReels ? Colors.black.withOpacity(0.3) : theme.colorScheme.surface,
+              borderRadius: isReels ? BorderRadius.circular(30) : null,
             border: isReels ? null : Border(
               top: BorderSide(
                 color: theme.colorScheme.outline,
@@ -61,7 +63,7 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
               tabBackgroundColor: isReels 
                   ? Colors.white.withOpacity(0.2) 
                   : theme.colorScheme.secondaryContainer.withOpacity(0.3),
-              color: isReels ? Colors.white.withOpacity(0.8) : theme.colorScheme.onSurface.withOpacity(0.8),
+              color: isReels ? Colors.white : theme.colorScheme.onSurface.withOpacity(0.8),
               textStyle: TextStyle(
                 color: isReels ? Colors.white : theme.colorScheme.primary,
                 fontWeight: FontWeight.w500,
@@ -139,6 +141,7 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

@@ -209,7 +209,7 @@ class _TemplePageState extends State<TemplePage>
               
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 0),
+                  padding: const EdgeInsets.only(left: 16, right: 16, top: 0, bottom: 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -255,26 +255,31 @@ class _TemplePageState extends State<TemplePage>
                       
                       // Rating Row Removed as per request
                       
-                      // Stats
-                      ProfileStats(
-                        profile: temple,
-                        onFollowersTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => FollowersScreen(
-                                entityId: temple.id,
-                                title: '${temple.name} ${AppLocalizations.of(context)!.followers}',
-                              ),
+                      // Stats and Actions shifted up together
+                      Transform.translate(
+                        offset: const Offset(0, -12.0),
+                        child: Column(
+                          children: [
+                            ProfileStats(
+                              profile: temple,
+                              onFollowersTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FollowersScreen(
+                                      entityId: temple.id,
+                                      title: '${temple.name} ${AppLocalizations.of(context)!.followers}',
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-                      
-                      // Actions
-                      ProfileActions(
-                        profile: temple,
-                        isOwner: _isOwner,
+                            ProfileActions(
+                              profile: temple,
+                              isOwner: _isOwner,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -300,16 +305,19 @@ class _TemplePageState extends State<TemplePage>
                 pinned: true,
               ),
             ],
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: AboutTab(profile: temple),
-                ),
-                GalleryTab(templeId: temple.id, templeName: temple.name),
-                CalendarTab(templeId: temple.id),
-              ],
+            body: Transform.translate(
+              offset: const Offset(0, -12.0),
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: AboutTab(profile: temple),
+                  ),
+                  GalleryTab(templeId: temple.id, templeName: temple.name),
+                  CalendarTab(templeId: temple.id),
+                ],
+              ),
             ),
           ),
         ),
@@ -331,24 +339,27 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: shrinkOffset > 0 // Only show shadow when stuck/scrolled
-            ? [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
-      ),
-      child: Column(
-        children: [
-          _tabBar,
-          if (shrinkOffset == 0) const Divider(height: 1), // Only show divider when expanded
-        ],
+    return Transform.translate(
+      offset: const Offset(0, -12.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          boxShadow: shrinkOffset > 0 // Only show shadow when stuck/scrolled
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          children: [
+            _tabBar,
+            if (shrinkOffset == 0) const Divider(height: 1), // Only show divider when expanded
+          ],
+        ),
       ),
     );
   }

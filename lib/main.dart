@@ -8,6 +8,7 @@ import 'package:flutter_user_app/core/provider/theme_provider.dart';
 import 'package:flutter_user_app/core/providers/locale_provider.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
+import 'package:flutter_user_app/core/helper/auth_helper.dart';
 import 'package:flutter_user_app/features/posts/presentation/providers/post_provider.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
 import 'package:flutter_user_app/features/posts/data/repository/post_repository_impl.dart';
@@ -34,22 +35,24 @@ void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-  // Initialize Background Service
-  // This needs to be called before runApp
-  await Workmanager().initialize(
-    callbackDispatcher, 
-    isInDebugMode: kDebugMode // true for testing, change to false for prod
-  );
-  
-  // Register Periodic Task
-  await Workmanager().registerPeriodicTask(
-    "1", 
-    taskName, 
-    frequency: const Duration(minutes: 15), // Minimum is 15 mins
-    constraints: Constraints(
-      networkType: NetworkType.connected, 
-    ),
-  );
+  // Initialize Background Service if not on Web
+  if (!kIsWeb) {
+    // This needs to be called before runApp
+    await Workmanager().initialize(
+      callbackDispatcher, 
+      isInDebugMode: kDebugMode // true for testing, change to false for prod
+    );
+    
+    // Register Periodic Task
+    await Workmanager().registerPeriodicTask(
+      "1", 
+      taskName, 
+      frequency: const Duration(minutes: 15), // Minimum is 15 mins
+      constraints: Constraints(
+        networkType: NetworkType.connected, 
+      ),
+    );
+  }
 
   // Initialize environment variables from .env file
   await AppConfig.initialize();
@@ -71,8 +74,9 @@ void main() async {
             // Configure 401 Unauthorized handling
             service.onTokenExpired = () async {
               print('AUTH: Session expired. Logging out...');
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.clear(); // Clear all data
+              
+              // Clear session data safely using AuthHelper
+              await AuthHelper.clearSession();
               
               // Navigate to login using global key
               navigatorKey.currentState?.pushAndRemoveUntil(

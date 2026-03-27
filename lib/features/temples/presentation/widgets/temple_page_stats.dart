@@ -44,58 +44,63 @@ class _ProfileStatsState extends State<ProfileStats> {
       padding: const EdgeInsets.only(bottom: 4),
       child: IntrinsicHeight(
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             // Live Post Count
-            Consumer<PostsProvider>(
-              builder: (context, postsProvider, child) {
-                final count = postsProvider.userPostCount;
-                return _buildStat(
-                  '${postsProvider.isLoadingPostCount ? "..." : count}', 
-                  l10n.posts, 
-                  context
-                );
-              },
+            Expanded(
+              child: Consumer<PostsProvider>(
+                builder: (context, postsProvider, child) {
+                  final count = postsProvider.userPostCount;
+                  return _buildStat(
+                    '${postsProvider.isLoadingPostCount ? "..." : count}', 
+                    l10n.posts, 
+                    context
+                  );
+                },
+              ),
             ),
             
             VerticalDivider(color: Colors.grey.shade300, width: 1, indent: 8, endIndent: 8),
 
             // Live Follower Count
-            Consumer<FollowProvider>(
-              builder: (context, followProvider, child) {
-                 final count = followProvider.followersCount;
-                 return _buildStat(
-                  '${followProvider.isLoadingFollowers ? "..." : count}', 
-                  l10n.followers, 
-                  context, 
-                  onTap: widget.onFollowersTap
-                );
-              },
+            Expanded(
+              child: Consumer<FollowProvider>(
+                builder: (context, followProvider, child) {
+                   final count = followProvider.followersCount;
+                   return _buildStat(
+                    '${followProvider.isLoadingFollowers ? "..." : count}', 
+                    l10n.followers, 
+                    context, 
+                    onTap: widget.onFollowersTap
+                  );
+                },
+              ),
             ),
             
             VerticalDivider(color: Colors.grey.shade300, width: 1, indent: 8, endIndent: 8),
 
             // Live Following Count
-            Consumer<FollowProvider>(
-              builder: (context, followProvider, child) {
-                 final count = followProvider.viewedFollowingCount;
-                 return _buildStat(
-                  '${followProvider.isLoadingFollowing ? "..." : count}', 
-                  l10n.following, 
-                  context,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FollowingScreen(
-                          entityId: widget.profile.id,
-                          title: '${widget.profile.name} ${l10n.following}',
+            Expanded(
+              child: Consumer<FollowProvider>(
+                builder: (context, followProvider, child) {
+                   final count = followProvider.viewedFollowingCount;
+                   return _buildStat(
+                    '${followProvider.isLoadingFollowing ? "..." : count}', 
+                    l10n.following, 
+                    context,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FollowingScreen(
+                            entityId: widget.profile.id,
+                            title: '${widget.profile.name} ${l10n.following}',
+                          ),
                         ),
-                      ),
-                    );
-                  }
-                );
-              },
+                      );
+                    }
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -136,7 +141,7 @@ class _ProfileStatsState extends State<ProfileStats> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
         child: child,
       ),
     );

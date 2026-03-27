@@ -46,7 +46,8 @@ class _ModifiedVideoReelItemState extends State<ModifiedVideoReelItem>
           curve: Curves.easeOut,
         )),
         child: CommentsSheet(
-          commentCount: widget.videoData['comments'],
+          reelId: (widget.videoData['_id'] ?? widget.videoData['id'] ?? '').toString(),
+          reelOwnerId: (widget.videoData['userId'] ?? '').toString(),
         ),
       ),
     );
@@ -75,7 +76,7 @@ class _ModifiedVideoReelItemState extends State<ModifiedVideoReelItem>
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
                 colors: [
-                  Colors.black.withOpacity(0.7),
+                  Colors.black.withValues(alpha: 0.7),
                   Colors.transparent,
                 ],
               ),

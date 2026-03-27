@@ -3,6 +3,15 @@ allprojects {
         google()
         mavenCentral()
     }
+
+    // Suppress Java 8 obsolescence and deprecation warnings from third-party plugins
+    tasks.withType<JavaCompile>().configureEach {
+        options.compilerArgs.addAll(listOf(
+            "-Xlint:-options",
+            "-Xlint:-deprecation",
+            "-Xlint:-unchecked"
+        ))
+    }
 }
 
 val newBuildDir: Directory =

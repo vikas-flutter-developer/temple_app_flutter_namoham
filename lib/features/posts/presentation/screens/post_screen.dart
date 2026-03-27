@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
+import 'package:flutter_user_app/core/helper/navigation_helper.dart';
 import 'package:flutter_user_app/core/services/r2_upload_service.dart';
+import 'package:flutter_user_app/features/notifications/presentation/screens/notification_screen.dart';
+import 'package:flutter_user_app/features/notifications/presentation/providers/notification_provider.dart';
 import 'package:flutter_user_app/features/posts/data/repository/post_repository_impl.dart';
 import 'package:flutter_user_app/features/posts/domain/usecase/get_posts_usecase.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
@@ -383,64 +387,133 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      body: Consumer<PostsProvider>(
-        builder: (context, postsProvider, _) {
-          switch (postsProvider.status) {
-            case PostsStatus.loading:
-              // Only show loading indicator if we have no posts yet
-              // This prevents posts from disappearing during refresh
-              if (postsProvider.posts.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              // If we have posts, show them with refresh indicator
-              return Center(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 600),
-                  child: RefreshIndicator(
-                    onRefresh: () => postsProvider.loadPosts(),
-                    child: ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: postsProvider.posts.length,
-                      itemBuilder: (context, index) {
-                        return PostWidget(postModel: postsProvider.posts[index]);
-                      },
-                    ),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            floating: true,
+            snap: true,
+            backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.2),
+            forceMaterialTransparency: true,
+            title: Center(
+              child: Text(
+                'NamoHam',
+                style: TextStyle(
+                  fontSize: 24,
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            leadingWidth: 65,
+            leading: IconButton(
+              icon: Container(
+                height: 40,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryFixed,
+                  borderRadius: BorderRadius.circular(40),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: SvgPicture.asset(
+                    'assets/icons/menu.svg',
+                    colorFilter: ColorFilter.mode(
+                        theme.colorScheme.onPrimaryFixed, BlendMode.srcIn),
                   ),
                 ),
-              );
-            case PostsStatus.loaded:
-              return Center(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 600),
-                  child: RefreshIndicator(
-                    onRefresh: () => postsProvider.loadPosts(),
-                    child: ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: postsProvider.posts.length,
-                      itemBuilder: (context, index) {
-                        return PostWidget(postModel: postsProvider.posts[index]);
-                      },
+              ),
+              onPressed: () {},
+            ),
+            actions: [
+              Consumer<NotificationProvider>(
+                builder: (context, notificationProvider, _) => Badge.count(
+                  count: notificationProvider.unreadCount,
+                  isLabelVisible: notificationProvider.unreadCount > 0,
+                  offset: const Offset(-8, 8),
+                  child: IconButton(
+                    icon: Container(
+                      height: 40,
+                      width: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryFixed,
+                        borderRadius: BorderRadius.circular(40),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(9.0),
+                        child: SvgPicture.asset(
+                          'assets/icons/notification.svg',
+                          colorFilter: ColorFilter.mode(
+                              theme.colorScheme.onPrimaryFixed, BlendMode.srcIn),
+                        ),
+                      ),
                     ),
+                    onPressed: () => navigateToPage(context, const NotificationScreen()),
                   ),
                 ),
-              );
-            case PostsStatus.error:
-              return RefreshIndicator(
-                onRefresh: () => postsProvider.loadPosts(),
-                child: ListView(
-                  children: [
-                    SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.7,
-                      child: Center(child: Text(postsProvider.errorMessage)),
+              ),
+              const SizedBox(width: 5),
+            ],
+          ),
+        ],
+        body: Consumer<PostsProvider>(
+          builder: (context, postsProvider, _) {
+            switch (postsProvider.status) {
+              case PostsStatus.loading:
+                if (postsProvider.posts.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                return Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: RefreshIndicator(
+                      onRefresh: () => postsProvider.loadPosts(),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: postsProvider.posts.length,
+                        itemBuilder: (context, index) {
+                          return PostWidget(postModel: postsProvider.posts[index]);
+                        },
+                      ),
                     ),
-                  ],
-                ),
-              );
-            case PostsStatus.initial:
-              return const SizedBox.shrink();
-          }
-        },
+                  ),
+                );
+              case PostsStatus.loaded:
+                return Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: RefreshIndicator(
+                      onRefresh: () => postsProvider.loadPosts(),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: postsProvider.posts.length,
+                        itemBuilder: (context, index) {
+                          return PostWidget(postModel: postsProvider.posts[index]);
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              case PostsStatus.error:
+                return RefreshIndicator(
+                  onRefresh: () => postsProvider.loadPosts(),
+                  child: ListView(
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.7,
+                        child: Center(child: Text(postsProvider.errorMessage)),
+                      ),
+                    ],
+                  ),
+                );
+              case PostsStatus.initial:
+                return const SizedBox.shrink();
+            }
+          },
+        ),
       ),
       floatingActionButton: _canCreatePost
           ? Padding(

@@ -10,6 +10,7 @@ import 'package:flutter_user_app/widgets/custom_widgets/custom_button.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_dropdown_widget.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_textfield.dart';
 import 'package:flutter_user_app/core/services/r2_upload_service.dart';
+import 'package:flutter_user_app/widgets/custom_widgets/countryphone.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -38,8 +39,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isUploadingProfile = false;
   
   // Multiple photos (for Temple/Creator)
-  List<File> _selectedPhotos = [];
-  List<String> _photoUrls = [];
+  final List<File> _selectedPhotos = [];
+  final List<String> _photoUrls = [];
   bool _isUploadingPhotos = false;
 
   // State dropdown value
@@ -67,11 +68,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _userIdController = TextEditingController();
   final TextEditingController _websiteController = TextEditingController();
   final TextEditingController _mapController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  String _countryCode = '+91';
 
   // Method to handle location icon press
   void _handleLocationPress() {
     // TODO: Implement location functionality
-    print('Location icon pressed - implement location services here');
+    // print('Location icon pressed - implement location services here');
   }
 
   // Pick and upload profile picture
@@ -133,9 +136,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final photosToAdd = images.take(5 - _selectedPhotos.length).toList();
         
         if (photosToAdd.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Maximum 5 photos allowed')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Maximum 5 photos allowed')),
+            );
+          }
           return;
         }
 
@@ -256,7 +261,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 width: 100,
                                 height: 100,
                                 decoration: BoxDecoration(
-                                  color: theme.colorScheme.outline.withOpacity(0.2),
+                                  color: theme.colorScheme.outline.withValues(alpha: 0.2),
                                   shape: BoxShape.circle,
                                   image: _profileImage != null
                                       ? DecorationImage(
@@ -419,6 +424,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  // Phone Number Field
+                  CountryPhoneInput(
+                    phoneController: _phoneController,
+                    onCountryCodeChanged: (code) {
+                      setState(() {
+                        _countryCode = code;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
                   // Current Address (only for Temple/Creator)
                   if (_selectedRegisterType != 'User Register')
                     Column(
@@ -569,21 +585,78 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   CustomButton(
                     labelText: "Continue",
                     onPressed: () {
-                      if (_formKey.currentState!.validate() && _termsAccepted) {
-                        // 1. Validate Password match
-                        if (_passwordController.text != _confirmPasswordController.text) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Passwords do not match')),
-                          );
+                      if (_formKey.currentState!.validate()) {
+                        // 1. Mandatory Field Validation based on type
+                        final name = _nameController.text.trim();
+                        final email = _emailController.text.trim();
+                        final phone = _phoneController.text.trim();
+                        final dob = _dateController.text.trim();
+                        final password = _passwordController.text.trim();
+                        final confirmPassword = _confirmPasswordController.text.trim();
+                        final address = _currentAddressController.text.trim();
+                        final zip = _zipCodeController.text.trim();
+                        final state = _selectedState ?? '';
+
+                        // Type-specific field labels for error messages
+                        String nameLabel = "Full Name";
+                        if (_selectedRegisterType == 'Temple Register') nameLabel = "Temple Name";
+                        if (_selectedRegisterType == 'Creator Register') nameLabel = "Creator Name";
+
+                        // Basic checks for ALL types
+                        if (name.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please enter $nameLabel')));
+                          return;
+                        }
+                        if (email.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Email Address')));
+                          return;
+                        }
+                        if (phone.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Phone Number')));
+                          return;
+                        }
+                        if (dob.isEmpty) {
+                          String dobLabel = _selectedRegisterType == 'Temple Register' ? 'Establishment Date' : 'Date of Birth';
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please enter $dobLabel')));
+                          return;
+                        }
+                        if (password.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Password')));
+                          return;
+                        }
+                        if (password != confirmPassword) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+                          return;
+                        }
+
+                        // Temple/Creator specific checks
+                        if (_selectedRegisterType != 'User Register') {
+                          if (address.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Address')));
+                            return;
+                          }
+                          if (zip.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Zip Code')));
+                            return;
+                          }
+                          if (_selectedRegisterType == 'Temple Register' && state.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select State')));
+                            return;
+                          }
+                        }
+
+                        if (!_termsAccepted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please accept terms and conditions')));
                           return;
                         }
 
                         // 2. Prepare Data Packet
                         Map<String, dynamic> registrationData = {
                           'registerType': _selectedRegisterType,
-                          'email': _emailController.text.trim(),
-                          'password': _passwordController.text.trim(),
-                          // Use uploaded profile picture URL or empty string
+                          'email': email,
+                          'password': password,
+                          'phoneNumber': '$_countryCode$phone',
+                          'countryCode': _countryCode,
                           'profilePic': _profileImageUrl ?? '',
                         };
 
@@ -593,31 +666,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }
 
                         if (_selectedRegisterType == 'User Register') {
-                          registrationData['fullName'] = _nameController.text.trim();
-                          registrationData['dob'] = _dateController.text.trim();
+                          registrationData['fullName'] = name;
+                          registrationData['dob'] = dob;
                         } else {
                           // Common fields for Temple & Creator
-                          registrationData['address'] = _currentAddressController.text.trim();
-                          registrationData['zipCode'] = _zipCodeController.text.trim();
-                          registrationData['state'] = _selectedState ?? '';
+                          registrationData['address'] = address;
+                          registrationData['zipCode'] = zip;
+                          registrationData['state'] = state;
 
                           if (_selectedRegisterType == 'Temple Register') {
-                            registrationData['templeName'] = _nameController.text.trim();
-                            // Optional fields
+                            registrationData['templeName'] = name;
                             if (_websiteController.text.isNotEmpty) {
                               registrationData['website'] = _websiteController.text.trim();
                             }
+                            if (_mapController.text.isNotEmpty) {
+                              registrationData['googleMapLink'] = _mapController.text.trim();
+                            }
                           } else if (_selectedRegisterType == 'Creator Register') {
-                            registrationData['creatorName'] = _nameController.text.trim();
+                            registrationData['creatorName'] = name;
                           }
                         }
 
                         // 3. Navigate to Mobile Number screen with data
                         navigateToPage(context, MobileNum(registrationData: registrationData));
-                      } else if (!_termsAccepted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please accept terms and conditions')),
-                        );
                       }
                     },
                   ),

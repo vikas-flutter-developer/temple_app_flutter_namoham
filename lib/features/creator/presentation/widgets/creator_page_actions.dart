@@ -38,7 +38,7 @@ class CreatorProfileActions extends StatelessWidget {
     final buttonColor = const Color(0xFF29D0FF);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -132,7 +132,7 @@ class CreatorProfileActions extends StatelessWidget {
           Expanded(
             child: _buildButton(
               text: l10n.donate,
-              color: buttonColor,
+              color: const Color(0xFFFF9933),
               onPressed: () {
                 if (isOwner) {
                   ScaffoldMessenger.of(context).showSnackBar(

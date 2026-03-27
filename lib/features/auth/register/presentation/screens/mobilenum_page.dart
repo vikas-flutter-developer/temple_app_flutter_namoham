@@ -22,6 +22,24 @@ class _MobileNumState extends State<MobileNum> {
   bool _isLoading = false;
   final ApiService _apiService = ApiService.create();
 
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill phone if provided from RegisterScreen
+    final rawPhone = widget.registrationData['phoneNumber'] as String? ?? '';
+    final countryCode = widget.registrationData['countryCode'] as String? ?? '+91';
+    
+    if (rawPhone.isNotEmpty) {
+      _countryCode = countryCode;
+      // Remove country code prefix from rawPhone to get just the 10 digits
+      String displayPhone = rawPhone;
+      if (displayPhone.startsWith(_countryCode)) {
+        displayPhone = displayPhone.substring(_countryCode.length);
+      }
+      phoneController.text = displayPhone;
+    }
+  }
+
   Future<void> _handleSendOtp() async {
     if (phoneController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,7 +73,7 @@ class _MobileNumState extends State<MobileNum> {
         userType: userType,
       );
 
-      print('OTP_SEND: Response: $response');
+      // print('OTP_SEND: Response: $response');
 
       // Copy the map to modify it
       Map<String, dynamic> finalData = Map.from(widget.registrationData);
@@ -82,7 +100,7 @@ class _MobileNumState extends State<MobileNum> {
 );
       }
     } catch (e) {
-      print('OTP_SEND_ERROR: $e');
+      // print('OTP_SEND_ERROR: $e');
       if (mounted) {
         final cleanError = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -120,6 +138,7 @@ class _MobileNumState extends State<MobileNum> {
                       // Phone Number Input Field
                       CountryPhoneInput(
                         phoneController: phoneController,
+                        initialCountryCode: _countryCode,
                         onCountryCodeChanged: (code) {
                           _countryCode = code;
                         },

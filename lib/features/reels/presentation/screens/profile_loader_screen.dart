@@ -34,9 +34,12 @@ class _ProfileLoaderScreenState extends State<ProfileLoaderScreen> {
     try {
       final api = Provider.of<ApiService>(context, listen: false);
 
-      if (widget.userType == 'temple') {
+      final normalizedUserType = widget.userType.toLowerCase();
+
+      if (normalizedUserType == 'temple') {
         final temple = await api.getTempleById(widget.userId);
         if (mounted) {
+           // Provide a blank default values if the backend doesn't return everything
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -44,7 +47,7 @@ class _ProfileLoaderScreenState extends State<ProfileLoaderScreen> {
             ),
           );
         }
-      } else if (widget.userType == 'creator') {
+      } else if (normalizedUserType == 'creator') {
         final creator = await api.getCreatorById(widget.userId);
         if (mounted) {
           Navigator.pushReplacement(
@@ -56,7 +59,7 @@ class _ProfileLoaderScreenState extends State<ProfileLoaderScreen> {
         }
       } else {
         setState(() {
-          _error = 'Unknown user type';
+          _error = 'User Profile Coming Soon';
           _isLoading = false;
         });
       }

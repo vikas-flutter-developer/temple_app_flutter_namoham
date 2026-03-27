@@ -3,9 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
-import 'package:flutter_user_app/widgets/custom_widgets/custom_appbar.dart';
-import 'package:flutter_user_app/widgets/custom_widgets/custom_button.dart';
-import 'package:flutter_user_app/widgets/custom_widgets/custom_text_widget.dart';
 import 'package:flutter_otp_text_field/flutter_otp_text_field.dart';
 
 class OtpPage extends StatefulWidget {
@@ -30,7 +27,6 @@ class _OtpPageState extends State<OtpPage> {
   bool _isResendEnabled = false;
   bool _isLoading = false;
   String _otpCode = '';
-  int? _attemptsRemaining;
 
   // API Service Instance
   final ApiService _apiService = ApiService.create();
@@ -111,7 +107,6 @@ class _OtpPageState extends State<OtpPage> {
     try {
       // OTP is verified as part of the registration call itself
       final type = widget.registrationData['registerType'];
-      final otp = _otpCode;
 
       if (type == 'User Register') {
         await _apiService.registerUser(
@@ -120,7 +115,7 @@ class _OtpPageState extends State<OtpPage> {
           dob: widget.registrationData['dob'] ?? '',
           password: widget.registrationData['password'] ?? '',
           phoneNumber: widget.phoneNumber,
-          otp: otp,
+          otp: _otpCode,
           profilePic: widget.registrationData['profilePic'] ?? '',
         );
       } else if (type == 'Temple Register') {
@@ -132,7 +127,7 @@ class _OtpPageState extends State<OtpPage> {
           state: widget.registrationData['state'] ?? '',
           password: widget.registrationData['password'] ?? '',
           pocPhoneNumber: widget.phoneNumber,
-          otp: otp,
+          otp: _otpCode,
         );
       } else if (type == 'Creator Register') {
         await _apiService.registerCreator(
@@ -143,7 +138,7 @@ class _OtpPageState extends State<OtpPage> {
           state: widget.registrationData['state'] ?? '',
           phoneNumber: widget.phoneNumber,
           password: widget.registrationData['password'] ?? '',
-          otp: otp,
+          otp: _otpCode,
         );
       }
 

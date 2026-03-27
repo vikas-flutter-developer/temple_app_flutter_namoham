@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
-import 'package:flutter_user_app/core/config/app_config.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
+import 'package:flutter_user_app/core/helper/auth_helper.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/forgot_password_otp_page.dart';
 import 'package:flutter_user_app/features/home/presentation/screens/home_page.dart';
 import 'package:flutter_user_app/features/auth/register/presentation/screens/register_screen.dart';
@@ -15,7 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({Key? key}) : super(key: key);
+  const LoginPage({super.key});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -24,11 +24,11 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _rememberMe = true;
+  bool _rememberMe = false;
   bool _isLoading = false;
 
   // Dropdown State
-  String _selectedLoginType = 'Temple Login';
+  String _selectedLoginType = 'User Login';
   final List<String> _loginTypes = [
     'User Login',
     'Temple Login',
@@ -41,7 +41,39 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    _autoFillCredentials('Temple Login');
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool('remember_me') ?? false;
+    if (rememberMe) {
+      final savedEmail = prefs.getString('saved_email') ?? '';
+      final savedPassword = prefs.getString('saved_password') ?? '';
+      final savedLoginType = prefs.getString('saved_login_type') ?? 'User Login';
+
+      setState(() {
+        _rememberMe = true;
+        _emailController.text = savedEmail;
+        _passwordController.text = savedPassword;
+        _selectedLoginType = savedLoginType;
+      });
+    }
+  }
+
+  Future<void> _saveCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe) {
+      await prefs.setBool('remember_me', true);
+      await prefs.setString('saved_email', _emailController.text.trim());
+      await prefs.setString('saved_password', _passwordController.text.trim());
+      await prefs.setString('saved_login_type', _selectedLoginType);
+    } else {
+      await prefs.remove('remember_me');
+      await prefs.remove('saved_email');
+      await prefs.remove('saved_password');
+      await prefs.remove('saved_login_type');
+    }
   }
 
   @override
@@ -51,23 +83,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _autoFillCredentials(String type) {
-    setState(() {
-      if (type == 'User Login') {
-        _emailController.text = "raj.kumar@example.com";
-        _passwordController.text = "raj";
-      } else if (type == 'Temple Login') {
-        _emailController.text = "golden@example.com";
-        _passwordController.text = "Temple@123";
-      } else if (type == 'Creator Login') {
-        _emailController.text = "swami@example.com";
-        _passwordController.text = "Creator@123";
-      } else if (type == 'Admin Login') {
-        _emailController.text = AppConfig.adminUsername;
-        _passwordController.text = AppConfig.adminPassword;
-      }
-    });
-  }
+
 
   Future<void> _handleLogin() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
@@ -93,11 +109,14 @@ class _LoginPageState extends State<LoginPage> {
         final String token = (data['token'] ?? '').toString();
 
         if (token.isNotEmpty) {
+          // Save or clear Remember Me credentials
+          await _saveCredentials();
+
           // Store the token and admin info for authenticated API requests
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', token);
           await prefs.setString('user_type', 'Admin');
-          
+
           // Save admin ID for messages feature
           final admin = data['admin'] as Map<String, dynamic>? ?? {};
           final adminId = (admin['_id'] ?? admin['id'] ?? data['adminId'] ?? data['_id'] ?? '').toString();
@@ -132,7 +151,7 @@ class _LoginPageState extends State<LoginPage> {
       final response = await _apiService.login(
         _emailController.text.trim(),
         _passwordController.text.trim(),
-        userType: apiUserType, 
+        userType: apiUserType,
       );
 
       // Save Token, userType, and userId
@@ -140,10 +159,13 @@ class _LoginPageState extends State<LoginPage> {
       final String token = (user['token'] ?? '').toString();
       final String userId = (user['_id'] ?? user['id'] ?? '').toString();
 
+      // Save or clear Remember Me credentials
+      await _saveCredentials();
+
+      // Clear previous session data safely using AuthHelper
+      await AuthHelper.clearSession();
+
       final prefs = await SharedPreferences.getInstance();
-      
-      // Clear previous session data to prevent profile mix-ups
-      await prefs.clear();
 
       await prefs.setString('auth_token', token);
       // Capitalize first letter for consistency with app logic
@@ -175,7 +197,7 @@ class _LoginPageState extends State<LoginPage> {
       final title = (user['title'] ?? '').toString();
       final description = (user['description'] ?? '').toString();
       final website = (user['website'] ?? '').toString();
-      
+
       // Save basic fields
       if (userName.isNotEmpty) {
         await prefs.setString('user_name', userName);
@@ -186,7 +208,7 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setString('user_image', userImage);
         await prefs.setString('profile_photo_url', userImage);
       }
-      
+
       // Save additional profile fields
       if (phoneNumber.isNotEmpty) await prefs.setString('phone_number', phoneNumber);
       if (address.isNotEmpty) await prefs.setString('address', address);
@@ -199,7 +221,7 @@ class _LoginPageState extends State<LoginPage> {
       if (title.isNotEmpty) await prefs.setString('title', title);
       if (description.isNotEmpty) await prefs.setString('description', description);
       if (website.isNotEmpty) await prefs.setString('website', website);
-      
+
       print('LOGIN: Saved all profile data to SharedPreferences');
       print('LOGIN: fullName=$userName, email=$userEmail, phone=$phoneNumber');
       print('LOGIN: city=$city, state=$state, country=$country, zipCode=$zipCode');
@@ -214,34 +236,34 @@ class _LoginPageState extends State<LoginPage> {
         navigateToPageAndRemoveUntil(context, HomePage());
       }
     } catch (e) {
-        String errorMessage = e.toString().replaceAll('Exception: ', '');
-        
-        // Attempt to extract friendly message from JSON response
-        if (errorMessage.contains('{') && errorMessage.contains('}')) {
-           try {
-             final startIndex = errorMessage.indexOf('{');
-             final endIndex = errorMessage.lastIndexOf('}');
-             final jsonString = errorMessage.substring(startIndex, endIndex + 1);
-             
-             final errorMap = json.decode(jsonString);
-             if (errorMap is Map && errorMap['message'] != null) {
-               errorMessage = errorMap['message'];
-             }
-           } catch (_) {
-             // If parsing fails, rely on basic cleanup
-           }
-        } 
-        
-        // Clean up "Login failed: " prefix if still present
-        errorMessage = errorMessage.replaceAll('Login failed: ', '');
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      String errorMessage = e.toString().replaceAll('Exception: ', '');
+
+      // Attempt to extract friendly message from JSON response
+      if (errorMessage.contains('{') && errorMessage.contains('}')) {
+        try {
+          final startIndex = errorMessage.indexOf('{');
+          final endIndex = errorMessage.lastIndexOf('}');
+          final jsonString = errorMessage.substring(startIndex, endIndex + 1);
+
+          final errorMap = json.decode(jsonString);
+          if (errorMap is Map && errorMap['message'] != null) {
+            errorMessage = errorMap['message'];
+          }
+        } catch (_) {
+          // If parsing fails, rely on basic cleanup
+        }
+      }
+
+      // Clean up "Login failed: " prefix if still present
+      errorMessage = errorMessage.replaceAll('Login failed: ', '');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -307,7 +329,6 @@ class _LoginPageState extends State<LoginPage> {
                                     setState(() {
                                       _selectedLoginType = value;
                                     });
-                                    _autoFillCredentials(value);
                                   }
                                 },
                                 items: _loginTypes
@@ -350,33 +371,40 @@ class _LoginPageState extends State<LoginPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: Checkbox(
-                                value: _rememberMe,
-                                activeColor: theme.colorScheme.primary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(4),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _rememberMe = !_rememberMe;
+                            });
+                          },
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: Checkbox(
+                                  value: _rememberMe,
+                                  activeColor: theme.colorScheme.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? false;
+                                    });
+                                  },
                                 ),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _rememberMe = value ?? false;
-                                  });
-                                },
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              "Remember Me",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: theme.colorScheme.outline,
+                              const SizedBox(width: 8),
+                              Text(
+                                "Remember Me",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: theme.colorScheme.outline,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         TextButton(
                           onPressed: () async {
@@ -403,32 +431,30 @@ class _LoginPageState extends State<LoginPage> {
                               final phoneNumber = response['phoneNumber'] as String? ?? '';
                               final sessionId = response['sessionId'] as String? ?? '';
 
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(response['message'] ?? 'OTP sent to your phone'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                                navigateToPage(
-                                  context,
-                                  ForgotPasswordOtpPage(
-                                    email: email,
-                                    userType: forgotUserType,
-                                    phoneNumber: phoneNumber,
-                                    sessionId: sessionId,
-                                  ),
-                                );
-                              }
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(response['message'] ?? 'OTP sent to your phone'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              navigateToPage(
+                                context,
+                                ForgotPasswordOtpPage(
+                                  email: email,
+                                  userType: forgotUserType,
+                                  phoneNumber: phoneNumber,
+                                  sessionId: sessionId,
+                                ),
+                              );
                             } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(e.toString().replaceAll('Exception: ', '')),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(e.toString().replaceAll('Exception: ', '')),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
                             } finally {
                               if (mounted) setState(() => _isLoading = false);
                             }
@@ -449,6 +475,7 @@ class _LoginPageState extends State<LoginPage> {
                         ? const Center(child: CircularProgressIndicator())
                         : CustomButton(
                       labelText: 'Login',
+                      useGradient: false,
                       onPressed: _handleLogin,
                     ),
 

@@ -220,16 +220,32 @@ class ApiService {
   // ============== AUTHENTICATION ==============
 
   /// Login user/temple/creator
-  Future<Map<String, dynamic>> login(String email, String password, {String userType = "User"}) async {
+  Future<Map<String, dynamic>> login(String email, String password, {String userType = "user", String? phoneNumber}) async {
+    final body = {
+      "email": email, // Identity or empty string if phone login
+      "password": password,
+      "userType": userType.toLowerCase(),
+    };
+    
+    if (phoneNumber != null) {
+      if (userType.toLowerCase() == 'temple') {
+        body["pocPhoneNumber"] = phoneNumber;
+      } else {
+        body["phoneNumber"] = phoneNumber;
+      }
+    }
+    
+    print('LOGIN_API: Request Body: $body');
+    
     final response = await client.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        "email": email,
-        "password": password,
-        "userType": userType
-      }),
+      body: json.encode(body),
     );
+    
+    print('LOGIN_API: Status: ${response.statusCode}');
+    print('LOGIN_API: Response Body: ${response.body}');
+
     if (response.statusCode == 200) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {

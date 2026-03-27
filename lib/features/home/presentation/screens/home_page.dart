@@ -279,8 +279,8 @@ class _HomePageState extends State<HomePage>
         await _showExitDialog();
       },
       child: Scaffold(
-      extendBody: true, // Allow body to extend behind the bottom nav bar
-      appBar: _selectedIndex != 0 ? null : CustomPageBar(title: "Explore"),
+      extendBody: _selectedIndex == 2, // Only extend body for Reels page (index 2) to show background content
+      appBar: null,
       // Replace the direct body with a PageView
       body: PageView(
         controller: _pageController,

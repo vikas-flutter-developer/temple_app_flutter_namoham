@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: temple-app-admin
+    env: docker
+    plan: free # or your preferred plan
+    region: ohio # or your preferred region
+    healthCheckPath: /
+    maxContextLines: 100
+    autoDeploy: true

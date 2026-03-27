@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
+import 'package:flutter_user_app/core/helper/auth_helper.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_button.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_page_bar.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_textfield.dart';
@@ -36,9 +37,8 @@ class _VerifyDeleteAccountScreenState extends State<VerifyDeleteAccountScreen> {
           const SnackBar(content: Text('Account deleted successfully. Logging out...')),
         );
 
-        // Clear session and logout
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.clear();
+        // Clear session and logout safely
+        await AuthHelper.clearSession();
 
         // Navigate to Login
         navigateToPageAndRemoveUntil(context, const LoginPage());

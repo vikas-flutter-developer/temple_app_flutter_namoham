@@ -65,25 +65,28 @@ class _VideosViewState extends State<_VideosView> {
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
     _loadUserType();
-    
+
     // Auto-play initial video after frame build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final provider = context.read<ReelsProvider>();
-        // Wait for provider to have data if needed (though usually it's sync if passed in)
         if (provider.reels.isNotEmpty && widget.initialIndex < provider.reels.length) {
-            final reel = provider.reels[widget.initialIndex];
-            _currentIndex = widget.initialIndex;
-            _currentlyPlayingId = reel.id;
-            
-            // Initialize and play
-            _getController(reel).then((controller) {
-              if (mounted) {
-                 _hasAutoPlayed.add(reel.id); // Track as auto-played
-                 controller.play();
-                 provider.incrementView(reel.id);
-              }
-            });
+          final reel = provider.reels[widget.initialIndex];
+          _currentIndex = widget.initialIndex;
+          _currentlyPlayingId = reel.id;
+
+          // Initialize controller and autoplay the first reel
+          _getController(reel).then((controller) {
+            if (mounted && _currentlyPlayingId == reel.id) {
+              controller.seekTo(Duration.zero);
+              controller.play();
+            }
+          });
+
+          // Preload the next reel
+          if (provider.reels.length > 1) {
+            _getController(provider.reels[1]);
+          }
         }
       }
     });
@@ -117,17 +120,17 @@ class _VideosViewState extends State<_VideosView> {
     }
 
     print('VIDEO_SCREEN: Initializing controller for ${reel.id} URL: ${reel.fullVideoUrl}');
-    
+
     // Get headers for potential protected content
     final apiService = Provider.of<ApiService>(context, listen: false);
     final headers = await apiService.getAuthHeaders();
 
     VideoPlayerController controller;
-    
+
     try {
       // 1. Check/Download file from cache
       final file = await DefaultCacheManager().getSingleFile(reel.fullVideoUrl, headers: headers);
-      
+
       // 2. Initialize controller with local file
       controller = VideoPlayerController.file(file);
       print('VIDEO_SCREEN: Playing from cache: ${file.path}');
@@ -139,28 +142,28 @@ class _VideosViewState extends State<_VideosView> {
         httpHeaders: headers,
       );
     }
-    
+
     await controller.initialize();
     controller.setLooping(false);
-    
+
     // Web requires mute for autoplay
     if (kIsWeb) {
       await controller.setVolume(0);
     }
-    
+
     // Auto-scroll listener
     controller.addListener(() {
       if (!mounted) return;
       // Safety check: if controller is removed from map (during dispose), stop
       if (!_controllers.containsKey(reel.id)) return;
-      
+
       final value = controller.value;
       if (value.duration > Duration.zero && value.position >= value.duration) {
          // Video finished
          if (_currentlyPlayingId == reel.id) {
             final provider = context.read<ReelsProvider>();
             final currentIndex = provider.reels.indexWhere((r) => r.id == reel.id);
-            
+
             if (currentIndex != -1 && currentIndex < provider.reels.length - 1) {
               // Move to next page
               _pageController.nextPage(
@@ -173,16 +176,16 @@ class _VideosViewState extends State<_VideosView> {
     });
 
     _controllers[reel.id] = controller;
-    
+
     return controller;
   }
 
   void _onPageChanged(int virtualIndex, List<ReelModel> reels) {
     if (reels.isEmpty) return;
-    
+
     // Calculate actual index using modulo for infinite scrolling
     final actualIndex = virtualIndex % reels.length;
-    
+
     setState(() {
       _currentIndex = virtualIndex;
     });
@@ -193,7 +196,7 @@ class _VideosViewState extends State<_VideosView> {
       final provider = context.read<ReelsProvider>();
       provider.loadReels(); // Refresh reels when looping back
     }
-    
+
     _lastActualIndex = actualIndex;
 
     // Cleanup old controllers to prevent memory leaks
@@ -201,28 +204,43 @@ class _VideosViewState extends State<_VideosView> {
 
     // Pause previous video
     if (_currentlyPlayingId != null) {
-       _hasAutoPlayed.remove(_currentlyPlayingId);
-       if (_controllers.containsKey(_currentlyPlayingId)) {
+      _hasAutoPlayed.remove(_currentlyPlayingId);
+      if (_controllers.containsKey(_currentlyPlayingId)) {
         _controllers[_currentlyPlayingId]?.pause();
-       }
+      }
     }
 
-    // Play current video and increment view
+    // Autoplay current reel
     final reel = reels[actualIndex];
     _currentlyPlayingId = reel.id;
-    
+
     if (_controllers.containsKey(reel.id)) {
-      _hasAutoPlayed.add(reel.id); // Track as auto-played
-      _controllers[reel.id]?.play();
+      // Controller already ready — play immediately
+      _controllers[reel.id]!.seekTo(Duration.zero);
+      _controllers[reel.id]!.play();
+    } else {
+      // Controller not ready yet — initialize and play once done
+      _getController(reel).then((controller) {
+        if (mounted && _currentlyPlayingId == reel.id) {
+          controller.seekTo(Duration.zero);
+          controller.play();
+        }
+      });
+    }
+
+    // Preload next reel's controller in background
+    final nextIndex = (actualIndex + 1) % reels.length;
+    if (!_controllers.containsKey(reels[nextIndex].id)) {
+      _getController(reels[nextIndex]);
     }
 
     // Increment view count
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.mounted) {
-         context.read<ReelsProvider>().incrementView(reel.id);
+        context.read<ReelsProvider>().incrementView(reel.id);
       }
     });
-    
+
     // Standard pagination trigger: Load more when within 3 items of the end
     final provider = context.read<ReelsProvider>();
     if (provider.hasMore && !provider.isLoadingMore && actualIndex >= reels.length - 3) {
@@ -231,7 +249,7 @@ class _VideosViewState extends State<_VideosView> {
     }
   }
 
-  
+
 
   /// Cleanup old video controllers to prevent memory leaks
   /// Only keep controllers for: previous reel, current reel, next reel
@@ -244,17 +262,17 @@ class _VideosViewState extends State<_VideosView> {
 
     // Get IDs to keep
     final idsToKeep = <String>{};
-    
+
     // Keep current
     if (currentIndex >= 0 && currentIndex < reels.length) {
       idsToKeep.add(reels[currentIndex].id);
     }
-    
+
     // Keep previous
     if (previousIndex >= 0 && previousIndex < reels.length) {
       idsToKeep.add(reels[previousIndex].id);
     }
-    
+
     // Keep next
     if (nextIndex >= 0 && nextIndex < reels.length) {
       idsToKeep.add(reels[nextIndex].id);
@@ -277,7 +295,7 @@ class _VideosViewState extends State<_VideosView> {
 @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true, 
+      extendBodyBehindAppBar: true,
       backgroundColor: Colors.black,
       body: Consumer<ReelsProvider>(
         builder: (context, provider, child) {
@@ -344,7 +362,13 @@ class _VideosViewState extends State<_VideosView> {
                 // Calculate actual index using modulo for circular scrolling
                 final actualIndex = virtualIndex % provider.reels.length;
                 final reel = provider.reels[actualIndex];
-                
+
+                // OPTIMIZATION: If controller is already ready, show video immediately to prevent flickering
+                if (_controllers.containsKey(reel.id)) {
+                  final controller = _controllers[reel.id]!;
+                  return _buildReelWidget(context, reel, controller, provider);
+                }
+
                 return FutureBuilder<VideoPlayerController>(
                   key: ValueKey('${reel.id}_${_retryCounters[reel.id] ?? 0}'),
                   future: _getController(reel),
@@ -354,100 +378,11 @@ class _VideosViewState extends State<_VideosView> {
                     }
 
                     if (snapshot.hasError || !snapshot.hasData) {
-                      final err = snapshot.error;
-                      final isTestVideo = reel.videoUrl.contains('/uploads/reels/');
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.error_outline, size: 48, color: Colors.white),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Video unavailable',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Something went wrong while loading this reel.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.white.withOpacity(0.7)),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: () {
-                                  // Clear the failed controller from cache
-                                  if (_controllers.containsKey(reel.id)) {
-                                    _controllers[reel.id]?.dispose();
-                                    _controllers.remove(reel.id);
-                                  }
-                                  // Increment retry counter to force FutureBuilder to rebuild
-                                  setState(() {
-                                    _retryCounters[reel.id] = (_retryCounters[reel.id] ?? 0) + 1;
-                                  });
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: Colors.black,
-                                ),
-                                child: const Text('Retry'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
+                      return _buildErrorWidget(reel);
                     }
 
                     final controller = snapshot.data!;
-                    
-                    // Auto-play first video
-                    if (virtualIndex == _currentIndex && !_hasAutoPlayed.contains(reel.id)) {
-                      _hasAutoPlayed.add(reel.id);
-                      _currentlyPlayingId = reel.id;
-                      controller.play();
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (context.mounted) {
-                          provider.incrementView(reel.id);
-                        }
-                      });
-                    }
-
-                    return ReelVideoWidget(
-                      reel: reel,
-                      controller: controller,
-                      isLiked: reel.isLikedBy(provider.userId),
-                      isSaved: reel.isSaved ?? false,
-                      canCreateReel: _canCreateReel(),
-                      onLikePressed: () => provider.toggleLike(reel.id),
-                      onCommentPressed: () => _showCommentsSheet(context, reel),
-                      onSavePressed: () {
-                        provider.toggleSaveReel(reel.id);
-                        ScaffoldMessenger.of(context).clearSnackBars();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              (reel.isSaved ?? false) ? 'Reel removed from saved' : 'Reel saved',
-                            ),
-                            duration: const Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                      // Delete available for Owner (User/Creator/Temple)
-                      onDeletePressed: (provider.userId?.trim() == reel.userId.trim())
-                          ? () => _confirmDelete(context, provider, reel)
-                          : null,
-                      
-                      // Block available for User, Creator, and Temple on OTHERS' content
-                      onBlockPressed: ((provider.userId?.trim() != reel.userId.trim()) &&
-                              (_userType.toLowerCase() == 'user' || _userType.toLowerCase() == 'creator' || _userType.toLowerCase() == 'temple'))
-                          ? () => _handleBlock(context, reel)
-                          : null,
-                    );
+                    return _buildReelWidget(context, reel, controller, provider);
                   },
                 );
               },
@@ -461,17 +396,15 @@ class _VideosViewState extends State<_VideosView> {
   /// Check if current user can create reels (only temple and creator)
   bool _canCreateReel() {
     if (_userType == null) return false;
-    final userTypeLower = _userType!.toLowerCase();
-    final canCreate = userTypeLower == 'temple' || userTypeLower == 'creator';
-    print('REELS_SCREEN: Can create reel? $canCreate (userType: $_userType)');
-    return canCreate;
+    final userTypeLower = _userType.toLowerCase();
+    return userTypeLower == 'temple' || userTypeLower == 'creator';
   }
 
   void _showCommentsSheet(BuildContext context, ReelModel reel) {
     // Capture provider before showing sheet to avoid "deactivated widget" error
     // if the context is lost or widget is disposing.
     final provider = context.read<ReelsProvider>();
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -488,7 +421,7 @@ class _VideosViewState extends State<_VideosView> {
 
   Future<void> _handleBlock(BuildContext context, ReelModel reel) async {
     final theme = Theme.of(context);
-    
+
     showDialog(
       context: context,
       builder: (dialogContext) => BlockConfirmationDialog(
@@ -496,7 +429,7 @@ class _VideosViewState extends State<_VideosView> {
         onBlock: () async {
           final blockProvider = Provider.of<BlockProvider>(context, listen: false);
           final reelsProvider = Provider.of<ReelsProvider>(context, listen: false);
-          
+
           final success = await blockProvider.blockEntity(
             entityId: reel.userId,
             entityType: reel.userType,
@@ -522,6 +455,83 @@ class _VideosViewState extends State<_VideosView> {
     );
   }
 
+  Widget _buildErrorWidget(ReelModel reel) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.white),
+            const SizedBox(height: 16),
+            const Text(
+              'Video unavailable',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Something went wrong while loading this reel.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                if (_controllers.containsKey(reel.id)) {
+                  _controllers[reel.id]?.dispose();
+                  _controllers.remove(reel.id);
+                }
+                setState(() {
+                  _retryCounters[reel.id] = (_retryCounters[reel.id] ?? 0) + 1;
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReelWidget(BuildContext context, ReelModel reel, VideoPlayerController controller, ReelsProvider provider) {
+    return ReelVideoWidget(
+      reel: reel,
+      controller: controller,
+      isLiked: reel.isLikedBy(provider.userId),
+      isSaved: reel.isSaved ?? false,
+      canCreateReel: _canCreateReel(),
+      onLikePressed: () => provider.toggleLike(reel.id),
+      onCommentPressed: () => _showCommentsSheet(context, reel),
+      onSavePressed: () {
+        provider.toggleSaveReel(reel.id);
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              (reel.isSaved ?? false) ? 'Reel removed from saved' : 'Reel saved',
+            ),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      },
+      onDeletePressed: (provider.userId?.trim() == reel.userId.trim())
+          ? () => _confirmDelete(context, provider, reel)
+          : null,
+      onBlockPressed: ((provider.userId?.trim() != reel.userId.trim()) &&
+              (_userType.toLowerCase() == 'user' || _userType.toLowerCase() == 'creator' || _userType.toLowerCase() == 'temple'))
+          ? () => _handleBlock(context, reel)
+          : null,
+    );
+  }
+
   void _confirmDelete(BuildContext context, ReelsProvider provider, ReelModel reel) {
     showDialog(
       context: context,
@@ -536,7 +546,7 @@ class _VideosViewState extends State<_VideosView> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context); // Close dialog
-              
+
               final success = await provider.deleteReel(reel.id);
               if (success && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(

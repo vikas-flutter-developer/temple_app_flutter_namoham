@@ -82,17 +82,19 @@ class R2UploadService {
   /// Returns the public URL of the uploaded file.
   Future<String?> uploadFile(File file, String folder) async {
     try {
+      print('R2_UPLOAD: [1/4] Checking file existence: ${file.path}');
       if (!await file.exists()) {
-        debugPrint('R2_UPLOAD: File does not exist: ${file.path}');
+        print('R2_UPLOAD: ERROR - File does not exist at path: ${file.path}');
         return null;
       }
 
       final fileSize = await file.length();
-      debugPrint('R2_UPLOAD: Starting upload for ${file.path} ($fileSize bytes) to folder: $folder');
+      print('R2_UPLOAD: [2/4] File size: $fileSize bytes. Folder: $folder');
 
       // Determine content type from extension
       final extension = file.path.split('.').last.toLowerCase();
       final contentType = _getContentType(extension);
+      print('R2_UPLOAD: Content type determined as: $contentType');
 
       // Generate unique filename
       final prefs = await SharedPreferences.getInstance();
@@ -101,18 +103,19 @@ class R2UploadService {
       final fileName = '${userId}_$timestamp.$extension';
 
       // Step 1: Get presigned URL
-      debugPrint('R2_UPLOAD: Requesting presigned URL...');
+      print('R2_UPLOAD: [3/4] Requesting presigned URL for $fileName...');
       final presignedData = await getPresignedUrl(fileName, contentType, folder);
+      print('R2_UPLOAD: Presigned URL response received: $presignedData');
 
       final uploadUrl = presignedData['uploadUrl'] as String?;
       final fileUrl = presignedData['fileUrl'] as String?;
 
       if (uploadUrl == null || fileUrl == null) {
-        debugPrint('R2_UPLOAD: Invalid presigned URL response: $presignedData');
-        throw Exception('Invalid presigned URL response');
+        print('R2_UPLOAD: ERROR - uploadUrl or fileUrl is null');
+        throw Exception('Invalid presigned URL response from server');
       }
 
-      debugPrint('R2_UPLOAD: Got presigned URL, uploading to R2...');
+      print('R2_UPLOAD: [4/4] Uploading to R2 via PUT...');
 
       // Step 2: Upload to R2
       await uploadToR2(uploadUrl, file, contentType);
@@ -123,7 +126,7 @@ class R2UploadService {
     } catch (e, stackTrace) {
       debugPrint('R2_UPLOAD: Error - $e');
       debugPrint('R2_UPLOAD: Stack trace - $stackTrace');
-      return null;
+      rethrow; // Rethrow to let the UI handle the specific error message
     }
   }
 

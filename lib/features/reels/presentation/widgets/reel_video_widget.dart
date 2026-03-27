@@ -3,8 +3,11 @@ import 'package:video_player/video_player.dart';
 
 import 'package:flutter_user_app/core/util/share_helper.dart';
 import 'package:flutter_user_app/features/reels/data/models/reel_model.dart';
-import 'package:flutter_user_app/features/reels/presentation/screens/profile_loader_screen.dart';
 import 'package:flutter_user_app/features/reels/presentation/screens/create_reel_screen.dart';
+import 'package:flutter_user_app/features/temples/presentation/screens/temple_page.dart';
+import 'package:flutter_user_app/features/creator/presentation/screens/creator_page.dart';
+import 'package:flutter_user_app/features/temples/data/models/temple_model.dart';
+import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
 import '../../../../widgets/custom_widgets/custom_network_image.dart';
 
 
@@ -313,21 +316,21 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                 label: reel.likes.toString(),
                 onPressed: widget.onLikePressed,
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
               _ActionButton(
                 icon: Icons.chat_bubble_outline,
                 iconColor: Colors.white,
                 label: reel.comments.length.toString(),
                 onPressed: widget.onCommentPressed,
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
               _ActionButton(
                 icon: widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
                 iconColor: Colors.white,
                 label: 'Save',
                 onPressed: widget.onSavePressed,
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
               _ActionButton(
                 icon: Icons.send,
                 iconColor: Colors.white,
@@ -337,14 +340,14 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                   ShareHelper.showReelShareSheet(context, reel.id);
                 },
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
                 _ActionButton(
                 icon: Icons.remove_red_eye_outlined,
                 iconColor: Colors.white,
                 label: reel.views.toString(),
                 onPressed: () {},
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
               if (widget.canCreateReel)
                 _ActionButton(
                   icon: Icons.add_circle_outline,
@@ -359,7 +362,7 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                     );
                   },
                 ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == 'delete' && widget.onDeletePressed != null) {
@@ -371,7 +374,7 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                 color: Colors.white,
                 icon: const Column(
                   children: [
-                    Icon(Icons.more_vert, color: Colors.white, size: 32),
+                    Icon(Icons.more_vert, color: Colors.white, size: 28),
                     Text(
                       'More',
                       style: TextStyle(
@@ -418,16 +421,59 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
           bottom: 130,
           child: GestureDetector(
             onTap: () {
-              // Navigate to the profile using ProfileLoaderScreen
-              if (reel.userId.isNotEmpty && reel.userType.isNotEmpty) {
+              if (reel.userId.isEmpty) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Cannot open profile: User ID missing')),
+                );
+                return;
+              }
+
+              final userType = reel.userType.toLowerCase();
+
+              if (userType == 'temple') {
+                final partialTemple = TempleModel(
+                  id: reel.userId,
+                  name: reel.username,
+                  imageUrl: reel.userImage,
+                  rating: 0,
+                  totalReviews: 0,
+                  posts: 0,
+                  followers: 0,
+                  following: 0,
+                  recommendationPercentage: 0,
+                  reviews: [],
+                  donations: [],
+                  totalDonations: 0,
+                  location: '',
+                  email: '',
+                  phoneNumber: '',
+                  isVerified: false,
+                );
+
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ProfileLoaderScreen(
-                      userId: reel.userId,
-                      userType: reel.userType,
-                    ),
+                    builder: (context) => TemplePage(templeModel: partialTemple),
                   ),
+                );
+              } else if (userType == 'creator') {
+                final partialCreator = CreatorModel(
+                  id: reel.userId,
+                  creatorName: reel.username,
+                  email: '',
+                  phoneNumber: '',
+                  profilePic: reel.userImage,
+                );
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CreatorPage(creator: partialCreator),
+                  ),
+                );
+              } else {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('User Profile Coming Soon')),
                 );
               }
             },
@@ -586,7 +632,9 @@ class _ActionButton extends StatelessWidget {
       children: [
         IconButton(
           icon: Icon(icon, color: iconColor),
-          iconSize: 32,
+          iconSize: 28,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
           onPressed: onPressed,
         ),
         Text(

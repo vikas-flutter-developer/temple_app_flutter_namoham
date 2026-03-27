@@ -1,7 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_user_app/features/notifications/presentation/providers/notification_provider.dart';
+import 'package:flutter_user_app/features/notifications/presentation/screens/notification_screen.dart';
 import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
+import 'package:flutter_user_app/core/helper/auth_helper.dart';
 import 'package:flutter_user_app/core/provider/theme_provider.dart';
 import 'package:flutter_user_app/features/auth/register/presentation/screens/add_account_page.dart';
 import 'package:flutter_user_app/core/api/api_service.dart'; // Import ApiService
@@ -228,9 +232,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (result == true) {
-      // Clear all stored data (auth token, profile info, etc.) to prevent mix-ups
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+      // Clear all stored data (auth token, profile info, etc.) safely
+      // using AuthHelper to keep "Remember Me" and other settings.
+      await AuthHelper.clearSession();
 
       // Navigate to login and clear stack
       if (mounted) {
@@ -251,373 +255,375 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      appBar: CustomPageBar(title: l10n.profile),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(
-              height: 20,
-            ),
-            // Profile Picture & Info
-            Column(
-              children: [
-                Container(
-                  width: 100,
-                  height: 100,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _loadProfileData();
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar(
+              floating: true,
+              snap: true,
+              pinned: false,
+              backgroundColor: theme.colorScheme.surface,
+              elevation: 0,
+              automaticallyImplyLeading: false,
+              centerTitle: true,
+              title: Text(
+                l10n.profile,
+                style: TextStyle(
+                  fontSize: 24,
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              leadingWidth: 65,
+              leading: IconButton(
+                icon: Container(
+                  height: 40,
+                  width: 40,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border:
-                        Border.all(color: theme.colorScheme.primary, width: 3),
+                    color: theme.colorScheme.primaryFixed,
+                    borderRadius: BorderRadius.circular(40),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(50),
-                    child: _profilePhotoUrl != null
-                        ? CustomNetworkImage(
-                            imageUrl: _profilePhotoUrl!,
-                            fit: BoxFit.cover,
-                            width: 100,
-                            height: 100,
-                            errorWidget: _localPhotoPath != null
+                  child: Padding(
+                    padding: const EdgeInsets.all(10.0),
+                    child: SvgPicture.asset(
+                      'assets/icons/menu.svg',
+                      colorFilter: ColorFilter.mode(
+                        theme.colorScheme.onPrimaryFixed,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  ),
+                ),
+                onPressed: () {},
+              ),
+              actions: [
+                Consumer<NotificationProvider>(
+                  builder: (context, notificationProvider, child) {
+                    final unreadCount = notificationProvider.unreadCount;
+                    return IconButton(
+                      icon: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            height: 40,
+                            width: 40,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryFixed,
+                              borderRadius: BorderRadius.circular(40),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(9.0),
+                              child: SvgPicture.asset(
+                                'assets/icons/notification.svg',
+                                colorFilter: ColorFilter.mode(
+                                  theme.colorScheme.onPrimaryFixed,
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (unreadCount > 0)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.error,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: theme.colorScheme.surface,
+                                    width: 2,
+                                  ),
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 20,
+                                  minHeight: 20,
+                                ),
+                                child: Text(
+                                  unreadCount > 99 ? '99+' : '$unreadCount',
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onError,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      onPressed: () {
+                        navigateToPage(context, const NotificationScreen());
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(width: 5),
+              ],
+            ),
+            SliverList(
+              delegate: SliverChildListDelegate([
+                const SizedBox(height: 10),
+                // Profile Picture & Info
+                Column(
+                  children: [
+                    Container(
+                      width: 125,
+                      height: 125,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: theme.colorScheme.primary,
+                          width: 3,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(62.5),
+                        child: _profilePhotoUrl != null
+                            ? CustomNetworkImage(
+                                imageUrl: _profilePhotoUrl!,
+                                fit: BoxFit.cover,
+                                width: 125,
+                                height: 125,
+                                errorWidget: _localPhotoPath != null
+                                    ? Image.file(
+                                        File(_localPhotoPath!),
+                                        fit: BoxFit.cover,
+                                        width: 125,
+                                        height: 125,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                _buildDefaultAvatar(theme),
+                                      )
+                                    : _buildDefaultAvatar(theme),
+                              )
+                            : _localPhotoPath != null
                                 ? Image.file(
                                     File(_localPhotoPath!),
                                     fit: BoxFit.cover,
-                                    width: 100,
-                                    height: 100,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return _buildDefaultAvatar(theme);
-                                    },
+                                    width: 125,
+                                    height: 125,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            _buildDefaultAvatar(theme),
                                   )
                                 : _buildDefaultAvatar(theme),
-                          )
-                        : _localPhotoPath != null
-                            ? Image.file(
-                                File(_localPhotoPath!),
-                                fit: BoxFit.cover,
-                                width: 100,
-                                height: 100,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return _buildDefaultAvatar(theme);
-                                },
-                              )
-                            : _buildDefaultAvatar(theme),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const SizedBox(height: 10),
-                Text(
-                  _fullName.isNotEmpty ? _fullName : 'Guest User',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  _email.isNotEmpty ? _email : '',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                OutlinedButton(
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProfileEditScreen(),
                       ),
-                    );
-                    // Reload profile when returning from edit screen
-                    _loadProfileData();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
                     ),
-                    side: BorderSide(color: theme.colorScheme.primary),
-                  ),
-                  child: Text(
-                    l10n.edit,
-                    style: TextStyle(color: theme.colorScheme.primary),
-                  ),
-                ),
-              ],
-            ),
-
-            // Menu Sections
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  // Refresh user profile data
-                  await _loadProfileData();
-                },
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  children: [
-                  const SizedBox(height: 18),
-
-                  // GENERAL Section
-                  _buildSectionHeader(l10n.general),
-
-                  // Profile Items
-                  ProfileItemsWidget(
-                    icon: Icons.people,
-                    title: l10n.following,
-                    subtitle: l10n.yourFollowingList,
-                    onTap: () {
-                      navigateToPage(context, const FollowingListScreen());
-                    },
-                  ),
-
-                  ProfileItemsWidget(
-                    icon: Icons.block,
-                    title: 'Block List',
-                    subtitle: 'Manage blocked accounts',
-                    onTap: () {
-                      navigateToPage(context, const BlockListScreen());
-                    },
-                  ),
-
-                  ProfileItemsWidget(
-                    icon: Icons.bookmark,
-                    title: l10n.savedPost,
-                    subtitle: l10n.savedPhotosVideos,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const SavedPostScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  ProfileItemsWidget(
-                    icon: Icons.message_outlined,
-                    title: l10n.messages,
-                    subtitle: l10n.chatsConversations,
-                    onTap: () {
-                      navigateToPage(context, const ConversationsScreen());
-                    },
-                  ),
-
-                  ProfileItemsWidget(
-                    icon: Icons.event,
-                    title: l10n.events,
-                    subtitle: l10n.viewAllEvents,
-                    onTap: () {
-                      navigateToPage(context, const EventsScreen());
-                    },
-                  ),
-
-                  ProfileItemsWidget(
-                    icon: Icons.money,
-                    title: l10n.donation,
-                    subtitle: l10n.donationHistory,
-                    onTap: () async {
-                      final prefs = await SharedPreferences.getInstance();
-                      final userId = prefs.getString('user_id') ?? '';
-                      if (context.mounted) {
-                        navigateToPage(context, DonationScreen(recipientId: userId));
-                      }
-                    },
-                  ),
-
-                  ProfileItemsWidget(
-                    icon: Icons.alarm,
-                    title: 'Event Reminder',
-                    subtitle: 'Saved Events For Reminder',
-                    onTap: () {
-                      navigateToPage(context, const ReminderScreen());
-                    },
-                  ),
-
-                  if (isTemple || isCreator)
-                    ProfileItemsWidget(
-                      icon: Icons.credit_card_outlined,
-                      title: l10n.bankAccount,
-                      subtitle: l10n.forReceiveDonation,
-                      onTap: () {
-                        navigateToPage(context, const AddAccountPage());
+                    const SizedBox(height: 2),
+                    Text(
+                      _fullName.isNotEmpty ? _fullName : 'Guest User',
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    OutlinedButton(
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const ProfileEditScreen()),
+                        );
+                        _loadProfileData();
                       },
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20)),
+                        side: BorderSide(color: theme.colorScheme.primary),
+                      ),
+                      child: Text(l10n.edit,
+                          style: TextStyle(color: theme.colorScheme.primary)),
                     ),
-
-                  const SizedBox(height: 10),
-
-                  // SETTINGS Section
-                  _buildSectionHeader(l10n.settings),
-                  _buildDarkModeToggle(context),
-
-                  ProfileItemsWidget(
-                    icon: Icons.language,
-                    title: l10n.language,
-                    subtitle: l10n.selectYourFavouriteLanguage,
-                    onTap: () {
-                      navigateToPage(context, const LanguageScreen());
-                    },
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  if (isUser)
-                    ProfileItemsWidget(
-                      icon: Icons.person,
-                      title: l10n.switchToCreator,
-                      subtitle: l10n.switchYourAccountToCreator,
-                      onTap: () {
-                        navigateToPage(context, const CreatorAccountSetupScreen());
-                      },
-                    ),
-
-                  const SizedBox(height: 10),
-
-                  // MORE Section
-                  _buildSectionHeader(l10n.more),
-
-                  ProfileItemsWidget(
-                    icon: Icons.phone,
-                    title: l10n.contactUs,
-                    subtitle: l10n.forMoreInformation,
-                    onTap: () {
-                      navigateToPage(context, const ContactUs());
-                    },
-                  ),
-
-                  ProfileItemsWidget(
-                    icon: Icons.delete_forever,
-                    title: 'Delete Account',
-                    subtitle: 'Permanently Delete Your Account',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const RequestDeleteAccountScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  ProfileItemsWidget(
-                    icon: Icons.logout,
-                    title: l10n.logout,
-                    subtitle: l10n.logoutFromCurrentAccount,
-                    onTap: _showLogoutDialog,
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Footer section with Share, Rate, Privacy, Terms, and Version
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            TextButton(
-                              onPressed: _showComingSoonToast,
-                              child: Text(
-                                'Share Us',
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              height: 12,
-                              width: 1,
-                              color: theme.colorScheme.outline,
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const AppRatingScreen(),
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                'Rate Us',
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              height: 12,
-                              width: 1,
-                              color: theme.colorScheme.outline,
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const PrivacyPolicyScreen(),
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                'Privacy Policy',
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const TermsAndConditionsScreen(),
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                'Terms & Conditions',
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              height: 12,
-                              width: 1,
-                              color: theme.colorScheme.outline,
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                              child: Text(
-                                'App Version: $_appVersion',
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
                   ],
                 ),
+                const SizedBox(height: 0),
+                // GENERAL Section
+                _buildSectionHeader(l10n.general),
+
+            ProfileItemsWidget(
+              icon: Icons.people,
+              title: l10n.following,
+              subtitle: l10n.yourFollowingList,
+              onTap: () => navigateToPage(context, const FollowingListScreen()),
+            ),
+
+            ProfileItemsWidget(
+              icon: Icons.block,
+              title: 'Block List',
+              subtitle: 'Manage blocked accounts',
+              onTap: () => navigateToPage(context, const BlockListScreen()),
+            ),
+
+            ProfileItemsWidget(
+              icon: Icons.bookmark,
+              title: l10n.savedPost,
+              subtitle: l10n.savedPhotosVideos,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SavedPostScreen()),
               ),
+            ),
+
+            ProfileItemsWidget(
+              icon: Icons.message_outlined,
+              title: l10n.messages,
+              subtitle: l10n.chatsConversations,
+              onTap: () => navigateToPage(context, const ConversationsScreen()),
+            ),
+
+            ProfileItemsWidget(
+              icon: Icons.event,
+              title: l10n.events,
+              subtitle: l10n.viewAllEvents,
+              onTap: () => navigateToPage(context, const EventsScreen()),
+            ),
+
+            ProfileItemsWidget(
+              icon: Icons.money,
+              title: l10n.donation,
+              subtitle: l10n.donationHistory,
+              onTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final userId = prefs.getString('user_id') ?? '';
+                if (context.mounted) {
+                  navigateToPage(context, DonationScreen(recipientId: userId));
+                }
+              },
+            ),
+
+            ProfileItemsWidget(
+              icon: Icons.alarm,
+              title: 'Event Reminder',
+              subtitle: 'Saved Events For Reminder',
+              onTap: () => navigateToPage(context, const ReminderScreen()),
+            ),
+
+            if (isTemple || isCreator)
+              ProfileItemsWidget(
+                icon: Icons.credit_card_outlined,
+                title: l10n.bankAccount,
+                subtitle: l10n.forReceiveDonation,
+                onTap: () => navigateToPage(context, const AddAccountPage()),
+              ),
+
+            const SizedBox(height: 10),
+
+            // SETTINGS Section
+            _buildSectionHeader(l10n.settings),
+            _buildDarkModeToggle(context),
+
+            ProfileItemsWidget(
+              icon: Icons.language,
+              title: l10n.language,
+              subtitle: l10n.selectYourFavouriteLanguage,
+              onTap: () => navigateToPage(context, const LanguageScreen()),
+            ),
+
+            const SizedBox(height: 10),
+
+            if (isUser)
+              ProfileItemsWidget(
+                icon: Icons.person,
+                title: l10n.switchToCreator,
+                subtitle: l10n.switchYourAccountToCreator,
+                onTap: () => navigateToPage(context, const CreatorAccountSetupScreen()),
+              ),
+
+            const SizedBox(height: 10),
+
+            // MORE Section
+            _buildSectionHeader(l10n.more),
+
+            ProfileItemsWidget(
+              icon: Icons.phone,
+              title: l10n.contactUs,
+              subtitle: l10n.forMoreInformation,
+              onTap: () => navigateToPage(context, const ContactUs()),
+            ),
+
+            ProfileItemsWidget(
+              icon: Icons.delete_forever,
+              title: 'Delete Account',
+              subtitle: 'Permanently Delete Your Account',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RequestDeleteAccountScreen()),
+              ),
+            ),
+
+            ProfileItemsWidget(
+              icon: Icons.logout,
+              title: l10n.logout,
+              subtitle: l10n.logoutFromCurrentAccount,
+              onTap: _showLogoutDialog,
+            ),
+
+            const SizedBox(height: 5),
+
+            // Footer
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: _showComingSoonToast,
+                        child: Text('Share Us',
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                      ),
+                      Container(height: 12, width: 1, color: theme.colorScheme.outline),
+                      TextButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AppRatingScreen()),
+                        ),
+                        child: Text('Rate Us',
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                      ),
+                      Container(height: 12, width: 1, color: theme.colorScheme.outline),
+                      TextButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                        ),
+                        child: Text('Privacy Policy',
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const TermsAndConditionsScreen()),
+                        ),
+                        child: Text('Terms & Conditions',
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                      ),
+                      Container(height: 12, width: 1, color: theme.colorScheme.outline),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                        child: Text('App Version: $_appVersion',
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+                const SizedBox(height: 20),
+              ]),
             ),
           ],
         ),
@@ -641,7 +647,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return Align(
       alignment: Alignment.centerLeft,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
         child: Text(
           title,
           style: TextStyle(

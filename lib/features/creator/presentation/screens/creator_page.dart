@@ -215,7 +215,7 @@ class _CreatorPageState extends State<CreatorPage>
               
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 0),
+                  padding: const EdgeInsets.only(left: 16, right: 16, top: 0, bottom: 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -259,36 +259,41 @@ class _CreatorPageState extends State<CreatorPage>
                         ],
                       ),
                       
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 8),
                       
-                      // Stats
-                      CreatorProfileStats(
-                        profile: creator,
-                        onFollowersTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => FollowersScreen(
-                                entityId: creator.id,
-                                title: '${creator.creatorName} ${AppLocalizations.of(context)!.followers}',
-                              ),
+                      // Stats and Actions
+                      Transform.translate(
+                        offset: const Offset(0, -12.0),
+                        child: Column(
+                          children: [
+                            CreatorProfileStats(
+                              profile: creator,
+                              onFollowersTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FollowersScreen(
+                                      entityId: creator.id,
+                                      title: '${creator.creatorName} ${AppLocalizations.of(context)!.followers}',
+                                    ),
+                                  ),
+                                );
+                              },
+                              onFollowingTap: _isOwner ? () {
+                                 Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FollowingListScreen(),
+                                  ),
+                                );
+                              } : null,
                             ),
-                          );
-                        },
-                        onFollowingTap: _isOwner ? () {
-                           Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => FollowingListScreen(),
+                            CreatorProfileActions(
+                              profile: creator,
+                              isOwner: _isOwner,
                             ),
-                          );
-                        } : null,
-                      ),
-                      
-                      // Actions
-                      CreatorProfileActions(
-                        profile: creator,
-                        isOwner: _isOwner,
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -314,16 +319,19 @@ class _CreatorPageState extends State<CreatorPage>
                 pinned: true,
               ),
             ],
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: CreatorAboutTab(profile: creator),
-                ),
-                CreatorGalleryTab(creatorId: creator.id),
-                CreatorCalendarTab(creatorId: creator.id),
-              ],
+            body: Transform.translate(
+              offset: const Offset(0, -12.0),
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: CreatorAboutTab(profile: creator),
+                  ),
+                  CreatorGalleryTab(creatorId: creator.id),
+                  CreatorCalendarTab(creatorId: creator.id),
+                ],
+              ),
             ),
           ),
         ),
@@ -345,24 +353,27 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: shrinkOffset > 0 // Only show shadow when stuck/scrolled
-            ? [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
-      ),
-      child: Column(
-        children: [
-          _tabBar,
-          if (shrinkOffset == 0) const Divider(height: 1), // Only show divider when expanded
-        ],
+    return Transform.translate(
+      offset: const Offset(0, -12.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          boxShadow: shrinkOffset > 0 // Only show shadow when stuck/scrolled
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          children: [
+            _tabBar,
+            if (shrinkOffset == 0) const Divider(height: 1), // Only show divider when expanded
+          ],
+        ),
       ),
     );
   }

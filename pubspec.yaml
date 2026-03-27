@@ -71,11 +71,11 @@ flutter:
   
   assets:
     - assets/splash/
-  - assets/illustrations/
-  - assets/icons/
-  - assets/icons_bottomnav/
-  - assets/contact_icons/
-  - assets/lottie/
+    - assets/illustrations/
+    - assets/icons/
+    - assets/icons_bottomnav/
+    - assets/contact_icons/
+    - assets/lottie/
 
 flutter_native_splash:
   color: "#ffffff"

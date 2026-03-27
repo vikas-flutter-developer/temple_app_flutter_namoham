@@ -3,4 +3,4 @@ services:
     name: temple-admin-website
     env: static
     buildCommand: "./render-build.sh"
-    publishPath: build/web
+    staticPublishPath: build/web

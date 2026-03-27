@@ -10,6 +10,12 @@ if [ ! -d "flutter" ]; then
   git clone https://github.com/flutter/flutter.git -b stable --depth 1
 fi
 
+# Create a dummy .env if it doesn't exist to prevent runtime errors
+if [ ! -f ".env" ]; then
+  echo "Creating dummy .env..."
+  touch .env
+fi
+
 export PATH="$PATH:`pwd`/flutter/bin"
 
 # Pre-download artifacts

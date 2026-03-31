@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:crop_your_image/crop_your_image.dart';
@@ -104,17 +103,21 @@ class ImageFilter {
 }
 
 class CropPage extends StatefulWidget {
-  final String imagePath;
+  final List<String> imagePaths;
   final bool isProfile;
 
-  const CropPage({Key? key, required this.imagePath, this.isProfile = false}) : super(key: key);
+  const CropPage({Key? key, required this.imagePaths, this.isProfile = false}) : super(key: key);
 
   @override
   State<CropPage> createState() => _CropPageState();
 }
 
 class _CropPageState extends State<CropPage> {
-  final CropController _cropController = CropController();
+  CropController _cropController = CropController();
+  
+  int _currentIndex = 0;
+  final List<String> _processedPaths = [];
+  
   Uint8List? _imageBytes;
   bool _isCropMode = true;
   ImageFilter _selectedFilter = ImageFilter.original;
@@ -140,7 +143,7 @@ class _CropPageState extends State<CropPage> {
 
   Future<void> _loadImage() async {
     try {
-      final file = File(widget.imagePath);
+      final file = File(widget.imagePaths[_currentIndex]);
       final bytes = await file.readAsBytes();
       if (mounted) {
         setState(() {
@@ -160,9 +163,6 @@ class _CropPageState extends State<CropPage> {
     if (result is CropSuccess) {
       final croppedData = result.croppedImage;
       try {
-        // If a filter is selected, we need to apply it to the cropped image
-        // If no filter, we can just save the cropped data directly
-        
         Uint8List finalBytes = croppedData;
 
         if (_selectedFilter.name != 'Original') {
@@ -201,12 +201,28 @@ class _CropPageState extends State<CropPage> {
           if (widget.isProfile) {
             Navigator.pop(context, filteredPath);
           } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => PostComposerPage(imagePath: filteredPath),
-              ),
-            );
+            _processedPaths.add(filteredPath);
+            
+            if (_currentIndex < widget.imagePaths.length - 1) {
+              // Proceed to next image
+              setState(() {
+                _currentIndex++;
+                _isLoading = true;
+                _imageBytes = null;
+                _isCropMode = true;
+                _selectedFilter = ImageFilter.original;
+                _cropController = CropController(); // Reset controller for new image
+              });
+              _loadImage();
+            } else {
+              // All images processed, go to PostComposerPage
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PostComposerPage(imagePaths: _processedPaths),
+                ),
+              );
+            }
           }
         }
       } catch (e) {
@@ -240,216 +256,246 @@ class _CropPageState extends State<CropPage> {
     // Trigger crop - the result will be handled in onCropped callback of Crop widget
     _cropController.crop();
   }
+  
+  void _onBackPressed() {
+    if (_currentIndex > 0) {
+      // Go back to previous image
+      setState(() {
+         _currentIndex--;
+         if (_processedPaths.length > _currentIndex) {
+            _processedPaths.removeAt(_currentIndex); // remove its processed version
+         }
+         _isLoading = true;
+         _imageBytes = null;
+         _isCropMode = true;
+         _selectedFilter = ImageFilter.original;
+         _cropController = CropController();
+      });
+      _loadImage();
+    } else {
+      // Exit completely
+      Navigator.pop(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black, // Dark background for better crop visibility
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top navigation bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Text(
-                    'Crop & Filter',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 18,
-                      color: Colors.white,
+    final bool isMultiple = widget.imagePaths.length > 1;
+    
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBackPressed();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black, // Dark background for better crop visibility
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Top navigation bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: _onBackPressed,
                     ),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving || _isLoading ? null : _processImage,
-                    child: _isSaving 
-                      ? const SizedBox(
-                          width: 16, 
-                          height: 16, 
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
-                        )
-                      : const Text(
-                          'Next',
-                          style: TextStyle(
-                            color: Colors.cyan,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                    Text(
+                      isMultiple ? 'Crop (${_currentIndex + 1}/${widget.imagePaths.length})' : 'Crop & Filter',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        color: Colors.white,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _isSaving || _isLoading ? null : _processImage,
+                      child: _isSaving 
+                        ? const SizedBox(
+                            width: 16, 
+                            height: 16, 
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                          )
+                        : Text(
+                            isMultiple && _currentIndex < widget.imagePaths.length - 1 ? 'Next' : 'Done',
+                            style: const TextStyle(
+                              color: Colors.cyan,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            // Main Content
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: Colors.cyan))
-                  : _imageBytes == null
-                      ? const Center(child: Text('Failed to load image', style: TextStyle(color: Colors.white)))
-                      : Container(
-                          color: Colors.black,
-                          child: Stack(
-                            children: [
-                              // Crop Widget with Filter Preview
-                              ColorFiltered(
-                                colorFilter: ColorFilter.matrix(_selectedFilter.matrix),
-                                child: Crop(
-                                  image: _imageBytes!,
-                                  controller: _cropController,
-                                  onCropped: _onCropped,
-                                  withCircleUi: false,
-                                  baseColor: Colors.black,
-                                  maskColor: Colors.black.withOpacity(0.5),
+              // Main Content
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: Colors.cyan))
+                    : _imageBytes == null
+                        ? const Center(child: Text('Failed to load image', style: TextStyle(color: Colors.white)))
+                        : Container(
+                            color: Colors.black,
+                            child: Stack(
+                              children: [
+                                // Crop Widget with Filter Preview
+                                ColorFiltered(
+                                  colorFilter: ColorFilter.matrix(_selectedFilter.matrix),
+                                  child: Crop(
+                                    key: ValueKey(_currentIndex), // Rebuild when switching images
+                                    image: _imageBytes!,
+                                    controller: _cropController,
+                                    onCropped: _onCropped,
+                                    withCircleUi: false,
+                                    baseColor: Colors.black,
+                                    maskColor: Colors.black.withValues(alpha: 0.5),
 
-                                  // Lock crop rect interaction when not in crop mode to prevent accidental moves
-                                  interactive: _isCropMode,
-                                  cornerDotBuilder: (size, edgeAlignment) => 
-                                    _isCropMode ? const DotControl(color: Colors.cyan) : const SizedBox(),
-                                ),
-                              ),
-                              
-                              // Loading overlay
-                              if (_isSaving)
-                                Container(
-                                  color: Colors.black.withOpacity(0.5),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(color: Colors.cyan),
+                                    // Lock crop rect interaction when not in crop mode to prevent accidental moves
+                                    interactive: _isCropMode,
+                                    cornerDotBuilder: (size, edgeAlignment) => 
+                                      _isCropMode ? const DotControl(color: Colors.cyan) : const SizedBox(),
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-            ),
-
-            // Controls
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Column(
-                children: [
-                  // Tab Buttons
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _isCropMode = true),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _isCropMode ? Colors.cyan : Colors.transparent,
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Crop',
-                                  style: TextStyle(
-                                    color: _isCropMode ? Colors.white : Colors.black,
-                                    fontWeight: FontWeight.w600,
+                                
+                                // Loading overlay
+                                if (_isSaving)
+                                  Container(
+                                    color: Colors.black.withValues(alpha: 0.5),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(color: Colors.cyan),
+                                    ),
                                   ),
-                                ),
-                              ),
+                              ],
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _isCropMode = false),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: !_isCropMode ? Colors.cyan : Colors.transparent,
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Filter',
-                                  style: TextStyle(
-                                    color: !_isCropMode ? Colors.white : Colors.black,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              ),
 
-                  // Aspect Ratio Options (Visible only in Crop Mode)
-                  if (_isCropMode)
-                    SizedBox(
-                      height: 80,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+              // Controls
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  children: [
+                    // Tab Buttons
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
                         children: [
-                          _buildAspectRatioButton('Free', null),
-                          _buildAspectRatioButton('1:1', 1.0),
-                          _buildAspectRatioButton('4:5', 4/5),
-                          _buildAspectRatioButton('16:9', 16/9),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _isCropMode = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: _isCropMode ? Colors.cyan : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Crop',
+                                    style: TextStyle(
+                                      color: _isCropMode ? Colors.white : Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _isCropMode = false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: !_isCropMode ? Colors.cyan : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Filter',
+                                    style: TextStyle(
+                                      color: !_isCropMode ? Colors.white : Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                    )
-                  // Filter Options (Visible only in Filter Mode)
-                  else
-                    SizedBox(
-                      height: 100,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _filters.length,
-                        itemBuilder: (context, index) {
-                          final filter = _filters[index];
-                          final isSelected = _selectedFilter == filter;
-                          return GestureDetector(
-                            onTap: () => setState(() => _selectedFilter = filter),
-                            child: Container(
-                              width: 80,
-                              margin: const EdgeInsets.only(right: 12),
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: ColorFiltered(
-                                        colorFilter: ColorFilter.matrix(filter.matrix),
-                                        child: _imageBytes != null 
-                                          ? Image.memory(_imageBytes!, fit: BoxFit.cover)
-                                          : Container(color: Colors.grey),
+                    ),
+
+                    // Aspect Ratio Options (Visible only in Crop Mode)
+                    if (_isCropMode)
+                      SizedBox(
+                        height: 80,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          children: [
+                            _buildAspectRatioButton('Free', null),
+                            _buildAspectRatioButton('1:1', 1.0),
+                            _buildAspectRatioButton('4:5', 4/5),
+                            _buildAspectRatioButton('16:9', 16/9),
+                          ],
+                        ),
+                      )
+                    // Filter Options (Visible only in Filter Mode)
+                    else
+                      SizedBox(
+                        height: 100,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filters.length,
+                          itemBuilder: (context, index) {
+                            final filter = _filters[index];
+                            final isSelected = _selectedFilter == filter;
+                            return GestureDetector(
+                              onTap: () => setState(() => _selectedFilter = filter),
+                              child: Container(
+                                width: 80,
+                                margin: const EdgeInsets.only(right: 12),
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: ColorFiltered(
+                                          colorFilter: ColorFilter.matrix(filter.matrix),
+                                          child: _imageBytes != null 
+                                            ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                                            : Container(color: Colors.grey),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    filter.name,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isSelected ? Colors.cyan : Colors.grey[600],
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      filter.name,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isSelected ? Colors.cyan : Colors.grey[600],
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

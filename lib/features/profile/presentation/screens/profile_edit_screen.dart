@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/countryphone.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_button.dart';
-import 'package:flutter_user_app/widgets/custom_widgets/custom_dropdown_widget.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_textfield.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/core/services/r2_upload_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'package:flutter_user_app/core/constants/indian_locations.dart';
@@ -393,8 +390,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => CropPage(
-              imagePath: pickedFile.path,
-              isProfile: true, // Enable profile mode
+              imagePaths: [pickedFile.path],
+              isProfile: true, // Enable profile mode - returns single cropped path
             ),
           ),
         );

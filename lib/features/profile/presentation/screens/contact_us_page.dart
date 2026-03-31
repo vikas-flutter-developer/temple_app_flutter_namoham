@@ -7,6 +7,7 @@ import 'package:flutter_user_app/widgets/custom_widgets/custom_text_widget.dart'
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_user_app/features/profile/presentation/screens/faq_screen.dart';
 import 'package:flutter_user_app/features/profile/presentation/screens/support_chat_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ContactUs extends StatelessWidget {
   const ContactUs({super.key});
@@ -47,7 +48,13 @@ class ContactUs extends StatelessWidget {
                       child: CustomCardTemplate(
                           title: "Call Support",
                           subtitle: "24x7 Customer Service",
-                          onTap: () {},
+                          onTap: () async {
+                            final Uri launchUri = Uri(
+                              scheme: 'tel',
+                              path: '+918879123444',
+                            );
+                            await launchUrl(launchUri);
+                          },
                           image: 'assets/contact_icons/support_call.svg')),
                 ],
               ),
@@ -57,9 +64,18 @@ class ContactUs extends StatelessWidget {
                   Expanded(
                       child: CustomCardTemplate(
                     title: "Email Support",
-                    subtitle: "support@example.com",
+                    subtitle: "Support@namoham.com",
                     image: 'assets/contact_icons/support_mail.svg',
-                    onTap: () {},
+                    onTap: () async {
+                      final Uri emailLaunchUri = Uri(
+                        scheme: 'mailto',
+                        path: 'Support@namoham.com',
+                        queryParameters: {
+                          'subject': 'Support Request',
+                        },
+                      );
+                      await launchUrl(emailLaunchUri);
+                    },
                   )),
                   const SizedBox(width: 20),
                   Expanded(

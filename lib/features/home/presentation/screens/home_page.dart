@@ -1,23 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
-import 'package:flutter_user_app/core/helper/navigation_helper.dart';
-import 'package:flutter_user_app/features/auth/login/presentation/screens/login_page.dart';
-import 'package:flutter_user_app/features/posts/data/repository/post_repository_impl.dart';
-import 'package:flutter_user_app/features/posts/domain/usecase/get_posts_usecase.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
 import 'package:flutter_user_app/features/profile/presentation/screens/profile_page.dart';
 import 'package:flutter_user_app/features/search/presentation/screens/search_page.dart';
 import 'package:flutter_user_app/widgets/navbar_widgets/bottom_navbar.dart';
-import 'package:flutter_user_app/widgets/custom_widgets/custom_page_bar.dart';
 import 'package:flutter_user_app/features/posts/presentation/screens/post_screen.dart';
 import 'package:flutter_user_app/features/reels/presentation/screens/video_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_user_app/features/events/data/models/event_model.dart';
-import 'package:flutter_user_app/features/events/presentation/screens/event_detail_screen.dart';
 import 'package:flutter_user_app/core/services/notification_service.dart';
 import 'package:flutter_user_app/features/events/presentation/widgets/event_reminder_dialog.dart';
 

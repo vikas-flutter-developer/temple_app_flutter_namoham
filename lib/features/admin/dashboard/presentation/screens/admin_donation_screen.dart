@@ -1,11 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/admin/dashboard/data/models/dashboard_models.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/widgets/admin_widgets.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/screens/admin_main_layout.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
-
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 class AdminDonationScreen extends StatefulWidget {
   const AdminDonationScreen({super.key});
 
@@ -41,10 +43,10 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
     
     try {
       final results = await Future.wait([
-        _apiService.getDashboardDonationStats(),
-        _apiService.getDonationMonthly(),
-        _apiService.getDonationTraffic(),
-        _apiService.getDonationHistory(),
+        _apiService.getDashboardDonationStats(filter: _selectedFilter),
+        _apiService.getDonationMonthly(filter: _selectedFilter),
+        _apiService.getDonationTraffic(filter: _selectedFilter),
+        _apiService.getDonationHistory(filter: _selectedFilter),
       ]);
       
       setState(() {
@@ -62,6 +64,143 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _showDetailsDialog(DonationHistoryModel donation) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Donation Details', style: TextStyle(fontWeight: FontWeight.bold)),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDetailRow('Invoice No.', donation.invoiceNo),
+                const Divider(),
+                _buildDetailRow('Donor', donation.donorName),
+                _buildDetailRow('Recipient', donation.recipientName),
+                const Divider(),
+                _buildDetailRow('Amount', '₹${_formatAmount(donation.amount)}'),
+                _buildDetailRow('Status', donation.status, valueColor: Colors.green),
+                _buildDetailRow('Method', donation.paymentMethod),
+                _buildDetailRow('Transaction ID', donation.transactionId.isEmpty ? 'N/A' : donation.transactionId),
+                if (donation.time != null)
+                  _buildDetailRow('Time', DateFormat('dd MMM yyyy, hh:mm a').format(donation.time!.toLocal())),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.download, size: 18),
+              label: const Text('Download Receipt'),
+              onPressed: () {
+                Navigator.pop(context);
+                _downloadReceipt(donation);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00A3FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.grey)),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(fontWeight: FontWeight.w500, color: valueColor ?? Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _downloadReceipt(DonationHistoryModel donation) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Container(
+            padding: const pw.EdgeInsets.all(32),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Center(child: pw.Text("DONATION RECEIPT", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold))),
+                pw.SizedBox(height: 24),
+                pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                  pw.Text('Invoice No: ${donation.invoiceNo}'),
+                  pw.Text('Date: ${donation.time != null ? DateFormat('dd MMM yyyy, hh:mm a').format(donation.time!.toLocal()) : ''}'),
+                ]),
+                pw.Divider(height: 32),
+                pw.SizedBox(height: 16),
+                pw.Text('Donor Details', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Name: ${donation.donorName}'),
+                pw.SizedBox(height: 24),
+                pw.Text('Temple/Creator Details', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Name: ${donation.recipientName}'),
+                pw.SizedBox(height: 32),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(16),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400)),
+                  child: pw.Column(
+                    children: [
+                      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                        pw.Text('Payment Method:'),
+                        pw.Text(donation.paymentMethod),
+                      ]),
+                      pw.SizedBox(height: 8),
+                      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                        pw.Text('Transaction ID:'),
+                        pw.Text(donation.transactionId),
+                      ]),
+                      pw.Divider(height: 24),
+                      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                        pw.Text('TOTAL DONATION:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Rs. ${_formatAmount(donation.amount)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+                      ]),
+                    ]
+                  )
+                ),
+                pw.SizedBox(height: 64),
+                pw.Center(child: pw.Text('Thank you for your generous donation!', style: pw.TextStyle(fontStyle: pw.FontStyle.italic))),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.sharePdf(bytes: await pdf.save(), filename: 'Receipt_${donation.invoiceNo}.pdf');
   }
 
   @override
@@ -324,11 +463,25 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
                               Text("₹${_formatAmount(donation.amount)}", style: const TextStyle(fontSize: 13)),
                               Text(
                                 donation.time != null 
-                                  ? DateFormat('yy-MM-dd HH:mm').format(donation.time!) 
+                                  ? DateFormat('dd MMM yyyy, hh:mm a').format(donation.time!.toLocal()) 
                                   : 'N/A', 
                                 style: const TextStyle(fontSize: 13),
                               ),
-                              const Icon(Icons.more_vert, size: 18, color: Colors.grey),
+                              PopupMenuButton<String>(
+                                padding: EdgeInsets.zero,
+                                icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
+                                onSelected: (value) {
+                                  if (value == 'view') {
+                                    _showDetailsDialog(donation);
+                                  } else if (value == 'download') {
+                                    _downloadReceipt(donation);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(value: 'view', child: Text('View Details', style: TextStyle(fontSize: 13))),
+                                  const PopupMenuItem(value: 'download', child: Text('Download Receipt', style: TextStyle(fontSize: 13))),
+                                ],
+                              ),
                             ]).toList(),
                           ),
                        const SizedBox(height: 16),
@@ -423,9 +576,12 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
   Widget _buildFilterBtn(String title, bool isSelected) {
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _selectedFilter = title.toLowerCase();
-        });
+        if (!isSelected) {
+          setState(() {
+            _selectedFilter = title.toLowerCase();
+          });
+          _loadData();
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
@@ -468,7 +624,7 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
            ),
         Container(
           width: 30,
-          height: height * 2.0,
+          height: height * 1.8,
           decoration: BoxDecoration(
             color: isActive ? const Color(0xFF00A3FF) : const Color(0xFFF3F6FD),
             borderRadius: BorderRadius.circular(8),

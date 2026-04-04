@@ -66,23 +66,37 @@ class _MakeDonationScreenState extends State<MakeDonationScreen> {
     
     // Verify Payment on Backend
     try {
+      final amount = double.tryParse(_amountController.text) ?? 0;
       final verifiedData = await _apiService.verifyPayment(
         razorpayOrderId: response.orderId ?? '',
         razorpayPaymentId: response.paymentId ?? '',
         razorpaySignature: response.signature ?? '',
+        recipientId: widget.recipientId,
+        recipientType: widget.recipientType,
+        amount: amount,
       );
       
       print('DONATION: Verification Success: $verifiedData');
 
       if (!mounted) return;
 
+      setState(() {
+        _isLoading = false;
+      });
+
       // Navigate to Success Screen
-       final amount = double.tryParse(_amountController.text) ?? 0;
        final description = _descriptionController.text.isEmpty
           ? 'Donation to ${widget.recipientName}'
           : _descriptionController.text;
 
-      navigateToPage(
+      String actualPaymentMethod = 'Razorpay';
+      if (verifiedData is Map && verifiedData['data'] is Map && verifiedData['data']['paymentMethod'] != null) {
+          actualPaymentMethod = verifiedData['data']['paymentMethod'];
+      } else if (verifiedData is Map && verifiedData['paymentMethod'] != null) {
+          actualPaymentMethod = verifiedData['paymentMethod'];
+      }
+
+      navigateToPageReplacement(
         context,
         DonationSuccessScreen(
           amount: amount,
@@ -90,6 +104,7 @@ class _MakeDonationScreenState extends State<MakeDonationScreen> {
           transactionId: response.paymentId ?? 'TXN${DateTime.now().millisecondsSinceEpoch}',
           referenceId: response.orderId ?? 'REF${DateTime.now().millisecondsSinceEpoch}',
           date: DateTime.now(),
+          paymentMethod: actualPaymentMethod,
           notes: description,
         ),
       );
@@ -159,8 +174,9 @@ class _MakeDonationScreenState extends State<MakeDonationScreen> {
 
       print('DONATION: Order Created: $response');
 
-      // Backend returns orderId (not id)
-      final orderId = response['orderId'];
+      // Backend returns orderId (not id) - Handling multiple possible formats
+      final orderData = response['order'] as Map<String, dynamic>? ?? {};
+      final orderId = orderData['id'] ?? response['orderId'] ?? response['id'];
       final razorpayKey = response['key'] ?? 'rzp_live_RmgNgMehnBgdUh';
       final prefill = response['prefill'] as Map<String, dynamic>? ?? {};
       

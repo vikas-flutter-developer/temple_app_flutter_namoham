@@ -22,6 +22,7 @@ import '../../../../widgets/custom_widgets/custom_network_image.dart';
 import 'package:flutter_user_app/features/profile/presentation/screens/reminder_page.dart';
 import 'package:flutter_user_app/features/messages/presentation/screens/conversations_screen.dart';
 import 'package:flutter_user_app/features/temples/presentation/screens/temple_donation_screen.dart';
+import 'package:flutter_user_app/features/donations/presentation/screens/my_donations_screen.dart';
 import 'package:flutter_user_app/widgets/custom_widgets/custom_page_bar.dart';
 import 'package:flutter_user_app/features/profile/presentation/widgets/profile_item_widget.dart';
 
@@ -490,8 +491,14 @@ class _ProfilePageState extends State<ProfilePage> {
               onTap: () async {
                 final prefs = await SharedPreferences.getInstance();
                 final userId = prefs.getString('user_id') ?? '';
+                final userType = prefs.getString('user_type')?.toLowerCase() ?? 'user';
                 if (context.mounted) {
-                  navigateToPage(context, DonationScreen(recipientId: userId));
+                  if (userType == 'user') {
+                    navigateToPage(
+                        context, MyDonationsScreen(userId: userId));
+                  } else {
+                    navigateToPage(context, DonationScreen(recipientId: userId));
+                  }
                 }
               },
             ),

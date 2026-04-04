@@ -1507,14 +1507,26 @@ class ApiService {
     required String razorpayOrderId,
     required String razorpayPaymentId,
     required String razorpaySignature,
+    String? recipientId,
+    String? recipientType,
+    double? amount,
   }) async {
     final response = await client.post(
       Uri.parse('$baseUrl/payments/verify-payment'),
       headers: await _getHeaders(),
       body: json.encode({
+        // Standard Razorpay snake_case
+        'razorpay_order_id': razorpayOrderId,
+        'razorpay_payment_id': razorpayPaymentId,
+        'razorpay_signature': razorpaySignature,
+        // Legacy/Custom camelCase
         'razorpayOrderId': razorpayOrderId,
         'razorpayPaymentId': razorpayPaymentId,
         'razorpaySignature': razorpaySignature,
+        // Additional context for robustness
+        if (recipientId != null) 'recipientId': recipientId,
+        if (recipientType != null) 'recipientType': recipientType,
+        if (amount != null) 'amount': amount,
       }),
     );
 
@@ -2411,9 +2423,9 @@ class ApiService {
   }
 
   /// Get donation stats
-  Future<Map<String, dynamic>> getDashboardDonationStats() async {
+  Future<Map<String, dynamic>> getDashboardDonationStats({String filter = 'all'}) async {
     final response = await client.get(
-      Uri.parse('$baseUrl/dashboard/donations/stats'),
+      Uri.parse('$baseUrl/dashboard/donations/stats?filter=$filter'),
       headers: await _getHeaders(),
     );
 
@@ -2425,10 +2437,10 @@ class ApiService {
   }
 
   /// Get donation monthly overview
-  Future<Map<String, dynamic>> getDonationMonthly({int? year}) async {
+  Future<Map<String, dynamic>> getDonationMonthly({int? year, String filter = 'all'}) async {
     final queryYear = year ?? DateTime.now().year;
     final response = await client.get(
-      Uri.parse('$baseUrl/dashboard/donations/monthly?year=$queryYear'),
+      Uri.parse('$baseUrl/dashboard/donations/monthly?year=$queryYear&filter=$filter'),
       headers: await _getHeaders(),
     );
 
@@ -2440,9 +2452,9 @@ class ApiService {
   }
 
   /// Get donation traffic by location
-  Future<Map<String, dynamic>> getDonationTraffic() async {
+  Future<Map<String, dynamic>> getDonationTraffic({String filter = 'all'}) async {
     final response = await client.get(
-      Uri.parse('$baseUrl/dashboard/donations/traffic'),
+      Uri.parse('$baseUrl/dashboard/donations/traffic?filter=$filter'),
       headers: await _getHeaders(),
     );
 
@@ -2457,9 +2469,10 @@ class ApiService {
   Future<Map<String, dynamic>> getDonationHistory({
     int page = 1,
     int limit = 20,
+    String filter = 'all',
   }) async {
     final response = await client.get(
-      Uri.parse('$baseUrl/dashboard/donations/history?page=$page&limit=$limit'),
+      Uri.parse('$baseUrl/dashboard/donations/history?page=$page&limit=$limit&filter=$filter'),
       headers: await _getHeaders(),
     );
 

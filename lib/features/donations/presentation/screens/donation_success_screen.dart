@@ -14,7 +14,6 @@ class DonationSuccessScreen extends StatefulWidget {
   final String referenceId;
   final DateTime date;
   final String paymentMethod; 
-  final String fromAccount; 
   final String? notes;
 
   const DonationSuccessScreen({
@@ -25,7 +24,6 @@ class DonationSuccessScreen extends StatefulWidget {
     required this.referenceId,
     required this.date,
     this.paymentMethod = 'MasterCard',
-    this.fromAccount = '.... .... .... 4679',
     this.notes,
   });
 
@@ -198,8 +196,6 @@ class _DonationSuccessScreenState extends State<DonationSuccessScreen> {
                         child: Column(
                           children: [
                             _buildDetailRow('You top up', '₹${widget.amount.toStringAsFixed(2)}', isBold: true),
-                            const SizedBox(height: 16),
-                            _buildDetailRow('From', widget.fromAccount),
                             const SizedBox(height: 16),
                             _buildDetailRow('Payment method', widget.paymentMethod),
                             const SizedBox(height: 16),

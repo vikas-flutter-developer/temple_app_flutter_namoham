@@ -29,11 +29,11 @@ class _LoginPageState extends State<LoginPage> {
 
   // Dropdown State
   String _selectedLoginType = 'User Login';
-  final List<String> _loginTypes = [
+  List<String> get _loginTypes => [
     'User Login',
     'Temple Login',
     'Creator Login',
-    'Admin Login'
+    if (kIsWeb) 'Admin Login'
   ];
 
   final ApiService _apiService = ApiService.create();
@@ -56,7 +56,8 @@ class _LoginPageState extends State<LoginPage> {
         _rememberMe = true;
         _emailController.text = savedEmail;
         _passwordController.text = savedPassword;
-        _selectedLoginType = savedLoginType;
+        // Ensure the saved login type is valid for the current platform
+        _selectedLoginType = _loginTypes.contains(savedLoginType) ? savedLoginType : 'User Login';
       });
     }
   }

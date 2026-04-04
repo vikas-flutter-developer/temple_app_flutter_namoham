@@ -1,6 +1,16 @@
 /// Dashboard data models for admin panel
 /// These models parse the API responses for the admin dashboard
 
+num _parseAmount(dynamic value) {
+  if (value == null) return 0;
+  if (value is num) return value;
+  if (value is String) {
+    final cleaned = value.replaceAll(RegExp(r'[^\d.]'), '');
+    return num.tryParse(cleaned) ?? 0;
+  }
+  return 0;
+}
+
 // ============== Dashboard Stats ==============
 
 class DashboardStatsModel {
@@ -114,7 +124,7 @@ class ChartDataPoint {
   factory ChartDataPoint.fromJson(Map<String, dynamic> json) {
     return ChartDataPoint(
       month: (json['month'] ?? '').toString(),
-      value: (json['value'] ?? 0) as num,
+      value: _parseAmount(json['value']),
     );
   }
 }
@@ -237,7 +247,7 @@ class DonationStatsModel {
     final data = json['data'] ?? json;
     return DonationStatsModel(
       newDonations: (data['newDonations'] ?? 0) as int,
-      totalAmount: (data['totalAmount'] ?? 0) as num,
+      totalAmount: _parseAmount(data['totalAmount']),
     );
   }
 }
@@ -276,7 +286,7 @@ class DonationChartDataPoint {
   factory DonationChartDataPoint.fromJson(Map<String, dynamic> json) {
     return DonationChartDataPoint(
       month: (json['month'] ?? '').toString(),
-      amount: (json['amount'] ?? 0) as num,
+      amount: _parseAmount(json['amount']),
       count: (json['count'] ?? 0) as int,
     );
   }
@@ -294,7 +304,7 @@ class DonationTrafficModel {
   factory DonationTrafficModel.fromJson(Map<String, dynamic> json) {
     return DonationTrafficModel(
       location: (json['location'] ?? 'Unknown').toString(),
-      amount: (json['amount'] ?? 0) as num,
+      amount: _parseAmount(json['amount']),
       count: (json['count'] ?? 0) as int,
     );
   }
@@ -318,6 +328,8 @@ class DonationHistoryModel {
   final String paymentMethod;
   final num amount;
   final DateTime? time;
+  final String status;
+  final String transactionId;
 
   DonationHistoryModel({
     required this.id,
@@ -327,17 +339,23 @@ class DonationHistoryModel {
     required this.paymentMethod,
     required this.amount,
     this.time,
+    this.status = 'Completed',
+    this.transactionId = '',
   });
 
   factory DonationHistoryModel.fromJson(Map<String, dynamic> json) {
     return DonationHistoryModel(
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       invoiceNo: (json['invoiceNo'] ?? json['id'] ?? '').toString(),
-      donorName: (json['donorName'] ?? json['donor'] ?? 'Unknown').toString(),
-      recipientName: (json['recipientName'] ?? json['recipient'] ?? 'Unknown').toString(),
-      paymentMethod: (json['paymentMethod'] ?? 'N/A').toString(),
-      amount: (json['amount'] ?? 0) as num,
+      donorName: (json['donorName'] ?? json['donationFrom'] ?? json['donor'] ?? 'Unknown').toString(),
+      recipientName: (json['recipientName'] ?? json['donationReceived'] ?? json['recipient'] ?? 'Unknown').toString(),
+      paymentMethod: (json['paymentMethod'] != null && json['paymentMethod'].toString().toLowerCase() != 'n/a') 
+          ? json['paymentMethod'].toString() 
+          : 'Razorpay',
+      amount: _parseAmount(json['amount']),
       time: json['time'] != null ? DateTime.tryParse(json['time'].toString()) : null,
+      status: (json['status'] ?? 'Completed').toString(),
+      transactionId: (json['transactionId'] ?? json['id'] ?? '').toString(),
     );
   }
 }

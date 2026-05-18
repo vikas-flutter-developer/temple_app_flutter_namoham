@@ -1,0 +1,11 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.abhitreader.temple",
+    "sha256_cert_fingerprints": [
+      "E1:1F:4D:8B:CB:DB:87:58:C9:FE:71:37:BB:E8:C9:0D:E8:25:50:4F:50:73:85:F8:79:40:EA:15:05:62:6E:4A",
+      "28:CE:44:1B:F6:AF:E5:AF:8B:13:FC:FD:0D:3E:FF:D3:A3:0C:5A:FE:4C:79:60:FD:05:BB:F9:FF:A0:9E:03:50"
+    ]
+  }
+}]

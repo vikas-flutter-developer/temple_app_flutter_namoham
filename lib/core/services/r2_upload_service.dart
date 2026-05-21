@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -35,22 +36,27 @@ class R2UploadService {
     String contentType,
     String folder,
   ) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/storage/presigned-url'),
-      headers: await _getAuthHeaders(),
-      body: jsonEncode({
-        'fileName': fileName,
-        'contentType': contentType,
-        'folder': folder,
-      }),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/storage/presigned-url'),
+        headers: await _getAuthHeaders(),
+        body: jsonEncode({
+          'fileName': fileName,
+          'contentType': contentType,
+          'folder': folder,
+        }),
+      ).timeout(const Duration(seconds: 30));
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    } else {
-      debugPrint('R2_UPLOAD: Failed to get presigned URL: ${response.statusCode}');
-      debugPrint('R2_UPLOAD: Response body: ${response.body}');
-      throw Exception('Failed to get presigned URL: ${response.statusCode}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        debugPrint('R2_UPLOAD: Failed to get presigned URL: ${response.statusCode}');
+        debugPrint('R2_UPLOAD: Response body: ${response.body}');
+        throw Exception('Failed to get presigned URL: ${response.statusCode}');
+      }
+    } on TimeoutException {
+      debugPrint('R2_UPLOAD: Timeout getting presigned URL');
+      throw Exception('Network timeout while contacting server');
     }
   }
 
@@ -59,19 +65,24 @@ class R2UploadService {
     final bytes = await file.readAsBytes();
     debugPrint('R2_UPLOAD: Uploading ${bytes.length} bytes to R2...');
 
-    final response = await http.put(
-      Uri.parse(uploadUrl),
-      body: bytes,
-      headers: {'Content-Type': contentType},
-    );
+    try {
+      final response = await http.put(
+        Uri.parse(uploadUrl),
+        body: bytes,
+        headers: {'Content-Type': contentType},
+      ).timeout(const Duration(minutes: 3)); // 3 minute timeout for larger video files
 
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      debugPrint('R2_UPLOAD: R2 upload failed: ${response.statusCode}');
-      debugPrint('R2_UPLOAD: Response body: ${response.body}');
-      throw Exception('R2 upload failed: ${response.statusCode}');
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        debugPrint('R2_UPLOAD: R2 upload failed: ${response.statusCode}');
+        debugPrint('R2_UPLOAD: Response body: ${response.body}');
+        throw Exception('R2 upload failed: ${response.statusCode}');
+      }
+
+      debugPrint('R2_UPLOAD: R2 upload successful');
+    } on TimeoutException {
+      debugPrint('R2_UPLOAD: Timeout uploading to R2');
+      throw Exception('Network timeout during file upload. Please check your internet connection.');
     }
-
-    debugPrint('R2_UPLOAD: R2 upload successful');
   }
 
   /// Upload a single file to R2.

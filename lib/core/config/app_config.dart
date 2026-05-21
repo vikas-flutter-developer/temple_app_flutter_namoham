@@ -14,8 +14,8 @@ class AppConfig {
       // dotenv not initialized
     }
     
-    // Fallback for production (Render)
-    return 'https://templebackend-178841694490.europe-west1.run.app/api';
+    // Fallback for local testing (Android Emulator)
+    return 'http://10.0.2.2:8000/api';
   }
 
 

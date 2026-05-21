@@ -388,54 +388,55 @@ class _PostWidgetState extends State<PostWidget>
               ),
             ),
           ),
-          // Wrap the image area with a Stack to overlay the animation
-          Stack(
-              alignment: Alignment.center,
-              children: [
-                GestureDetector(
-                onDoubleTap: () {
-                    HapticFeedback.mediumImpact();
-                    bool willBeLiked = !isLikedByCurrentUser;
-                    _triggerAnimation(willBeLiked); 
-                    postsProvider.likePost(widget.postModel.id);
-                  },
-                  child: SizedBox(
-                    height: 320,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 0, right: 0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.zero,
-                        child: widget.postModel.imageUrls.isEmpty
-                            ? _postImagePlaceholder(theme)
-                            : PageView.builder(
-                                controller: _photoPageController,
-                                itemCount: widget.postModel.imageUrls.length,
-                                itemBuilder: (context, index) {
-                                  final rawUrl = widget.postModel.imageUrls[index];
-                                  return _buildPostImage(theme, rawUrl);
-                                },
-                              ),
+          // Wrap the image area with an Expanded Stack to overlay the animation and fill space
+          Expanded(
+            child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  GestureDetector(
+                  onDoubleTap: () {
+                      HapticFeedback.mediumImpact();
+                      bool willBeLiked = !isLikedByCurrentUser;
+                      _triggerAnimation(willBeLiked); 
+                      postsProvider.likePost(widget.postModel.id);
+                    },
+                    child: SizedBox.expand(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 0, right: 0),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.zero,
+                          child: widget.postModel.imageUrls.isEmpty
+                              ? _postImagePlaceholder(theme)
+                              : PageView.builder(
+                                  controller: _photoPageController,
+                                  itemCount: widget.postModel.imageUrls.length,
+                                  itemBuilder: (context, index) {
+                                    final rawUrl = widget.postModel.imageUrls[index];
+                                    return _buildPostImage(theme, rawUrl);
+                                  },
+                                ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                // Animation Overlay
-                if (_showAnimation)
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: ScaleTransition(
-                      scale: _scaleAnimation,
-                      child: Lottie.asset(
-                        _isAnimatingLike
-                            ? 'assets/lottie/like.json'
-                            : 'assets/lottie/unlike1.json',
-                        height: _isAnimatingLike ? 300 : 100,
-                        width: _isAnimatingLike ? 300 : 100,
+                  // Animation Overlay
+                  if (_showAnimation)
+                    FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: ScaleTransition(
+                        scale: _scaleAnimation,
+                        child: Lottie.asset(
+                          _isAnimatingLike
+                              ? 'assets/lottie/like.json'
+                              : 'assets/lottie/unlike1.json',
+                          height: _isAnimatingLike ? 300 : 100,
+                          width: _isAnimatingLike ? 300 : 100,
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
+                ],
+              ),
+          ),
 
             if (widget.postModel.imageUrls.length > 1)
               Center(

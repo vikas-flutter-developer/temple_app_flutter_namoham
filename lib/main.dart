@@ -73,16 +73,9 @@ void main() async {
             final service = ApiService.create();
             // Configure 401 Unauthorized handling
             service.onTokenExpired = () async {
-              print('AUTH: Session expired. Logging out...');
-              
-              // Clear session data safely using AuthHelper
-              await AuthHelper.clearSession();
-              
-              // Navigate to login using global key
-              navigatorKey.currentState?.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-                (route) => false,
-              );
+              // Per Client Request: Do NOT automatically log out users.
+              // Simply log the event and let backend re-validation cycles handle status.
+              print('AUTH: Session notice received, maintaining session persistence per UI preference.');
             };
             return service;
           },
@@ -178,6 +171,10 @@ class _MainAppState extends State<MainApp> {
     super.initState();
     // Define initialization tasks that need to complete before removing splash
     _initializationFuture = _initializeApp();
+    // Initialize deep link handler once after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      DeepLinkHandler().initialize();
+    });
   }
 
   // Handle all initialization tasks here
@@ -233,11 +230,6 @@ class _MainAppState extends State<MainApp> {
       builder: (context, themeProvider, localeProvider, _) {
         // Update system UI whenever theme changes
         _updateSystemUI(themeProvider.themeMode);
-
-        // Initialize deep link handler after first frame
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          DeepLinkHandler().initialize(context);
-        });
 
         return MaterialApp(
           navigatorKey: navigatorKey,

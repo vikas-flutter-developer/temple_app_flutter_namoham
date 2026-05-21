@@ -73,7 +73,7 @@ class PostsProvider extends ChangeNotifier {
       },
       (posts) {
         _status = PostsStatus.loaded;
-        _posts = posts;
+        _posts = List.from(posts)..shuffle();
         print('SUCCESS: Loaded ${posts.length} posts'); // Debug log
         loadSavedPosts(); // Load saved status
       },

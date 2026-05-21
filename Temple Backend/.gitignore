@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+# .env
+app.yaml
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Seed scripts (optional - remove these lines if you want to include them)
+# seed_temples.js
+# seedPosts.js
+# check_users.js

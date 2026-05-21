@@ -23,14 +23,118 @@ class ApiService {
     );
   }
 
+  // Track single active token refresh request to share across concurrent calls
+  static Future<String?>? _activeRefreshOperation;
+
+  /// Checks if the provided JWT access token is nearing its expiration time.
+  bool _isJwtExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+      
+      String payload = parts[1];
+      final int padding = (4 - payload.length % 4) % 4;
+      if (padding > 0) {
+        payload += '=' * padding;
+      }
+      
+      final List<int> decodedBytes = base64Url.decode(payload);
+      final Map<String, dynamic> data = json.decode(utf8.decode(decodedBytes));
+      
+      if (data.containsKey('exp')) {
+        final int expTimeSeconds = data['exp'];
+        final expiryDate = DateTime.fromMillisecondsSinceEpoch(expTimeSeconds * 1000);
+        // Deem it expired if CURRENT TIME is past (ExpirationTime - 2 minute buffer)
+        final DateTime bufferLimit = expiryDate.subtract(const Duration(minutes: 2));
+        return DateTime.now().isAfter(bufferLimit);
+      }
+      return false; 
+    } catch (e) {
+      print('API_SERVICE: Failed parsing JWT for expiry: $e');
+      return true; // Safest bet: trigger refresh if token parsing corrupted
+    }
+  }
+
+  /// Silent refresh flow: contacts backend to obtain a pair of fresh tokens.
+  Future<String?> _refreshToken() async {
+    // Handle race condition: reuse in-progress Future if one already running
+    if (_activeRefreshOperation != null) {
+      print('API_SERVICE: Awaiting existing refresh operation in progress...');
+      return await _activeRefreshOperation;
+    }
+
+    final task = () async {
+      print('API_SERVICE: Refresh token starting...');
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final refreshToken = prefs.getString('refresh_token');
+
+        if (refreshToken == null || refreshToken.isEmpty) {
+          print('API_SERVICE: Refresh token missing locally.');
+          return null;
+        }
+
+        final clientLocal = http.Client();
+        try {
+          // Perform request targeting backend /refresh endpoint
+          final response = await clientLocal.post(
+            Uri.parse('$baseUrl/auth/refresh'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'refreshToken': refreshToken}),
+          ).timeout(const Duration(seconds: 12));
+
+          if (response.statusCode == 200) {
+            final body = json.decode(response.body);
+            final String? nextAccessToken = body['accessToken'];
+            final String? nextRefreshToken = body['refreshToken'];
+
+            if (nextAccessToken != null && nextAccessToken.isNotEmpty) {
+              print('API_SERVICE: Token refresh successful ✅');
+              await prefs.setString('auth_token', nextAccessToken);
+              if (nextRefreshToken != null && nextRefreshToken.isNotEmpty) {
+                 await prefs.setString('refresh_token', nextRefreshToken);
+              }
+              return nextAccessToken;
+            }
+          }
+          print('API_SERVICE: Refresh failed on server side (HTTP ${response.statusCode})');
+        } finally {
+          clientLocal.close();
+        }
+        return null;
+      } catch (ex) {
+        print('API_SERVICE: Fatal error during token renewal: $ex');
+        return null;
+      } finally {
+        _activeRefreshOperation = null; // Permit subsequent cycles
+      }
+    }();
+
+    _activeRefreshOperation = task;
+    return await task;
+  }
+
   /// Helper to get Headers with Token for authenticated requests
   Future<Map<String, String>> _getHeaders() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    print('API_SERVICE: Token exists: ${token != null}, Length: ${token?.length ?? 0}'); // Debug
+    String? currentToken = prefs.getString('auth_token');
+
+    // Detect expiration presence -> attempt active renewal prior to launch
+    if (currentToken != null && currentToken.isNotEmpty) {
+      if (_isJwtExpired(currentToken)) {
+        print('API_SERVICE: User token is expired. Initiating auto-refresh flow.');
+        final renewedToken = await _refreshToken();
+        if (renewedToken != null) {
+          currentToken = renewedToken;
+        } else {
+          print('API_SERVICE: Auto-refresh attempt yielded no valid token.');
+        }
+      }
+    }
+
     return {
       'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
+      if (currentToken != null) 'Authorization': 'Bearer $currentToken',
     };
   }
 
@@ -1459,13 +1563,14 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
+      String errorMessage = 'Failed to create payment order: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-      throw Exception('Failed to create payment order:  | ');
+      throw Exception(errorMessage);
     }
   }
 
@@ -1492,13 +1597,14 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
+      String errorMessage = 'Failed to create payment link: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-      throw Exception('Failed to create payment link: ${response.statusCode}');
+      throw Exception(errorMessage);
     }
   }
 
@@ -1533,13 +1639,14 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
+      String errorMessage = 'Failed to verify payment: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-      throw Exception('Failed to verify payment: ${response.statusCode}');
+      throw Exception(errorMessage);
     }
   }
 
@@ -1620,14 +1727,14 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
+      String errorMessage = 'Failed to create event: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-
-      throw Exception('Failed to create event: ${response.statusCode}');
+      throw Exception(errorMessage);
     }
   }
 
@@ -1642,13 +1749,14 @@ class ApiService {
     if (response.statusCode == 200) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
+      String errorMessage = 'Failed to update event: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-      throw Exception('Failed to update event: ${response.statusCode}');
+      throw Exception(errorMessage);
     }
   }
 
@@ -1662,13 +1770,14 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 204) {
       return;
     } else {
+      String errorMessage = 'Failed to delete event: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-      throw Exception('Failed to delete event: ${response.statusCode}');
+      throw Exception(errorMessage);
     }
   }
 
@@ -1691,14 +1800,14 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
+      String errorMessage = 'Failed to attend event: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-
-      throw Exception('Failed to attend event: ${response.statusCode}');
+      throw Exception(errorMessage);
     }
   }
 
@@ -1715,13 +1824,14 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
+      String errorMessage = 'Failed to create payment order: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-      throw Exception('Failed to create payment order: ${response.statusCode}');
+      throw Exception(errorMessage);
     }
   }
 
@@ -1746,13 +1856,14 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
+      String errorMessage = 'Failed to verify payment: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-      throw Exception('Failed to verify payment: ${response.statusCode}');
+      throw Exception(errorMessage);
     }
   }
 
@@ -1767,13 +1878,14 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else {
+      String errorMessage = 'Failed to create payment link: ${response.statusCode}';
       try {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          throw Exception(decoded['message'].toString());
+          errorMessage = decoded['message'].toString();
         }
       } catch (_) {}
-      throw Exception('Failed to create payment link: ${response.statusCode}');
+      throw Exception(errorMessage);
     }
   }
 
@@ -2065,9 +2177,24 @@ class ApiService {
 
   /// Get donations received by a temple/creator
   /// Returns donations and summary statistics
-  Future<Map<String, dynamic>> getDonationsByRecipient(String recipientId) async {
+  Future<Map<String, dynamic>> getDonationsByRecipient(String recipientId, {DateTime? startDate, DateTime? endDate, String? donorId}) async {
+    String url = '$baseUrl/donations/recipient/$recipientId';
+    final queryParams = <String>[];
+    if (startDate != null) {
+      queryParams.add('startDate=${Uri.encodeComponent(startDate.toIso8601String())}');
+    }
+    if (endDate != null) {
+      queryParams.add('endDate=${Uri.encodeComponent(endDate.toIso8601String())}');
+    }
+    if (donorId != null && donorId.isNotEmpty) {
+      queryParams.add('donorId=${Uri.encodeComponent(donorId)}');
+    }
+    if (queryParams.isNotEmpty) {
+      url += '?${queryParams.join('&')}';
+    }
+
     final response = await client.get(
-      Uri.parse('$baseUrl/donations/recipient/$recipientId'),
+      Uri.parse(url),
       headers: await _getHeaders(),
     );
 

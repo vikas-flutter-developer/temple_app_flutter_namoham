@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class CustomNetworkImage extends StatelessWidget {
   final String imageUrl;
@@ -41,22 +42,43 @@ class CustomNetworkImage extends StatelessWidget {
         color: backgroundColor,
       ),
       clipBehavior: Clip.antiAlias,
-      child: CachedNetworkImage(
-        imageUrl: imageUrl,
-        width: width,
-        height: height,
-        fit: fit,
-        placeholder: (context, url) => placeholder ?? Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
-          child: Container(
-            width: width,
-            height: height,
-            color: Colors.white,
-          ),
-        ),
-        errorWidget: (context, url, error) => _buildErrorWidget(),
-      ),
+      child: kIsWeb
+          ? Image.network(
+              imageUrl,
+              width: width,
+              height: height,
+              fit: fit,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return placeholder ??
+                    Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        width: width,
+                        height: height,
+                        color: Colors.white,
+                      ),
+                    );
+              },
+              errorBuilder: (context, error, stackTrace) => _buildErrorWidget(),
+            )
+          : CachedNetworkImage(
+              imageUrl: imageUrl,
+              width: width,
+              height: height,
+              fit: fit,
+              placeholder: (context, url) => placeholder ?? Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: Container(
+                  width: width,
+                  height: height,
+                  color: Colors.white,
+                ),
+              ),
+              errorWidget: (context, url, error) => _buildErrorWidget(),
+            ),
     );
   }
 

@@ -148,7 +148,8 @@ class ShareHelper {
     try {
       // Generate shareable URL for the post
       final postUrl = UrlGenerator.generatePostUrl(postId);
-      final shareText = 'Check out this post on Temple App!\n$postUrl';
+      final playStoreUrl = 'https://play.google.com/store/apps/details?id=com.abhitreader.temple&pcampaignid=web_share';
+      final shareText = 'Check out this post on Temple App!\n$postUrl\n\nDownload the app: $playStoreUrl';
       
       // Share using the native share sheet or specific platform
       switch (platform) {
@@ -232,7 +233,8 @@ class ShareHelper {
     try {
       // Generate shareable URL for the reel
       final reelUrl = UrlGenerator.generateReelUrl(reelId);
-      final shareText = 'Check out this reel on Temple App!\n$reelUrl';
+      final playStoreUrl = 'https://play.google.com/store/apps/details?id=com.abhitreader.temple&pcampaignid=web_share';
+      final shareText = 'Check out this reel on Temple App!\n$reelUrl\n\nDownload the app: $playStoreUrl';
       
       // Share using the native share sheet or specific platform
       switch (platform) {

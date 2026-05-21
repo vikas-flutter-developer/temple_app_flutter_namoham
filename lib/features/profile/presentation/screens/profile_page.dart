@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_user_app/features/notifications/presentation/providers/notification_provider.dart';
 import 'package:flutter_user_app/features/notifications/presentation/screens/notification_screen.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter_user_app/l10n/app_localizations.dart';
 import 'package:flutter_user_app/core/helper/navigation_helper.dart';
 import 'package:flutter_user_app/core/helper/auth_helper.dart';
@@ -581,7 +582,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       TextButton(
-                        onPressed: _showComingSoonToast,
+                        onPressed: () {
+                          Share.share(
+                            'Check out Temple App: https://play.google.com/store/apps/details?id=com.abhitreader.temple&pcampaignid=web_share',
+                          );
+                        },
                         child: Text('Share Us',
                             style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                       ),

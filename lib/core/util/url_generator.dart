@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 
 /// Generates shareable URLs for app content
 class UrlGenerator {
-  // Base URL for deep links - using custom scheme
+  // Base URL for deep links - using custom scheme as fallback
   static const String appScheme = 'templeapp';
   
-  // Optional: web URL for users without the app installed
-  static const String webBaseUrl = 'https://templeapp.com';
+  // The verified website domain for Android App Links
+  static const String webBaseUrl = 'https://namoham.com';
 
   /// Generate a shareable URL for a reel
   /// 
   /// Returns URLs in the format:
-  /// - App scheme: templeapp://reel/{reelId}
-  /// - Web fallback: https://templeapp.com/reel/{reelId}
-  static String generateReelUrl(String reelId, {bool useWebUrl = false}) {
+  /// - Web App Link: https://namoham.com/reel/{reelId}
+  /// - App scheme (fallback): templeapp://reel/{reelId}
+  static String generateReelUrl(String reelId, {bool useWebUrl = true}) {
     if (useWebUrl) {
       return '$webBaseUrl/reel/$reelId';
     }
@@ -21,7 +21,7 @@ class UrlGenerator {
   }
 
   /// Generate a shareable URL for a post
-  static String generatePostUrl(String postId, {bool useWebUrl = false}) {
+  static String generatePostUrl(String postId, {bool useWebUrl = true}) {
     if (useWebUrl) {
       return '$webBaseUrl/post/$postId';
     }
@@ -29,7 +29,7 @@ class UrlGenerator {
   }
 
   /// Generate a shareable URL for a temple profile
-  static String generateTempleUrl(String templeId, {bool useWebUrl = false}) {
+  static String generateTempleUrl(String templeId, {bool useWebUrl = true}) {
     if (useWebUrl) {
       return '$webBaseUrl/temple/$templeId';
     }
@@ -37,7 +37,7 @@ class UrlGenerator {
   }
 
   /// Generate a shareable URL for a creator profile
-  static String generateCreatorUrl(String creatorId, {bool useWebUrl = false}) {
+  static String generateCreatorUrl(String creatorId, {bool useWebUrl = true}) {
     if (useWebUrl) {
       return '$webBaseUrl/creator/$creatorId';
     }

@@ -106,9 +106,9 @@ class _DonationSuccessScreenState extends State<DonationSuccessScreen> {
     final String dateStr = "${_getMonth(widget.date.month)} ${widget.date.day}, ${widget.date.year} · ${_formatTime(widget.date)}";
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F7FA), // Subtle cool-gray backdrop so the receipt card pops visually
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.black, size: 28),
@@ -124,110 +124,168 @@ class _DonationSuccessScreenState extends State<DonationSuccessScreen> {
               Screenshot(
                 controller: _screenshotController,
                 child: Container(
-                  color: Colors.white, // Ensure background is white for screenshot
-                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24), // Highly polished corners
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      )
+                    ],
+                  ),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(height: 10),
-                      // Checkmark Circle
+                      // Top colored Accent Banner
                       Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: cyanColor.withOpacity(0.15), 
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Container(
-                            width: 70,
-                            height: 70,
-                            decoration: const BoxDecoration(
-                              color: cyanColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.check, color: Colors.white, size: 40),
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: cyanColor,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(24),
+                            topRight: Radius.circular(24),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
                       
-                      // Amount
-                      Text(
-                        '₹ ${widget.amount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // Success Text
-                      Column(
-                        children: [
-                          Text(
-                            'You Succesfully Donate to',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.templeName,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade800,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Details Card
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF9F9F9), 
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
                         child: Column(
                           children: [
-                            _buildDetailRow('You top up', '₹${widget.amount.toStringAsFixed(2)}', isBold: true),
-                            const SizedBox(height: 16),
-                            _buildDetailRow('Payment method', widget.paymentMethod),
-                            const SizedBox(height: 16),
-                            _buildDetailRow('Date', dateStr),
-                            const SizedBox(height: 16),
-                            _buildCopyRow(context, 'Transaction ID', widget.transactionId),
-                            const SizedBox(height: 16),
-                            _buildCopyRow(context, 'Reference ID', widget.referenceId),
-                            if (widget.notes != null && widget.notes!.isNotEmpty) ...[
-                              const SizedBox(height: 16),
-                              const Divider(),
-                              const SizedBox(height: 16),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'Notes',
-                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                                ),
+                            // Branding Center
+                            Image.asset(
+                              'assets/splash/namo_logo_tight.png',
+                              height: 90,
+                              fit: BoxFit.contain,
+                            ),
+                            const SizedBox(height: 20),
+                            
+                            // Stylized Custom Dash Divider
+                            _buildDashedLine(),
+                            const SizedBox(height: 28),
+                            
+                            // Success Indicator & State
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0FDF4), // Soft success emerald tint
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFFDCFCE7), width: 2),
                               ),
-                              const SizedBox(height: 4),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  widget.notes!,
-                                  style: const TextStyle(
-                                    color: Colors.black87,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF22C55E), // Vibrant Modern Success Green
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.check, color: Colors.white, size: 32),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Payment Successful',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                                color: Color(0xFF22C55E),
+                              ),
+                            ),
+                            
+                            const SizedBox(height: 24),
+                            
+                            // Large Amount Value
+                            Text(
+                              '₹ ${widget.amount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 38, // Increased size for impact
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF111827),
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Donated to ${widget.templeName}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            
+                            const SizedBox(height: 32),
+                            _buildDashedLine(),
+                            const SizedBox(height: 32),
+                            
+                            // Explicit Detail Table
+                            _buildModernDetailRow('Transaction ID', widget.transactionId, isCopyable: true),
+                            const SizedBox(height: 20),
+                            _buildModernDetailRow('Reference ID', widget.referenceId, isCopyable: true),
+                            const SizedBox(height: 20),
+                            _buildModernDetailRow('Date & Time', dateStr),
+                            const SizedBox(height: 20),
+                            _buildModernDetailRow('Payment Method', widget.paymentMethod),
+                            
+                            if (widget.notes != null && widget.notes!.isNotEmpty) ...[
+                              const SizedBox(height: 24),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'MESSAGES / NOTES',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 1,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      widget.notes!,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        height: 1.4,
+                                        color: Color(0xFF334155),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
+                            
+                            const SizedBox(height: 40),
+                            
+                            // Official Seal Footer
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.lock_outline_rounded, size: 14, color: Colors.grey.shade500),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'SECURED OFFICIAL RECEIPT',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -376,5 +434,81 @@ class _DonationSuccessScreenState extends State<DonationSuccessScreen> {
     hour = hour == 0 ? 12 : hour;
     String minuteStr = minute.toString().padLeft(2, '0');
     return '$hour:$minuteStr $ampm';
+  }
+
+  Widget _buildModernDetailRow(String label, String value, {bool isCopyable = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 4,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 6,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    color: Color(0xFF1F2937),
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (isCopyable) ...[
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: () => _copyToClipboard(context, value),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(Icons.copy, size: 12, color: Color(0xFF6B7280)),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDashedLine() {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final boxWidth = constraints.constrainWidth();
+        const dashWidth = 5.0;
+        const dashSpace = 3.0;
+        final dashCount = (boxWidth / (dashWidth + dashSpace)).floor();
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(dashCount, (_) {
+            return const SizedBox(
+              width: dashWidth,
+              height: 1.5,
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: Color(0xFFE5E7EB)),
+              ),
+            );
+          }),
+        );
+      },
+    );
   }
 }

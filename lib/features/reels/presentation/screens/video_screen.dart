@@ -66,28 +66,49 @@ class _VideosViewState extends State<_VideosView> {
     _pageController = PageController(initialPage: widget.initialIndex);
     _loadUserType();
 
-    // Auto-play initial video after frame build
+    // Auto-play logic activated immediately or upon async retrieval
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final provider = context.read<ReelsProvider>();
-        if (provider.reels.isNotEmpty && widget.initialIndex < provider.reels.length) {
-          final reel = provider.reels[widget.initialIndex];
-          _currentIndex = widget.initialIndex;
-          _currentlyPlayingId = reel.id;
+      if (!mounted) return;
+      final provider = context.read<ReelsProvider>();
 
-          // Initialize controller and autoplay the first reel
-          _getController(reel).then((controller) {
-            if (mounted && _currentlyPlayingId == reel.id) {
-              controller.seekTo(Duration.zero);
-              controller.play();
-            }
-          });
+      // Core function to trigger initialization sequence
+      void startAutoplay() {
+        if (provider.reels.isEmpty) return;
 
-          // Preload the next reel
-          if (provider.reels.length > 1) {
-            _getController(provider.reels[1]);
+        final validIndex = widget.initialIndex % provider.reels.length;
+        final targetReel = provider.reels[validIndex];
+
+        setState(() {
+           _currentlyPlayingId = targetReel.id;
+        });
+
+        // Fetch and execute playback mandate
+        _getController(targetReel).then((c) {
+          if (mounted && _currentlyPlayingId == targetReel.id) {
+            c.seekTo(Duration.zero);
+            c.play(); // Autoplay achieved natively
           }
+        });
+
+        // Concurrently preload successive track for buffer smoothness
+        if (provider.reels.length > 1) {
+          final nextIdx = (validIndex + 1) % provider.reels.length;
+          _getController(provider.reels[nextIdx]);
         }
+      }
+
+      if (provider.reels.isNotEmpty) {
+        startAutoplay(); // Immediate play if cached/prefetched
+      } else {
+        // Attachment for delayed server datasets: automatically detach once satisfied
+        late final VoidCallback subscriber;
+        subscriber = () {
+          if (mounted && provider.reels.isNotEmpty && _currentlyPlayingId == null) {
+             provider.removeListener(subscriber);
+             startAutoplay();
+          }
+        };
+        provider.addListener(subscriber);
       }
     });
   }
@@ -188,6 +209,8 @@ class _VideosViewState extends State<_VideosView> {
 
     setState(() {
       _currentIndex = virtualIndex;
+      // CRITICAL FIX: Must be set inside setState to trigger rebuild and propagate `isActive` flag to child
+      _currentlyPlayingId = reels[actualIndex].id; 
     });
 
     // Detect loop: if actual index wrapped back to 0-2 and we moved forward
@@ -212,7 +235,6 @@ class _VideosViewState extends State<_VideosView> {
 
     // Autoplay current reel
     final reel = reels[actualIndex];
-    _currentlyPlayingId = reel.id;
 
     if (_controllers.containsKey(reel.id)) {
       // Controller already ready — play immediately
@@ -505,6 +527,7 @@ class _VideosViewState extends State<_VideosView> {
     return ReelVideoWidget(
       reel: reel,
       controller: controller,
+      isActive: _currentlyPlayingId == reel.id, // Tells widget whether it should be actively playing
       isLiked: reel.isLikedBy(provider.userId),
       isSaved: reel.isSaved ?? false,
       canCreateReel: _canCreateReel(),

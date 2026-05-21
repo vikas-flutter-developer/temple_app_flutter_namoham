@@ -71,6 +71,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _phoneController = TextEditingController();
   String _countryCode = '+91';
 
+  // Gender selection
+  String? _selectedGender;
+  final List<String> _genders = ['Male', 'Female', 'Other'];
+
   // Method to handle location icon press
   void _handleLocationPress() {
     // TODO: Implement location functionality
@@ -486,6 +490,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  // Gender Selection (only for User and Creator)
+                  if (_selectedRegisterType != 'Temple Register')
+                    Column(
+                      children: [
+                        CustomDropdown(
+                          title: 'Gender',
+                          items: _genders,
+                          value: _selectedGender,
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedGender = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+
                   // User ID field (for Temple/Creator)
                   if (_selectedRegisterType != 'User Register')
                     Column(
@@ -620,6 +642,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please enter $dobLabel')));
                           return;
                         }
+                        
+                        // Gender check for User and Creator
+                        if (_selectedRegisterType != 'Temple Register') {
+                          if (_selectedGender == null || _selectedGender!.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select Gender')));
+                            return;
+                          }
+                        }
+
                         if (password.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Password')));
                           return;
@@ -668,6 +699,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (_selectedRegisterType == 'User Register') {
                           registrationData['fullName'] = name;
                           registrationData['dob'] = dob;
+                          registrationData['gender'] = _selectedGender ?? '';
                         } else {
                           // Common fields for Temple & Creator
                           registrationData['address'] = address;
@@ -684,6 +716,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             }
                           } else if (_selectedRegisterType == 'Creator Register') {
                             registrationData['creatorName'] = name;
+                            registrationData['gender'] = _selectedGender ?? '';
                           }
                         }
 

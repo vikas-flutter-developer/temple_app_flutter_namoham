@@ -22,6 +22,7 @@ class ReelVideoWidget extends StatefulWidget {
   final VoidCallback? onDeletePressed;
   final VoidCallback? onBlockPressed;
   final bool canCreateReel;
+  final bool isActive; // Explicitly declares if this reel is currently selected to play
 
   const ReelVideoWidget({
     super.key,
@@ -35,6 +36,7 @@ class ReelVideoWidget extends StatefulWidget {
     this.onDeletePressed,
     this.onBlockPressed,
     this.canCreateReel = false,
+    this.isActive = false, // Default to false
   });
 
   @override
@@ -42,9 +44,10 @@ class ReelVideoWidget extends StatefulWidget {
 }
 
 class _ReelVideoWidgetState extends State<ReelVideoWidget> {
-  bool _showControls = false; // Initially false, only show when paused
-  bool _isPlaying = true;
+  bool _showControls = false; 
+  bool _isPlaying = false; // Default to false initially
   bool _hasError = false;
+  bool _isInitialized = false; // MUST track initialization state for proper rebuilds
 
   @override
   void initState() {
@@ -52,6 +55,26 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
     widget.controller.addListener(_videoListener);
     _isPlaying = widget.controller.value.isPlaying;
     _hasError = widget.controller.value.hasError;
+    _isInitialized = widget.controller.value.isInitialized;
+
+    // Ensure playback matches active state once built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncPlayback();
+    });
+  }
+
+  void _syncPlayback() {
+    if (!widget.controller.value.isInitialized) return;
+
+    if (widget.isActive) {
+      if (!widget.controller.value.isPlaying) {
+        widget.controller.play();
+      }
+    } else {
+      if (widget.controller.value.isPlaying) {
+        widget.controller.pause();
+      }
+    }
   }
 
   @override
@@ -62,8 +85,12 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
       widget.controller.addListener(_videoListener);
       _isPlaying = widget.controller.value.isPlaying;
       _hasError = widget.controller.value.hasError;
-      _showControls = !_isPlaying && !_hasError;
+      _isInitialized = widget.controller.value.isInitialized;
+      _showControls = !_isPlaying && !_hasError && _isInitialized;
     }
+    
+    // Sync whenever parent updates active status
+    _syncPlayback();
   }
 
   @override
@@ -71,23 +98,31 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
     widget.controller.removeListener(_videoListener);
     super.dispose();
   }
-
   void _videoListener() {
     if (mounted) {
       final value = widget.controller.value;
       final isPlaying = value.isPlaying;
       final hasError = value.hasError;
+      final isInitialized = value.isInitialized;
 
-      if (_isPlaying != isPlaying || _hasError != hasError) {
+      // REBUILD when play state, error, OR INITIALIZATION state changes!
+      if (_isPlaying != isPlaying || _hasError != hasError || _isInitialized != isInitialized) {
         setState(() {
           _isPlaying = isPlaying;
           _hasError = hasError;
+          _isInitialized = isInitialized;
+          
           if (hasError) {
             _showControls = false;
           } else if (_isPlaying != isPlaying) {
              _showControls = !isPlaying;
           }
         });
+      }
+      
+      // Crucial: If it JUST initialized, trigger play immediately if active!
+      if (isInitialized && !_isInitialized && widget.isActive) {
+          _syncPlayback();
       }
     }
   }

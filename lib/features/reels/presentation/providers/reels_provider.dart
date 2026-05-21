@@ -19,7 +19,7 @@ class ReelsProvider extends ChangeNotifier {
   
   // Pagination
   int _page = 1;
-  final int _limit = 3;
+  final int _limit = 20; // Increased from 3 to fetch the entire initial pool for true randomization
   bool _hasMore = true;
   bool _isLoadingMore = false;
   

@@ -130,7 +130,7 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> with WidgetsBindingOb
           if (!postProvider.canCreatePost) return const SizedBox.shrink();
           
           return Padding(
-            padding: const EdgeInsets.only(bottom: 100.0),
+            padding: const EdgeInsets.only(bottom: 16.0),
             child: FloatingActionButton(
               onPressed: () {
                 Navigator.push(

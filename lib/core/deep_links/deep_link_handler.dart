@@ -2,6 +2,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:app_links/app_links.dart';
 import '../util/url_generator.dart';
+import 'package:flutter_user_app/core/api/api_service.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
+import 'package:flutter_user_app/features/reels/presentation/providers/reels_provider.dart';
+import 'package:flutter_user_app/features/posts/data/models/post_model.dart';
+import 'package:flutter_user_app/features/posts/presentation/screens/post_detail_screen.dart';
+import 'package:flutter_user_app/features/reels/presentation/screens/video_screen.dart';
+
+// The GlobalKey must be the same instance used in MaterialApp.
+// Import it from main.dart.
+import 'package:flutter_user_app/main.dart' show navigatorKey;
 
 /// Handles incoming deep links and routes to appropriate screens
 class DeepLinkHandler {
@@ -11,12 +22,13 @@ class DeepLinkHandler {
 
   final _appLinks = AppLinks();
   StreamSubscription? _linkSubscription;
-  BuildContext? _context;
+  bool _initialized = false;
 
-  /// Initialize the deep link handler
-  /// Call this in main.dart after the app is initialized
-  void initialize(BuildContext context) {
-    _context = context;
+  /// Initialize the deep link handler.
+  /// Call this ONCE from initState (not build) after the app is initialized.
+  void initialize() {
+    if (_initialized) return; // Prevent re-initialization on every rebuild
+    _initialized = true;
     _handleInitialLink();
     _listenForLinks();
   }
@@ -65,10 +77,13 @@ class DeepLinkHandler {
     _navigateToContent(type, id);
   }
 
+  /// Get the current navigator context safely via the global key
+  BuildContext? get _navContext => navigatorKey.currentContext;
+
   /// Navigate to the appropriate screen based on content type
   void _navigateToContent(String type, String id) {
-    if (_context == null || !_context!.mounted) {
-      debugPrint('Context not available for navigation');
+    if (_navContext == null) {
+      debugPrint('Navigator context not available for navigation');
       return;
     }
 
@@ -91,30 +106,103 @@ class DeepLinkHandler {
   }
 
   /// Navigate to a specific reel
-  void _navigateToReel(String reelId) {
-    // Import the reels screen and navigate to it
-    // We'll need to fetch the reel first or pass just the ID
+  void _navigateToReel(String reelId) async {
+    final ctx = _navContext;
+    if (ctx == null) return;
     try {
-      Navigator.pushNamed(
-        _context!,
-        '/reels',
-        arguments: {'reelId': reelId},
-      );
+      final reelsProvider = Provider.of<ReelsProvider>(ctx, listen: false);
+      
+      // Attempt to find the reel
+      int index = reelsProvider.reels.indexWhere((r) => r.id == reelId);
+      
+      if (index == -1) {
+        // If not found, try loading reels once
+        await reelsProvider.loadReels();
+        index = reelsProvider.reels.indexWhere((r) => r.id == reelId);
+      }
+
+      if (index != -1 && navigatorKey.currentState != null) {
+        // We found the reel, navigate to the reels screen starting at this index
+        navigatorKey.currentState!.push(
+          MaterialPageRoute(
+            builder: (context) => VideosScreen(initialIndex: index),
+          ),
+        );
+      } else {
+        _showDeepLinkError('Reel not found in current feed');
+      }
     } catch (e) {
       debugPrint('Error navigating to reel: $e');
-      // Fallback: try to navigate without named routes
       _showDeepLinkError('Reel not found');
     }
   }
 
   /// Navigate to a specific post
-  void _navigateToPost(String postId) {
+  void _navigateToPost(String postId) async {
+    final ctx = _navContext;
+    if (ctx == null) return;
     try {
-      Navigator.pushNamed(
-        _context!,
-        '/post',
-        arguments: {'postId': postId},
-      );
+      // Strategy 1: Try to find in already-loaded posts provider cache
+      PostModel? postModel;
+
+      try {
+        final postsProvider = Provider.of<PostsProvider>(ctx, listen: false);
+        int index = postsProvider.posts.indexWhere((p) => p.id == postId);
+        if (index != -1) {
+          final postEntity = postsProvider.posts[index];
+          postModel = PostModel(
+            id: postEntity.id,
+            userId: postEntity.userId,
+            username: postEntity.username,
+            userImage: postEntity.userImage,
+            userType: postEntity.userType,
+            caption: postEntity.caption,
+            location: postEntity.location,
+            imageUrls: postEntity.imageUrls,
+            likes: postEntity.likes,
+            likedBy: postEntity.likedBy,
+            likedByNames: postEntity.likedByNames ?? [],
+            commentsCount: postEntity.commentsCount,
+            shareCount: postEntity.shareCount,
+            timestamp: postEntity.timestamp,
+            createdAt: postEntity.timestamp,
+            isSaved: postEntity.isSaved,
+          );
+        }
+      } catch (_) {
+        // Provider not available yet, skip
+      }
+
+      // Strategy 2: Fetch directly from API (most reliable for cold-start)
+      if (postModel == null) {
+        debugPrint('Post not in cache, fetching from API: $postId');
+        final apiService = ApiService.create();
+        final response = await apiService.getPostById(postId);
+
+        Map<String, dynamic>? postData;
+        if (response['data'] is Map<String, dynamic>) {
+          postData = response['data'] as Map<String, dynamic>;
+        } else if (response['post'] is Map<String, dynamic>) {
+          postData = response['post'] as Map<String, dynamic>;
+        } else if (response is Map<String, dynamic> && response.isNotEmpty) {
+          postData = response;
+        }
+
+        if (postData != null && postData.isNotEmpty) {
+          postModel = PostModel.fromJson(postData);
+        }
+      }
+
+      // Navigate using the global navigatorKey — always valid
+      if (postModel != null && navigatorKey.currentState != null) {
+        navigatorKey.currentState!.push(
+          MaterialPageRoute(
+            builder: (context) => PostDetailScreen(post: postModel!),
+          ),
+        );
+      } else {
+        _showDeepLinkError('Post not found');
+      }
     } catch (e) {
       debugPrint('Error navigating to post: $e');
       _showDeepLinkError('Post not found');
@@ -123,37 +211,22 @@ class DeepLinkHandler {
 
   /// Navigate to a temple profile
   void _navigateToTemple(String templeId) {
-    try {
-      Navigator.pushNamed(
-        _context!,
-        '/temple',
-        arguments: {'templeId': templeId},
-      );
-    } catch (e) {
-      debugPrint('Error navigating to temple: $e');
-      _showDeepLinkError('Temple not found');
-    }
+    // Requires a Temple profile screen that takes an ID
+    _showDeepLinkError('Temple profiles not fully implemented yet');
   }
 
   /// Navigate to a creator profile
   void _navigateToCreator(String creatorId) {
-    try {
-      Navigator.pushNamed(
-        _context!,
-        '/creator',
-        arguments: {'creatorId': creatorId},
-      );
-    } catch (e) {
-      debugPrint('Error navigating to creator: $e');
-      _showDeepLinkError('Creator not found');
-    }
+    // Requires a Creator profile screen that takes an ID
+    _showDeepLinkError('Creator profiles not fully implemented yet');
   }
 
   /// Show an error message when deep link navigation fails
   void _showDeepLinkError(String message) {
-    if (_context == null || !_context!.mounted) return;
+    final ctx = _navContext;
+    if (ctx == null) return;
 
-    ScaffoldMessenger.of(_context!).showSnackBar(
+    ScaffoldMessenger.of(ctx).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
@@ -166,6 +239,7 @@ class DeepLinkHandler {
   void dispose() {
     _linkSubscription?.cancel();
     _linkSubscription = null;
-    _context = null;
+    _initialized = false;
   }
 }
+

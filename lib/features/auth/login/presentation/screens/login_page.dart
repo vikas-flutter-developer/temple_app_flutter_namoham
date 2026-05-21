@@ -276,6 +276,9 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final bool isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
@@ -283,7 +286,11 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.fastOutSlowIn,
+                height: isKeyboardOpen ? 10 : (screenHeight < 750 ? 20 : 40),
+              ),
               CustomTextWidget(
                   title: "Let's Sign You In",
                   subtitle: "Welcome back,\nyou've been missed!"),
@@ -292,14 +299,29 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 30),
-                    Center(
-                      child: SvgPicture.asset(
-                        'assets/illustrations/login_illustration.svg',
-                        height: 210,
-                      ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.fastOutSlowIn,
+                      height: isKeyboardOpen ? 0 : (screenHeight < 750 ? 15 : 30),
                     ),
-                    const SizedBox(height: 30),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.fastOutSlowIn,
+                      height: isKeyboardOpen ? 0 : (screenHeight < 750 ? 120 : 210),
+                      child: isKeyboardOpen 
+                        ? const SizedBox.shrink()
+                        : Center(
+                            child: SvgPicture.asset(
+                              'assets/illustrations/login_illustration.svg',
+                              height: screenHeight < 750 ? 120 : 210,
+                            ),
+                          ),
+                    ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.fastOutSlowIn,
+                      height: isKeyboardOpen ? 0 : (screenHeight < 750 ? 15 : 30),
+                    ),
 
                     // DROPDOWN
                     Row(
@@ -345,7 +367,11 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.fastOutSlowIn,
+                      height: isKeyboardOpen ? 12 : (screenHeight < 750 ? 16 : 24),
+                    ),
 
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -359,7 +385,11 @@ class _LoginPageState extends State<LoginPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.fastOutSlowIn,
+                      height: isKeyboardOpen ? 8 : (screenHeight < 750 ? 10 : 16),
+                    ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: CustomTextField(
@@ -368,7 +398,11 @@ class _LoginPageState extends State<LoginPage> {
                         obscure: true,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.fastOutSlowIn,
+                      height: isKeyboardOpen ? 8 : (screenHeight < 750 ? 10 : 16),
+                    ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -470,7 +504,11 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.fastOutSlowIn,
+                      height: isKeyboardOpen ? 12 : (screenHeight < 750 ? 16 : 24),
+                    ),
 
                     _isLoading
                         ? const Center(child: CircularProgressIndicator())
@@ -480,7 +518,11 @@ class _LoginPageState extends State<LoginPage> {
                       onPressed: _handleLogin,
                     ),
 
-                    const SizedBox(height: 24),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.fastOutSlowIn,
+                      height: isKeyboardOpen ? 12 : (screenHeight < 750 ? 16 : 24),
+                    ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -506,7 +548,11 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.fastOutSlowIn,
+                      height: isKeyboardOpen ? 10 : 20,
+                    ),
                   ],
                 ),
               ),

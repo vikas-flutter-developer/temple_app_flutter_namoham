@@ -108,7 +108,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final order = result['order'] as Map<String, dynamic>? ?? {};
     final String orderId = order['id'] ?? result['orderId'] ?? '';
     final int amountInPaise = order['amount'] ?? result['amountInPaise'] ?? (price * 100).toInt();
-    final String razorpayKey = result['key'] ?? 'rzp_live_RmgNgMehnBgdUh';
+    final String razorpayKey = result['key'] ?? 'rzp_live_SpDJBobHodrfVv';
 
     if (orderId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

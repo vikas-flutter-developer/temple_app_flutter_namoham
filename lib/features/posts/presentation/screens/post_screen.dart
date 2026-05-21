@@ -12,6 +12,8 @@ import 'package:flutter_user_app/features/posts/domain/usecase/get_posts_usecase
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
 import 'package:flutter_user_app/features/posts/presentation/widgets/post_widget.dart';
 import 'package:flutter_user_app/features/add_post/presentation/screens/add_post_page.dart';
+import 'package:flutter_user_app/features/add_post/presentation/screens/crop_page.dart';
+import 'package:flutter_user_app/features/reels/presentation/screens/create_reel_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -72,6 +74,103 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   }
 
   bool get _canCreatePost => (_userType?.toLowerCase() == 'temple') || (_userType?.toLowerCase() == 'creator');
+
+  void _showCreateOptions(BuildContext context) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: theme.colorScheme.surface,
+      builder: (BuildContext bc) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Text(
+                  'Create',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withAlpha(102),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.image_outlined, color: theme.colorScheme.primary),
+                  ),
+                  title: const Text(
+                    'Post',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text('Share photos on your feed'),
+                  onTap: () async {
+                    Navigator.pop(bc);
+                    final ImagePicker picker = ImagePicker();
+                    try {
+                      final List<XFile> pickedFiles = await picker.pickMultiImage();
+                      if (pickedFiles.isNotEmpty && context.mounted) {
+                        final paths = pickedFiles.take(10).map((f) => f.path).toList();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CropPage(imagePaths: paths),
+                          ),
+                        ).then((_) => _refreshPosts());
+                      }
+                    } catch (e) {
+                      debugPrint('Error launching system gallery: $e');
+                    }
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withAlpha(102),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.video_collection_outlined, color: theme.colorScheme.primary),
+                  ),
+                  title: const Text(
+                    'Reel',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text('Create and share a short video'),
+                  onTap: () {
+                    Navigator.pop(bc);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CreateReelScreen()),
+                    ).then((_) => _refreshPosts());
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   void _showCreatePostDialog(BuildContext context) {
     final captionController = TextEditingController();
@@ -392,16 +491,17 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            floating: true,
-            snap: true,
+            pinned: true,
+            floating: false,
+            snap: false,
             backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.2),
             forceMaterialTransparency: true,
             title: Center(
               child: Text(
-                'NamoHam',
+                'Namoham',
                 style: TextStyle(
+                  color: theme.colorScheme.primary,
                   fontSize: 24,
-                  color: theme.colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -469,9 +569,8 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
                     constraints: const BoxConstraints(maxWidth: 600),
                     child: RefreshIndicator(
                       onRefresh: () => postsProvider.loadPosts(),
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        physics: const AlwaysScrollableScrollPhysics(),
+                      child: PageView.builder(
+                        scrollDirection: Axis.vertical,
                         itemCount: postsProvider.posts.length,
                         itemBuilder: (context, index) {
                           return PostWidget(postModel: postsProvider.posts[index]);
@@ -486,9 +585,8 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
                     constraints: const BoxConstraints(maxWidth: 600),
                     child: RefreshIndicator(
                       onRefresh: () => postsProvider.loadPosts(),
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        physics: const AlwaysScrollableScrollPhysics(),
+                      child: PageView.builder(
+                        scrollDirection: Axis.vertical,
                         itemCount: postsProvider.posts.length,
                         itemBuilder: (context, index) {
                           return PostWidget(postModel: postsProvider.posts[index]);
@@ -517,12 +615,9 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
       ),
       floatingActionButton: _canCreatePost
           ? Padding(
-              padding: const EdgeInsets.only(bottom: 80.0),
+              padding: const EdgeInsets.only(bottom: 16.0),
               child: FloatingActionButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AddPostPage()),
-                ).then((_) => _refreshPosts()),
+                onPressed: () => _showCreateOptions(context),
                 child: const Icon(Icons.add),
               ),
             )

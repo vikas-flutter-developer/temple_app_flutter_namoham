@@ -413,64 +413,7 @@ class AddPostPageState extends State<AddPostPage> {
                         ),
             ),
 
-            // ─── Photo / Videos toggle ────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Photo button
-                  GestureDetector(
-                    onTap: () => _toggleMode(true),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _isPhotoMode ? Colors.cyan : Colors.transparent,
-                        border: Border.all(
-                          color: _isPhotoMode
-                              ? Colors.cyan
-                              : Colors.grey.shade300,
-                        ),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: Text(
-                        'Photo',
-                        style: TextStyle(
-                          color: _isPhotoMode ? Colors.white : Colors.cyan,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Videos button
-                  GestureDetector(
-                    onTap: () => _toggleMode(false),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: !_isPhotoMode ? Colors.cyan : Colors.transparent,
-                        border: Border.all(
-                          color: !_isPhotoMode
-                              ? Colors.cyan
-                              : Colors.grey.shade300,
-                        ),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: Text(
-                        'Videos',
-                        style: TextStyle(
-                          color: !_isPhotoMode ? Colors.white : Colors.cyan,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),

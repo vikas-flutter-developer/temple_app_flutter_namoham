@@ -45,8 +45,8 @@ app.*.map.json
 /android/app/release
 
 # Environment files (SENSITIVE - never commit!)
-.env
-*.env
+#.env
+#*.env
 !.env.example
 
 # Custom exclusions
@@ -55,4 +55,5 @@ temple_web_dist.zip
 analyze_final.txt
 analyze_output.txt
 *.log
-*.rar
+#*.rar
+Temple Backend/Temple Backend.zip

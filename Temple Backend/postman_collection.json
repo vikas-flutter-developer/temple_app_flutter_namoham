@@ -1,0 +1,4277 @@
+{
+  "info": {
+    "_postman_id": "9273ce62-4545-410c-93c8-ed50f47bf23e",
+    "name": "Temple API - Collection",
+    "description": "Designed collection aligned with repository routes. Includes auth token extraction and common variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "49634796",
+    "_collection_link": "https://go.postman.co/collection/49634796-9273ce62-4545-410c-93c8-ed50f47bf23e?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "🔐 AUTH",
+      "item": [
+        {
+          "name": "📱 1️⃣ Send Registration OTP (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Save session ID and phone/email for later use",
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  const requestBody = JSON.parse(pm.request.body.raw);",
+                  "  ",
+                  "  // Save session ID for OTP verification",
+                  "  if (responseData.sessionId) {",
+                  "    pm.collectionVariables.set('USER_OTP_SESSION_ID', responseData.sessionId);",
+                  "    console.log('✅ OTP sent! Session ID:', responseData.sessionId);",
+                  "  }",
+                  "  ",
+                  "  // Save phone and email for registration",
+                  "  pm.collectionVariables.set('TEST_PHONE', requestBody.phoneNumber);",
+                  "  pm.collectionVariables.set('TEST_EMAIL', requestBody.email);",
+                  "  ",
+                  "  console.log('📱 Check your SMS for the OTP code');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+919876543210\",\n  \"email\": \"raj.kumar@example.com\",\n  \"userType\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/send-registration-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "send-registration-otp"
+              ]
+            },
+            "description": "**Step 1: Send Registration OTP**\n\nInitiates user registration by sending an OTP to the provided phone number using 2Factor AUTOGEN system.\n\n**Expected Response:**\n```json\n{\n  \"message\": \"OTP sent successfully\",\n  \"sessionId\": \"abc123...\"\n}\n```\n\n**Flow:**\n1. Send this request with phone, email, and userType\n2. 2Factor generates a 6-digit OTP automatically\n3. OTP is sent via SMS to the phone number\n4. Session ID is saved for verification in step 2\n5. Check your phone for the OTP (valid for 10 minutes)"
+          },
+          "response": []
+        },
+        {
+          "name": "📱 2️⃣ Register User (with OTP)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "const user = jsonData.user || {};",
+                  "const token = user.token || jsonData.accessToken || jsonData.token || null;",
+                  "const id = user._id || user.id || jsonData.userId || null;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('USER_TOKEN', token);",
+                  "  pm.collectionVariables.set('AUTH_TOKEN', token);",
+                  "  pm.collectionVariables.set('USER_ID', id || user._id);",
+                  "  console.log('User registered successfully with OTP verification');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Raj Kumar\",\n  \"email\": \"raj.kumar@example.com\",\n  \"dob\": \"1995-05-15\",\n  \"password\": \"raj\",\n  \"phoneNumber\": \"+919876543210\",\n  \"profilePic\": \"https://example.com/raj.jpg\",\n  \"address\": \"123 Mumbai Street\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"country\": \"India\",\n  \"zipCode\": \"400001\",\n  \"otp\": \"12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/registerUser",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registerUser"
+              ]
+            },
+            "description": "**Step 2: Register User with OTP**\n\nCompletes user registration by verifying the OTP and creating the account.\n\n**Required Fields:**\n- `fullName`: User's full name\n- `email`: Email address (must match step 1)\n- `phoneNumber`: Phone number (must match step 1)\n- `password`: Account password\n- `otp`: 6-digit OTP received via SMS\n- `dob`: Date of birth (optional)\n- `profilePic`: Profile picture URL (optional)\n- `address`: Full address (optional)\n- `city`: City (optional)\n- `state`: State/Province (optional)\n- `country`: Country (optional)\n- `zipCode`: ZIP code (optional)\n\n**Expected Response:**\n```json\n{\n  \"message\": \"User registered successfully\",\n  \"user\": { ... },\n  \"refreshToken\": \"...\"\n}\n```\n\n**Notes:**\n- Enter the OTP you received in step 1\n- User token is automatically saved for authenticated requests\n- After registration, you can immediately use authenticated endpoints"
+          },
+          "response": []
+        },
+        {
+          "name": "📱 1️⃣ Send Registration OTP (Temple)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  const requestBody = JSON.parse(pm.request.body.raw);",
+                  "  if (responseData.sessionId) {",
+                  "    pm.collectionVariables.set('TEMPLE_OTP_SESSION_ID', responseData.sessionId);",
+                  "    console.log('✅ Temple OTP sent! Session ID:', responseData.sessionId);",
+                  "  }",
+                  "  pm.collectionVariables.set('TEST_TEMPLE_PHONE', requestBody.phoneNumber);",
+                  "  pm.collectionVariables.set('TEST_TEMPLE_EMAIL', requestBody.email);",
+                  "  console.log('📱 Check your SMS for the OTP code');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+919988776655\",\n  \"email\": \"golden@example.com\",\n  \"userType\": \"temple\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/send-registration-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "send-registration-otp"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "📱 2️⃣ Register Temple (with OTP)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "const user = jsonData.user || {};",
+                  "const token = user.token || jsonData.accessToken || jsonData.token || null;",
+                  "const id = user._id || user.id || jsonData.userId || null;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('TEMPLE_TOKEN', token);",
+                  "  pm.collectionVariables.set('AUTH_TOKEN', token);",
+                  "  pm.collectionVariables.set('TEMPLE_ID', id || user._id);",
+                  "  console.log('Temple registered successfully with OTP verification');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templeName\": \"Golden Temple\",\n  \"email\": \"temple@example.com\",\n  \"address\": \"123 Temple Road\",\n  \"city\": \"Amritsar\",\n  \"state\": \"Punjab\",\n  \"country\": \"India\",\n  \"zipCode\": \"143001\",\n  \"pocPhoneNumber\": \"+919876543210\",\n  \"password\": \"Password@123\",\n  \"establishmentDate\": \"1577-01-01\",\n  \"description\": \"Historical and spiritual center.\",\n  \"website\": \"https://goldentemple.org\",\n  \"otp\": \"123456\",\n  \"bankDetails.accountHolderName\": \"SGPC\",\n  \"bankDetails.bankAccountNumber\": \"1234567890\",\n  \"bankDetails.ifscCode\": \"HDFC0001234\",\n  \"bankDetails.bankName\": \"HDFC Bank\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/registerTemple",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registerTemple"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "📱 1️⃣ Send Registration OTP (Creator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  const requestBody = JSON.parse(pm.request.body.raw);",
+                  "  if (responseData.sessionId) {",
+                  "    pm.collectionVariables.set('CREATOR_OTP_SESSION_ID', responseData.sessionId);",
+                  "    console.log('✅ Creator OTP sent! Session ID:', responseData.sessionId);",
+                  "  }",
+                  "  pm.collectionVariables.set('TEST_CREATOR_PHONE', requestBody.phoneNumber);",
+                  "  pm.collectionVariables.set('TEST_CREATOR_EMAIL', requestBody.email);",
+                  "  console.log('📱 Check your SMS for the OTP code');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+919123456789\",\n  \"email\": \"swami@example.com\",\n  \"userType\": \"creator\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/send-registration-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "send-registration-otp"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "📱 2️⃣ Register Creator (with OTP)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "const user = jsonData.user || {};",
+                  "const token = user.token || jsonData.accessToken || jsonData.token || null;",
+                  "const id = user._id || user.id || jsonData.userId || null;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('CREATOR_TOKEN', token);",
+                  "  pm.collectionVariables.set('AUTH_TOKEN', token);",
+                  "  pm.collectionVariables.set('CREATOR_ID', id || user._id);",
+                  "  console.log('Creator registered successfully with OTP verification');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"creatorName\": \"Swami Anand\",\n  \"email\": \"swami@example.com\",\n  \"address\": \"456 Spiritual Road\",\n  \"city\": \"Bangalore\",\n  \"state\": \"Karnataka\",\n  \"country\": \"India\",\n  \"zipCode\": \"560001\",\n  \"phoneNumber\": \"+919123456789\",\n  \"password\": \"Password@123\",\n  \"dob\": \"1980-01-01\",\n  \"title\": \"Vedic Scholar\",\n  \"bio\": \"Expert in ancient scriptures and meditation.\",\n  \"description\": \"Sharing spiritual wisdom for the modern age.\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/registerCreator",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registerCreator"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login (Creator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "// Try to extract token and id from returned 'user' field or top-level fields",
+                  "const user = jsonData.user || {};",
+                  "const token = user.token || jsonData.accessToken || jsonData.token || null;",
+                  "const id = user._id || user.id || jsonData.userId || null;",
+                  "let accountType = user.userType || user.accountType || null;",
+                  "try {",
+                  "  if (!accountType && pm.request && pm.request.body && pm.request.body.raw) {",
+                  "    const bodyRaw = pm.request.body.raw;",
+                  "    if (bodyRaw.includes('userType')) {",
+                  "      accountType = JSON.parse(bodyRaw).userType;",
+                  "    }",
+                  "  }",
+                  "} catch (e) {}",
+                  "if (token) {",
+                  "  if (accountType === 'temple') { pm.collectionVariables.set('TEMPLE_TOKEN', token); pm.collectionVariables.set('TEMPLE_ID', id || user._id); }",
+                  "  else if (accountType === 'creator') { pm.collectionVariables.set('CREATOR_TOKEN', token); pm.collectionVariables.set('CREATOR_ID', id || user._id); }",
+                  "  else { pm.collectionVariables.set('USER_TOKEN', token); pm.collectionVariables.set('USER_ID', id || user._id); }",
+                  "  pm.collectionVariables.set('AUTH_TOKEN', token);",
+                  "  console.log('Token saved to collection variables');",
+                  "} else {",
+                  "  console.warn('No token found in login response');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"swami@example.com\",\n  \"password\": \"Creator@123\",\n  \"userType\": \"Creator\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "// Try to extract token and id from returned 'user' field or top-level fields",
+                  "const user = jsonData.user || {};",
+                  "const token = user.token || jsonData.accessToken || jsonData.token || null;",
+                  "const id = user._id || user.id || jsonData.userId || null;",
+                  "let accountType = user.userType || user.accountType || null;",
+                  "try {",
+                  "  if (!accountType && pm.request && pm.request.body && pm.request.body.raw) {",
+                  "    const bodyRaw = pm.request.body.raw;",
+                  "    if (bodyRaw.includes('userType')) {",
+                  "      accountType = JSON.parse(bodyRaw).userType;",
+                  "    }",
+                  "  }",
+                  "} catch (e) {}",
+                  "if (token) {",
+                  "  if (accountType === 'temple') { pm.collectionVariables.set('TEMPLE_TOKEN', token); pm.collectionVariables.set('TEMPLE_ID', id || user._id); }",
+                  "  else if (accountType === 'creator') { pm.collectionVariables.set('CREATOR_TOKEN', token); pm.collectionVariables.set('CREATOR_ID', id || user._id); }",
+                  "  else { pm.collectionVariables.set('USER_TOKEN', token); pm.collectionVariables.set('USER_ID', id || user._id); }",
+                  "  pm.collectionVariables.set('AUTH_TOKEN', token);",
+                  "  console.log('Token saved to collection variables');",
+                  "} else {",
+                  "  console.warn('No token found in login response');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"raj.kumar@example.com\",\n  \"password\": \"raj\",\n  \"userType\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login (Temple)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "// Try to extract token and id from returned 'user' field or top-level fields",
+                  "const user = jsonData.user || {};",
+                  "const token = user.token || jsonData.accessToken || jsonData.token || null;",
+                  "const id = user._id || user.id || jsonData.userId || null;",
+                  "let accountType = user.userType || user.accountType || null;",
+                  "try {",
+                  "  if (!accountType && pm.request && pm.request.body && pm.request.body.raw) {",
+                  "    const bodyRaw = pm.request.body.raw;",
+                  "    if (bodyRaw.includes('userType')) {",
+                  "      accountType = JSON.parse(bodyRaw).userType;",
+                  "    }",
+                  "  }",
+                  "} catch (e) {}",
+                  "if (token) {",
+                  "  if (accountType === 'temple' || accountType === 'Temple') { pm.collectionVariables.set('TEMPLE_TOKEN', token); pm.collectionVariables.set('TEMPLE_ID', id || user._id); }",
+                  "  else if (accountType === 'creator') { pm.collectionVariables.set('CREATOR_TOKEN', token); pm.collectionVariables.set('CREATOR_ID', id || user._id); }",
+                  "  else { pm.collectionVariables.set('USER_TOKEN', token); pm.collectionVariables.set('USER_ID', id || user._id); }",
+                  "  pm.collectionVariables.set('AUTH_TOKEN', token);",
+                  "  console.log('Token saved to collection variables');",
+                  "} else {",
+                  "  console.warn('No token found in login response');",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\":\"golden@example.com\",\n  \"password\": \"Temple@123\",\n  \"userType\": \"Temple\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Clear tokens on logout",
+                  "pm.collectionVariables.unset('AUTH_TOKEN');",
+                  "// Optional: Clear specific tokens if you want to force full re-login",
+                  "// pm.collectionVariables.unset('USER_TOKEN');",
+                  "// pm.collectionVariables.unset('TEMPLE_TOKEN');",
+                  "// pm.collectionVariables.unset('CREATOR_TOKEN');",
+                  "console.log('✅ Cleared AUTH_TOKEN variable');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": [],
+          "name": "Logout"
+        },
+        {
+          "name": "1️⃣ Request Password Reset (Send OTP)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  const requestBody = JSON.parse(pm.request.body.raw);",
+                  "  ",
+                  "  // Save sessionId for OTP verification",
+                  "  if (responseData.sessionId) {",
+                  "    pm.collectionVariables.set('RESET_OTP_SESSION_ID', responseData.sessionId);",
+                  "    console.log('✅ Password reset OTP sent! Session ID:', responseData.sessionId);",
+                  "  }",
+                  "  ",
+                  "  // Save phone number and email for next step",
+                  "  if (responseData.phoneNumber) {",
+                  "    pm.collectionVariables.set('RESET_PHONE', responseData.phoneNumber);",
+                  "  }",
+                  "  pm.collectionVariables.set('RESET_EMAIL', requestBody.email);",
+                  "  pm.collectionVariables.set('RESET_USER_TYPE', requestBody.userType);",
+                  "  ",
+                  "  console.log('📱 Check your SMS for the OTP code');",
+                  "  console.log('⏰ OTP expires in:', responseData.expiresIn, 'seconds');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"raj.kumar@example.com\",\n  \"userType\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "**Step 1: Request Password Reset**\n\nSends OTP to the user's registered phone number using 2Factor AUTOGEN system.\n\n**Expected Response:**\n```json\n{\n  \"message\": \"OTP sent to your registered phone number\",\n  \"phoneNumber\": \"+919876543210\",\n  \"sessionId\": \"abc123...\",\n  \"expiresIn\": 600\n}\n```\n\n**Notes:**\n- OTP is valid for 10 minutes (600 seconds)\n- Session ID is automatically saved for the next step\n- Check your phone for the 6-digit OTP"
+          },
+          "response": []
+        },
+        {
+          "name": "2️⃣ Reset Password with OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  console.log('✅ Password reset successful!');",
+                  "  console.log('💡 You can now login with your new password');",
+                  "  ",
+                  "  // Clear OTP-related variables",
+                  "  pm.collectionVariables.unset('RESET_OTP_SESSION_ID');",
+                  "} else {",
+                  "  console.error('❌ Password reset failed');",
+                  "  console.log('💡 Try requesting a new OTP if it expired');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"raj.kumar@example.com\",\n  \"userType\": \"user\",\n  \"phoneNumber\": \"+919876543210\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassword@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "**Step 2: Reset Password with OTP**\n\nVerifies the OTP and resets the user's password.\n\n**Required Fields:**\n- `email`: User's email address\n- `userType`: \"user\", \"temple\", or \"creator\"\n- `phoneNumber`: Phone number (same as used in step 1)\n- `otp`: 6-digit OTP received via SMS\n- `newPassword`: New password (minimum 8 characters)\n\n**Expected Response:**\n```json\n{\n  \"message\": \"Password reset successfully. Please login with your new password.\",\n  \"success\": true\n}\n```\n\n**Notes:**\n- Enter the OTP you received via SMS\n- Password must be at least 8 characters long\n- After success, login with the new password"
+          },
+          "response": []
+        },
+        {
+          "name": "3️⃣ Resend Password Reset OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  ",
+                  "  // Update sessionId (old one is now invalid)",
+                  "  if (responseData.sessionId) {",
+                  "    pm.collectionVariables.set('RESET_OTP_SESSION_ID', responseData.sessionId);",
+                  "    console.log('✅ New password reset OTP sent! Session ID:', responseData.sessionId);",
+                  "  }",
+                  "  ",
+                  "  console.log('📱 Check your SMS for the new OTP code');",
+                  "  console.log('⏰ New OTP expires in:', responseData.expiresIn, 'seconds');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"raj.kumar@example.com\",\n  \"userType\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-reset-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resend-reset-otp"
+              ]
+            },
+            "description": "**Step 3: Resend Password Reset OTP**\n\nResends the OTP if the previous one expired or was not received.\n\n**Required Fields:**\n- `email`: User's email address\n- `userType`: \"user\", \"temple\", or \"creator\"\n\n**Expected Response:**\n```json\n{\n  \"message\": \"OTP resent to your registered phone number\",\n  \"phoneNumber\": \"+919876543210\",\n  \"sessionId\": \"new-session-id...\",\n  \"expiresIn\": 600\n}\n```\n\n**Notes:**\n- This invalidates any previous OTP sessions\n- New OTP is valid for 10 minutes\n- New session ID is automatically saved"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  console.log('✅ User profile updated successfully');",
+                  "  console.log('Updated data:', responseData.user);",
+                  "} else {",
+                  "  console.error('❌ Profile update failed');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}",
+                "description": "JWT token obtained from login"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Raj Kumar Updated\",\n  \"email\": \"raj.kumar.new@example.com\",\n  \"phoneNumber\": \"+919876543210\",\n  \"profilePic\": \"https://example.com/new-raj.jpg\",\n  \"dob\": \"1995-05-15\",\n  \"address\": \"456 Navi Mumbai Street\",\n  \"country\": \"India\",\n  \"state\": \"Maharashtra\",\n  \"city\": \"Navi Mumbai\",\n  \"zipCode\": \"400703\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/updateProfile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "updateProfile"
+              ]
+            },
+            "description": "**Update User Profile**\n\nAllows authenticated users to update their profile information.\n\n**Authentication Required:** Bearer token in Authorization header\n\n**Updatable Fields (User):**\n- `fullName`: Full name\n- `email`: Email address\n- `phoneNumber`: Phone number\n- `profilePic`: Profile picture URL\n- `dob`: Date of birth\n- `country`: Country\n- `city`: City\n- `zipCode`: ZIP code\n- `password`: New password (requires `currentPassword`)\n- `currentPassword`: Required only if updating password\n\n**Expected Response:**\n```json\n{\n  \"message\": \"Profile updated successfully\",\n  \"user\": {\n    \"_id\": \"...\",\n    \"fullName\": \"Raj Kumar Updated\",\n    \"email\": \"raj.kumar.new@example.com\",\n    \"phoneNumber\": \"+919876543210\",\n    \"profilePic\": \"https://example.com/new-raj.jpg\",\n    \"country\": \"India\",\n    \"city\": \"Mumbai\",\n    \"zipCode\": \"400001\",\n    \"accountType\": \"user\"\n  }\n}\n```\n\n**Notes:**\n- Must be authenticated (valid JWT token required)\n- User ID is extracted from the token automatically for security\n- To change password, you MUST provide both `currentPassword` and `password`"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile (Temple)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  console.log('✅ Temple profile updated successfully');",
+                  "  console.log('Updated data:', responseData.user);",
+                  "} else {",
+                  "  console.error('❌ Profile update failed');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEMPLE_TOKEN}}",
+                "description": "JWT token obtained from temple login"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Golden Temple Updated\",\n  \"email\": \"golden.updated@example.com\",\n  \"phoneNumber\": \"+919988776655\",\n  \"address\": \"123 New Temple Road, Amritsar\",\n  \"country\": \"India\",\n  \"city\": \"Amritsar\",\n  \"state\": \"Punjab\",\n  \"zipCode\": \"143001\",\n  \"description\": \"The holiest shrine in Sikhism, covered in gold and surrounded by a sacred pool.\",\n  \"website\": \"https://goldentemple.org\",\n  \"timings\": {\n    \"openTime\": \"04:00 AM\",\n    \"closeTime\": \"10:00 PM\",\n    \"specialDays\": [\"Gurpurab\", \"Diwali\"]\n  },\n  \"bankDetails\": {\n    \"accountHolderName\": \"Golden Temple Trust\",\n    \"bankAccountNumber\": \"1234567890\",\n    \"ifscCode\": \"SBIN0001234\",\n    \"bankName\": \"State Bank of India\"\n  },\n  \"profilePic\": \"https://example.com/golden-temple-new.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/updateProfile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "updateProfile"
+              ]
+            },
+            "description": "**Update Temple Profile**\n\nAllows authenticated temples to update their profile information.\n\n**Authentication Required:** Bearer token in Authorization header\n\n**Updatable Fields (Temple):**\n- `fullName`: Temple name\n- `email`: Contact email\n- `phoneNumber`: Point of contact phone number\n- `address`: Full address\n- `country`: Country\n- `city`: City name\n- `state`: State/Province\n- `zipCode`: Postal code\n- `description`: Temple description\n- `website`: Official website URL\n- `timings`: Opening/closing times and special days\n- `bankDetails`: Bank account information for donations\n- `profilePic`: Temple picture URL\n- `password`: New password (requires `currentPassword`)\n- `currentPassword`: Required only if updating password\n\n**Expected Response:**\n```json\n{\n  \"message\": \"Profile updated successfully\",\n  \"user\": {\n    \"_id\": \"...\",\n    \"templeName\": \"Golden Temple Updated\",\n    \"email\": \"golden.updated@example.com\",\n    \"address\": \"123 New Temple Road, Amritsar\",\n    \"country\": \"India\",\n    \"city\": \"Amritsar\",\n    \"state\": \"Punjab\",\n    \"zipCode\": \"143001\",\n    \"accountType\": \"temple\"\n  }\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile (Creator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  console.log('✅ Creator profile updated successfully');",
+                  "  console.log('Updated data:', responseData.user);",
+                  "} else {",
+                  "  console.error('❌ Profile update failed');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{CREATOR_TOKEN}}",
+                "description": "JWT token obtained from creator login"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Swami Anand Updated\",\n  \"email\": \"swami.updated@example.com\",\n  \"phoneNumber\": \"+919123456789\",\n  \"address\": \"789 Spiritual Avenue, Rishikesh\",\n  \"country\": \"India\",\n  \"city\": \"Rishikesh\",\n  \"state\": \"Uttarakhand\",\n  \"zipCode\": \"249201\",\n  \"title\": \"Spiritual Master & Yoga Guru\",\n  \"bio\": \"Dedicated to spreading peace, mindfulness, and spiritual wisdom.\",\n  \"description\": \"A renowned spiritual leader with over 20 years of experience in meditation and yoga. Conducts workshops and retreats worldwide.\",\n  \"dob\": \"1980-03-10\",\n  \"profilePic\": \"https://example.com/swami-new.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/updateProfile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "updateProfile"
+              ]
+            },
+            "description": "**Update Creator Profile**\n\nAllows authenticated creators to update their profile information.\n\n**Authentication Required:** Bearer token in Authorization header\n\n**Updatable Fields (Creator):**\n- `fullName`: Creator name\n- `email`: Contact email\n- `phoneNumber`: Contact phone number\n- `address`: Address\n- `country`: Country\n- `city`: City\n- `state`: State/Province\n- `zipCode`: Postal code\n- `title`: Professional title (e.g., \"Spiritual Leader\")\n- `bio`: Short biography\n- `description`: Detailed description\n- `dob`: Date of birth\n- `profilePic`: Profile picture URL\n- `password`: New password (requires `currentPassword`)\n- `currentPassword`: Required only if updating password\n\n**Expected Response:**\n```json\n{\n  \"message\": \"Profile updated successfully\",\n  \"user\": {\n    \"_id\": \"...\",\n    \"creatorName\": \"Swami Anand Updated\",\n    \"email\": \"swami.updated@example.com\",\n    \"phoneNumber\": \"+919123456789\",\n    \"country\": \"India\",\n    \"city\": \"Rishikesh\",\n    \"title\": \"Spiritual Master & Yoga Guru\",\n    \"bio\": \"Dedicated to spreading peace...\",\n    \"accountType\": \"creator\"\n  }\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  console.log('✅ Profile fetched successfully');",
+                  "  console.log('User data:', responseData.user);",
+                  "} else {",
+                  "  console.error('❌ Failed to fetch profile');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}",
+                "description": "Can also use {{TEMPLE_TOKEN}} or {{CREATOR_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "**Get Current Profile Information**\n\nReturns the complete profile information for the currently authenticated user, temple, or creator.\n\n**Authentication Required:** Bearer token in Authorization header\n\n**Expected Response:**\n```json\n{\n  \"success\": true,\n  \"user\": {\n    \"_id\": \"...\",\n    \"fullName\": \"...\",\n    \"email\": \"...\",\n    \"accountType\": \"user|temple|creator\",\n    ...\n  }\n}\n```\n\n**Notes:**\n- Works for all 3 account types based on the token provided\n- Automatically excludes sensitive fields like password"
+          },
+          "response": []
+        },
+        {
+          "name": "Switch to Creator",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{USER_ID}}\",\n  \"creatorName\": \"Swami Anand\",\n  \"title\": \"Yoga Guru\",\n  \"bio\": \"Spreading mindfulness\",\n  \"description\": \"Certified yoga instructor with 10 years experience\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/switch-to-creator",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "switch-to-creator"
+              ]
+            },
+            "description": "**Switch User Account to Creator**\n\nConverts an existing user account into a creator account using their existing data.\n\n**Body Fields:**\n- `userId`: The MongoDB ID of the user to switch\n- `creatorName`: Optional name (defaults to full name)\n- `title`: Professional title\n- `bio`: Short bio\n- `description`: Detailed description\n\n**Returns:** { success: true, user: { accountType: 'creator', ... } }"
+          },
+          "response": []
+        },
+        {
+          "name": "🗑️ 1️⃣ Request Account Deletion",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const responseData = pm.response.json();",
+                  "  if (responseData.sessionId) {",
+                  "    pm.collectionVariables.set('DELETION_SESSION_ID', responseData.sessionId);",
+                  "    console.log('✅ Deletion OTP requested! Session ID:', responseData.sessionId);",
+                  "  }",
+                  "  console.log('📱 Verification OTP sent to your registered phone number');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/request-account-deletion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "request-account-deletion"
+              ]
+            },
+            "description": "Sends an OTP to the user's registered phone number to confirm permanent account deletion."
+          },
+          "response": []
+        },
+        {
+          "name": "🗑️ 2️⃣ Verify and Deactivate Account (Soft Delete)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-delete-account",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-delete-account"
+              ]
+            },
+            "description": "Verifies the OTP and soft-deletes the account (marks as deactivated for 30 days). User is logged out and tokens are revoked."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔐 ADMIN",
+      "item": [
+        {
+          "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data.token) {",
+                  "  pm.collectionVariables.set('ADMIN_TOKEN', jsonData.data.token);",
+                  "  pm.collectionVariables.set('ADMIN_ID', jsonData.data.admin.id);",
+                  "  console.log('✅ Admin Token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Admin Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Admin Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Admin@123\",\n  \"newPassword\": \"NewSecurePassword@456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "change-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "logout"
+              ]
+            },
+            "description": "Logs out the admin and clears the session token."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Admin ID for Support Chat",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "id"
+              ]
+            },
+            "description": "Public endpoint to get the admin's unique ID for initiating support chats."
+          },
+          "response": []
+        },
+        {
+          "name": "🛂 VERIFICATION WORKFLOW",
+          "item": [
+            {
+              "name": "List Pending Verifications",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{ADMIN_TOKEN}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/verifications?status=pending",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "verifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "",
+                      "description": "Optional: temple or creator (leave empty to get both)",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "pending",
+                      "description": "Optional: pending, approved, or rejected"
+                    }
+                  ]
+                },
+                "description": "Lists all accounts awaiting admin verification."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Account Details for Verification",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{ADMIN_TOKEN}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/verifications/temple/{{TEMPLE_ID}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "verifications",
+                    "temple",
+                    "{{TEMPLE_ID}}"
+                  ]
+                },
+                "description": "Fetches full details of a specific account for manual review before approval/rejection."
+              },
+              "response": []
+            },
+            {
+              "name": "Approve Account ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{ADMIN_TOKEN}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"accountType\": \"temple\",\n  \"accountId\": \"{{TEMPLE_ID}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/verify/approve",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "verify",
+                    "approve"
+                  ]
+                },
+                "description": "Approves a temple or creator account, allowing them to finally log in."
+              },
+              "response": []
+            },
+            {
+              "name": "Reject Account 🚫",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{ADMIN_TOKEN}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"accountType\": \"temple\",\n  \"accountId\": \"{{TEMPLE_ID}}\",\n  \"reason\": \"Incomplete documentation provided.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/admin/verify/reject",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "verify",
+                    "reject"
+                  ]
+                },
+                "description": "Rejects a registration request with a reason. The user will see this reason when attempting to log in."
+              },
+              "response": []
+            },
+            {
+              "name": "👥 Account Management",
+              "item": [
+                {
+                  "name": "1️⃣ Get Deactivated Accounts",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{ADMIN_TOKEN}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/admin/deactivated-accounts",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "admin",
+                        "deactivated-accounts"
+                      ]
+                    },
+                    "description": "Lists all accounts (Users, Temples, Creators) that are currently deactivated and awaiting permanent deletion."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "2️⃣ Reactivate Account",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{ADMIN_TOKEN}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"accountType\": \"user\",\n  \"accountId\": \"INSERT_ID_HERE\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{baseUrl}}/admin/reactivate-account",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "admin",
+                        "reactivate-account"
+                      ]
+                    },
+                    "description": "Allows an admin to restore a deactivated account and unhide all its content."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "3️⃣ Hard Delete Account (Immediate)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{ADMIN_TOKEN}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"accountType\": \"user\",\n  \"accountId\": \"INSERT_ID_HERE\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{baseUrl}}/admin/hard-delete-account",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "admin",
+                        "hard-delete-account"
+                      ]
+                    },
+                    "description": "Permanently deletes an account and all its associated data (posts, reels, follows, etc.) immediately, bypassing the 30-day grace period."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "4️⃣ Cleanup All Expired Accounts",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{ADMIN_TOKEN}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/admin/cleanup-expired-accounts",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "admin",
+                        "cleanup-expired-accounts"
+                      ]
+                    },
+                    "description": "Manually triggers the daily cleanup job that purges all accounts whose 30-day grace period has ended."
+                  },
+                  "response": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📊 DASHBOARD",
+      "item": [
+        {
+          "name": "Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/stats?filter=month",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "stats"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "month"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Monthly Engagement",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/engagement/monthly?year=2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "engagement",
+                "monthly"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Traffic by Location",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/traffic/location",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "traffic",
+                "location"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Client List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/clients?page=1&limit=20&type=all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "clients"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "type",
+                  "value": "all"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Donation Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/donations/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "donations",
+                "stats"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Donation Monthly Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/donations/monthly?year=2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "donations",
+                "monthly"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Donation Traffic",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/donations/traffic",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "donations",
+                "traffic"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Donation History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/donations/history?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "donations",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Event Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/events/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "events",
+                "stats"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Event List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/events/list?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "events",
+                "list"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Recent Activity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/reports/activity?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "reports",
+                "activity"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🏛️ TEMPLES",
+      "item": [
+        {
+          "name": "Get Temples",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/temples",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "temples"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Search Temples",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/temples/search?q=golden",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "temples",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "golden"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Temple by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/temples/{{TEMPLE_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "temples",
+                "{{TEMPLE_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Follow Temple (simple)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/temples/follow/{{TEMPLE_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "temples",
+                "follow",
+                "{{TEMPLE_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unfollow Temple (simple)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/temples/unfollow/{{TEMPLE_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "temples",
+                "unfollow",
+                "{{TEMPLE_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Temple Details",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}",
+                "description": "Requires temple or admin token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated temple description...\",\n  \"timings\": {\n    \"openTime\": \"05:00 AM\",\n    \"closeTime\": \"09:00 PM\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/temples/{{TEMPLE_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "temples",
+                "{{TEMPLE_ID}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧑‍🎨 CREATORS",
+      "item": [
+        {
+          "name": "Get Creators",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/creators",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "creators"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Creator by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/creators/{{CREATOR_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "creators",
+                "{{CREATOR_ID}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📝 POSTS",
+      "item": [
+        {
+          "name": "Get All Posts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/posts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Posts by User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/posts/user/{{USER_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts",
+                "user",
+                "{{USER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Post (Temple/Creator)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Ensure token exists: try TEMPLE then CREATOR (User cannot create posts)",
+                  "const token = pm.collectionVariables.get('TEMPLE_TOKEN') || pm.collectionVariables.get('CREATOR_TOKEN');",
+                  "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) { var json = pm.response.json(); pm.collectionVariables.set('POST_ID', json.post && json.post.id ? json.post.id : json.post && json.post._id ? json.post._id : ''); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"caption\": \"Beautiful Diwali celebrations\",\n  \"location\": \"Delhi\",\n  \"imageUrls\": [\"https://example.com/diwali.jpg\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/posts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Like Post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/posts/{{POST_ID}}/like",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts",
+                "{{POST_ID}}",
+                "like"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Lovely event!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/posts/{{POST_ID}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts",
+                "{{POST_ID}}",
+                "comments"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Comment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{USER_ID}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/posts/{{POST_ID}}/comments/{{COMMENT_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts",
+                "{{POST_ID}}",
+                "comments",
+                "{{COMMENT_ID}}"
+              ]
+            },
+            "description": "**Delete a Comment**\n\nAllows a comment to be deleted if the user meets one of these criteria:\n1. They are the **author** of the comment.\n2. They are the **owner** of the post on which the comment was made.\n\n**Authentication:** Required (Bearer token)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Comments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/posts/{{POST_ID}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts",
+                "{{POST_ID}}",
+                "comments"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Post",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEMPLE_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/posts/{{POST_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts",
+                "{{POST_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Save Post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/posts/{{POST_ID}}/save",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts",
+                "{{POST_ID}}",
+                "save"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Saved Posts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/posts/saved",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "posts",
+                "saved"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🎬 REELS",
+      "item": [
+        {
+          "name": "Create Reel",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.reel && json.reel.id) {",
+                  "        pm.collectionVariables.set('REEL_ID', json.reel.id);",
+                  "        console.log('✅ REEL_ID saved:', json.reel.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEMPLE_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"videoUrl\": \"https://www.w3schools.com/html/mov_bbb.mp4\",\n  \"thumbnailUrl\": \"https://example.com/thumbnail.jpg\",\n  \"caption\": \"Evening Aarti\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reels/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Reels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Reels by User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reels/user/{{TEMPLE_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "user",
+                "{{TEMPLE_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Like Reel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{USER_ID}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reels/{{REEL_ID}}/like",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "{{REEL_ID}}",
+                "like"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Increment Reel View",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reels/{{REEL_ID}}/view",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "{{REEL_ID}}",
+                "view"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Reel Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{USER_ID}}\",\n  \"username\": \"Raj\",\n  \"text\": \"Great reel!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reels/{{REEL_ID}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "{{REEL_ID}}",
+                "comments"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Reel Comment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{USER_ID}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reels/{{REEL_ID}}/comments/{{COMMENT_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "{{REEL_ID}}",
+                "comments",
+                "{{COMMENT_ID}}"
+              ]
+            },
+            "description": "**Delete a Reel Comment**\n\nAllows a comment on a reel to be deleted if the user meets one of these criteria:\n1. They are the **author** of the comment.\n2. They are the **owner** of the reel on which the comment was made.\n\n**Authentication:** Required (Bearer token)."
+          },
+          "response": []
+        },
+        {
+          "name": "Save Reel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reels/{{REEL_ID}}/save",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "{{REEL_ID}}",
+                "save"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Saved Reels",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reels/saved",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "saved"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Reel Comments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reels/{{REEL_ID}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "{{REEL_ID}}",
+                "comments"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Reel",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEMPLE_TOKEN}}",
+                "description": "JWT token obtained from login"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reels/{{REEL_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reels",
+                "{{REEL_ID}}"
+              ]
+            },
+            "description": "**Delete a Reel**\n\nAllows the owner of a reel to delete it.\n\n**Authentication Required:** Bearer token in Authorization header\n\n**Notes:**\n- User ID is securely extracted from the authentication token automatically.\n- Only the owner of the reel can delete it.\n\n**Expected Response:**\n```json\n{\n  \"message\": \"Reel deleted successfully\"\n}\n```"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🎫 EVENTS",
+      "item": [
+        {
+          "name": "Create Event",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.event && jsonData.event._id) {",
+                  "    pm.collectionVariables.set(\"EVENT_ID\", jsonData.event._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEMPLE_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventName\": \"Bhajan Live\",\n  \"description\": \"Live Spiritual Session\",\n  \"organizerId\": \"{{CREATOR_ID}}\",\n  \"organizerType\": \"creator\",\n  \"organizerName\": \"Swami Anand Bhageshwar\",\n  \"organizerImage\": \"https://ukkpcwjzogrleqkdekhx.supabase.co/storage/v1/object/public/media/profile_6981cedecb7f81ea7f99f1c1_1770186165248.jpg\",\n  \"eventDate\": \"2026-02-15\",\n  \"eventTime\": \"21:15\",\n  \"location\": \"Mumbai\",\n  \"capacity\": 100,\n  \"price\": 500,\n  \"eventType\": \"other\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEMPLE_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Event by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEMPLE_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{EVENT_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{EVENT_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "My Upcoming Events (with Reminders)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}",
+                "description": "JWT token from login"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/my-upcoming",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "my-upcoming"
+              ]
+            },
+            "description": "**Get My Upcoming Events (with Reminder Status)**\n\nReturns all upcoming events the authenticated user has registered for, along with reminder status.\n\n**Authentication Required:** Bearer token in Authorization header\n\n**Response includes for each event:**\n- All event details (name, date, time, location, etc.)\n- `remindersSent`: Array of reminder types already sent (e.g. [\"day_of\"])\n- `remindersPending`: Array of reminder types not yet sent (e.g. [\"one_hour_before\"])\n\n**Reminder Types:**\n- `day_of` - Sent on the morning of the event day\n- `one_hour_before` - Sent ~1 hour before the event starts\n\n**Expected Response:**\n```json\n{\n  \"success\": true,\n  \"count\": 2,\n  \"events\": [\n    {\n      \"_id\": \"...\",\n      \"eventName\": \"Morning Puja\",\n      \"eventDate\": \"2026-02-15T00:00:00.000Z\",\n      \"eventTime\": \"10:00 AM\",\n      \"location\": \"Temple Hall\",\n      \"remindersSent\": [],\n      \"remindersPending\": [\"day_of\", \"one_hour_before\"]\n    }\n  ]\n}\n```\n\n**Notes:**\n- Only shows events that are active and not deactivated\n- Only shows events from today onwards\n- Reminders are sent automatically via cron job (every 10 minutes)\n- Day-of reminder is sent in the morning on event day\n- 1-hour reminder is sent ~60 minutes before event time"
+          },
+          "response": []
+        },
+        {
+          "name": "Attend Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"userId\" : \"{{USER_ID}}\" ,\r\n    \"userType\" : \"User\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events/{{EVENT_ID}}/attend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{EVENT_ID}}",
+                "attend"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Event Order (Paid Event)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{EVENT_ID}}/create-order",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{EVENT_ID}}",
+                "create-order"
+              ]
+            },
+            "description": "Step 1 for Paid Events: Create a Razorpay order."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Event Payment Link (Hosted)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{EVENT_ID}}/payment-link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{EVENT_ID}}",
+                "payment-link"
+              ]
+            },
+            "description": "Create a Razorpay Hosted Payment Link for a paid event. Ideal for web/simple mobile integrations where you don't want a custom Razorpay checkout UI."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Event Payment & Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{EVENT_ID}}\",\n  \"razorpay_order_id\": \"order_...\",\n  \"razorpay_payment_id\": \"pay_...\",\n  \"razorpay_signature\": \"...\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events/{{EVENT_ID}}/verify-payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{EVENT_ID}}",
+                "verify-payment"
+              ]
+            },
+            "description": "Step 2 for Paid Events: Verify the Razorpay payment signature and automatically register for the event."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Event",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventName\": \"Updated Festival Name\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events/{{EVENT_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{EVENT_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Event",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{EVENT_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{EVENT_ID}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💰 DONATIONS",
+      "item": [
+        {
+          "name": "Make Donation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientId\": \"{{TEMPLE_ID}}\",\n  \"recipientType\": \"temple\",\n  \"amount\": 500,\n  \"message\": \"For temple repairs\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/donations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "donations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Donations by Recipient",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEMPLE_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/donations/recipient/{{TEMPLE_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "donations",
+                "recipient",
+                "{{TEMPLE_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Donations by Donor",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/donations/donor/{{USER_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "donations",
+                "donor",
+                "{{USER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Donation Leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/donations/stats/leaderboard?recipientType=temple&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "donations",
+                "stats",
+                "leaderboard"
+              ],
+              "query": [
+                {
+                  "key": "recipientType",
+                  "value": "temple"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💳 RAZORPAY PAYMENTS",
+      "item": [
+        {
+          "name": "1️⃣ Create Payment Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  var json = pm.response.json();",
+                  "  pm.collectionVariables.set('ORDER_ID', json.orderId);",
+                  "  console.log('✅ Order ID saved:', json.orderId);",
+                  "  console.log('Razorpay Key:', json.key);",
+                  "} else {",
+                  "  console.error('❌ Failed to create order:', pm.response.code);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientId\": \"{{TEMPLE_ID}}\",\n  \"recipientType\": \"temple\",\n  \"amount\": 100,\n  \"description\": \"Donation for temple maintenance\",\n  \"eventId\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/create-order",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "create-order"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Payment Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientId\": \"{{TEMPLE_ID}}\",\n  \"recipientType\": \"temple\",\n  \"amount\": 500,\n  \"description\": \"Donation via payment link\",\n  \"payer\": { \"name\": \"\", \"email\": \"\", \"contact\": \"\" }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/create-link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "create-link"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2️⃣ Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpayOrderId\": \"{{ORDER_ID}}\",\n  \"razorpayPaymentId\": \"pay_XXXXXXXXXXXXXXXX\",\n  \"razorpaySignature\": \"signature_from_razorpay_response\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/verify-payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "verify-payment"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/status/{{ORDER_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "status",
+                "{{ORDER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payment History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/history?type=donor&limit=10&skip=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "donor",
+                  "description": "donor or recipient"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "skip",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Webhook (Razorpay → Backend)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-razorpay-signature",
+                "value": "webhook_signature"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"payment.captured\",\n  \"payload\": {\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_XXXXXXXXXXXXXXXX\",\n        \"order_id\": \"order_XXXXXXXXXXXXXXXX\",\n        \"amount\": 10000,\n        \"currency\": \"INR\",\n        \"status\": \"captured\"\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhook"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "👥 FOLLOW",
+      "item": [
+        {
+          "name": "Follow Entity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"followingId\": \"{{TEMPLE_ID}}\",\n  \"followingType\": \"temple\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/follow",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "follow"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unfollow",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/follow/{{TEMPLE_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "follow",
+                "{{TEMPLE_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Followers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/follow/followers/{{TEMPLE_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "follow",
+                "followers",
+                "{{TEMPLE_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Following",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/follow/following/{{USER_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "follow",
+                "following",
+                "{{USER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💬 CHATS",
+      "item": [
+        {
+          "name": "Direct Messages (User-Creator)",
+          "item": [
+            {
+              "name": "1️⃣ Initiate Chat Request (User → Creator)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"user1\": {\n    \"userId\": \"{{USER_ID}}\",\n    \"userType\": \"user\",\n    \"userName\": \"Raj\"\n  },\n  \"user2\": {\n    \"userId\": \"{{CREATOR_ID}}\",\n    \"userType\": \"creator\",\n    \"userName\": \"Swami Anand\"\n  },\n  \"chatType\": \"direct\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/messages/conversation",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "conversation"
+                  ]
+                },
+                "description": "**Step 1: Initiate Request (Optional)**\n\nCreates a `pending` conversation if it doesn't exist. You can also directly use the 'Send Message' endpoint to initiate a chat."
+              },
+              "response": []
+            },
+            {
+              "name": "3️⃣ Send Message (After Acceptance)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderId\": \"{{USER_ID}}\",\n  \"senderType\": \"user\",\n  \"senderName\": \"Raj\",\n  \"receiverId\": \"{{CREATOR_ID}}\",\n  \"receiverType\": \"creator\",\n  \"receiverName\": \"Swami Anand\",\n  \"content\": \"Hello! I would like to chat.\",\n  \"chatType\": \"direct\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/messages/send",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "send"
+                  ]
+                },
+                "description": "**Step 3: Chatting / Initiating**\n\nThe request sender can use this to initiate a chat. The receiver **cannot** reply until they have accepted the request (via the /accept endpoint)."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Conversations (Direct)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/messages/conversations/{{USER_ID}}?chatType=direct",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "conversations",
+                    "{{USER_ID}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "chatType",
+                      "value": "direct"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "2️⃣ ✅ Accept Message Request (By Creator)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{CREATOR_TOKEN}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversationId\": \"{{CONVERSATION_ID}}\",\n  \"userId\": \"{{CREATOR_ID}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/messages/accept",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "accept"
+                  ]
+                },
+                "description": "**Step 2: Acceptance**\n\nCreator calls this to approve the chat. Status changes to `accepted`."
+              },
+              "response": []
+            },
+            {
+              "name": "2️⃣ ❌ Reject Message Request (By Creator)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{CREATOR_TOKEN}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversationId\": \"{{CONVERSATION_ID}}\",\n  \"userId\": \"{{CREATOR_ID}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/messages/reject",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "reject"
+                  ]
+                },
+                "description": "**Step 2: Rejection**\n\nCreator calls this to decline the chat request. The conversation will no longer appear in their list."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Pending Requests (For Creator)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/messages/requests/{{CREATOR_ID}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "requests",
+                    "{{CREATOR_ID}}"
+                  ]
+                },
+                "description": "Returns a count and list of all pending message requests for the creator."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Support Chat (Admin)",
+          "item": [
+            {
+              "name": "Send Support Message",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"senderId\": \"{{USER_ID}}\",\n  \"senderType\": \"user\",\n  \"senderName\": \"Raj\",\n  \"receiverId\": \"{{ADMIN_ID}}\",\n  \"receiverType\": \"admin\",\n  \"receiverName\": \"Admin\",\n  \"content\": \"I need help!\",\n  \"chatType\": \"support\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/messages/send",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "send"
+                  ]
+                },
+                "description": "**Support Chat:**\n\n- Used for user-to-admin communication.\n- Auto-accepted (status is immediately `accepted`)."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Conversations (Support)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/messages/conversations/{{USER_ID}}?chatType=support",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "conversations",
+                    "{{USER_ID}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "chatType",
+                      "value": "support"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Shared Endpoints",
+          "item": [
+            {
+              "name": "Get Messages",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/messages/messages/{{CONVERSATION_ID}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "messages",
+                    "{{CONVERSATION_ID}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Mark As Read",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversationId\": \"{{CONVERSATION_ID}}\",\n  \"userId\": \"{{USER_ID}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/messages/read",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "read"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Unread Count",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/messages/unread/{{USER_ID}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "unread",
+                    "{{USER_ID}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Conversation",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/messages/conversation/{{CONVERSATION_ID}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "conversation",
+                    "{{CONVERSATION_ID}}"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🔐 OTP",
+      "item": [
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"9876543210\",\n  \"countryCode\": \"+91\",\n  \"purpose\": \"registration\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/otp/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "otp",
+                "send"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"9876543210\",\n  \"countryCode\": \"+91\",\n  \"otp\": \"12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/otp/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "otp",
+                "verify"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"9876543210\",\n  \"countryCode\": \"+91\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/otp/resend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "otp",
+                "resend"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Check Phone Verified",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/otp/check-verified?phoneNumber=9876543210&countryCode=+91",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "otp",
+                "check-verified"
+              ],
+              "query": [
+                {
+                  "key": "phoneNumber",
+                  "value": "9876543210"
+                },
+                {
+                  "key": "countryCode",
+                  "value": "+91"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔎 SEARCH",
+      "item": [
+        {
+          "name": "Search Unified",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=ganesha",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "ganesha"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Suggestions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search/suggestions?q=ga",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search",
+                "suggestions"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "ga"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔄 SHARE",
+      "item": [
+        {
+          "name": "Share Post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{USER_ID}}\",\n  \"sharedVia\": \"whatsapp\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/share/post/{{POST_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "share",
+                "post",
+                "{{POST_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Share Reel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{USER_ID}}\",\n  \"sharedVia\": \"facebook\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/share/reel/{{REEL_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "share",
+                "reel",
+                "{{REEL_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Share Stats - Post",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/share/stats/post/{{POST_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "share",
+                "stats",
+                "post",
+                "{{POST_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Share Stats - Reel",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/share/stats/reel/{{REEL_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "share",
+                "stats",
+                "reel",
+                "{{REEL_ID}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "⭐ REVIEWS",
+      "item": [
+        {
+          "name": "Add Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templeId\": \"{{TEMPLE_ID}}\",\n  \"title\": \"Beautiful Temple\",\n  \"review\": \"Very peaceful atmosphere.\",\n  \"rating\": 5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reviews/add",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviews",
+                "add"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Temple Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reviews/temple/{{TEMPLE_ID}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviews",
+                "temple",
+                "{{TEMPLE_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Review",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviews/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviews",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔔 NOTIFICATIONS",
+      "item": [
+        {
+          "name": "Get My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/mark-read/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "mark-read",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/mark-all-read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "mark-all-read"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "⭐ APP RATINGS",
+      "item": [
+        {
+          "name": "Submit App Rating",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Excellent app! Very helpful for finding local temples.\",\n  \"platform\": \"web\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/app-ratings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app-ratings"
+              ]
+            },
+            "description": "Submits a rating for the app. If a rating already exists for this user, it will be updated (upsert behavior)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update App Rating (Explicit)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 4,\n  \"comment\": \"Updated comment: Found a small bug but still great.\",\n  \"platform\": \"web\",\n  \"appVersion\": \"1.0.1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/app-ratings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app-ratings"
+              ]
+            },
+            "description": "Explicitly updates an existing rating for the authenticated user."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All App Ratings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/app-ratings?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app-ratings"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Application Rating",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/app-ratings/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app-ratings",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🚫 BLOCK/HIDE",
+      "item": [
+        {
+          "name": "Block/Hide Entity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityId\": \"{{TEMPLE_ID}}\",\n  \"entityType\": \"temple\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/blocks/block",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "blocks",
+                "block"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unblock/Unhide Entity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityId\": \"{{TEMPLE_ID}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/blocks/unblock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "blocks",
+                "unblock"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Block List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/blocks/list",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "blocks",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "� STORAGE",
+      "item": [
+        {
+          "name": "Get Presigned Upload URL (Cloudflare R2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}",
+                "description": "JWT token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"profile_image.jpg\",\n  \"contentType\": \"image/jpeg\",\n  \"folder\": \"profile_pic\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage/presigned-url",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "storage",
+                "presigned-url"
+              ]
+            },
+            "description": "**Get a Presigned URL for direct upload to Cloudflare R2**\n\n**Body Parameters:**\n- : Original name of the file (e.g. \"vacation.mp4\")\n- : Mime type (e.g. \"video/mp4\", \"image/jpeg\")\n- : One of , , or \n\n**Returns:**\n- : The temporary URL to PUT the file to.\n- : The final public URL to store in your database.\n- : The internal R2 path (folder/timestamp-fileName).\n\n**Next Steps in Flutter:**\n1. Send  request to  with the file bytes.\n2. Include  header matching what you sent here."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000/api"
+    },
+    {
+      "key": "USER_TOKEN",
+      "value": ""
+    },
+    {
+      "key": "TEMPLE_TOKEN",
+      "value": ""
+    },
+    {
+      "key": "CREATOR_TOKEN",
+      "value": ""
+    },
+    {
+      "key": "USER_ID",
+      "value": ""
+    },
+    {
+      "key": "TEMPLE_ID",
+      "value": ""
+    },
+    {
+      "key": "CREATOR_ID",
+      "value": ""
+    },
+    {
+      "key": "POST_ID",
+      "value": ""
+    },
+    {
+      "key": "REEL_ID",
+      "value": ""
+    },
+    {
+      "key": "EVENT_ID",
+      "value": ""
+    },
+    {
+      "key": "DONATION_ID",
+      "value": ""
+    },
+    {
+      "key": "CONVERSATION_ID",
+      "value": ""
+    },
+    {
+      "key": "ORDER_ID",
+      "value": ""
+    },
+    {
+      "key": "ADMIN_TOKEN",
+      "value": ""
+    },
+    {
+      "key": "ADMIN_ID",
+      "value": ""
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:flutter/services.dart';
 class AdminDonationScreen extends StatefulWidget {
   const AdminDonationScreen({super.key});
 
@@ -146,6 +147,10 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
   Future<void> _downloadReceipt(DonationHistoryModel donation) async {
     final pdf = pw.Document();
 
+    // Load logo image
+    final ByteData logoData = await rootBundle.load('assets/splash/namo_logo_tight.png');
+    final pw.MemoryImage logoImage = pw.MemoryImage(logoData.buffer.asUint8List());
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -155,7 +160,23 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Center(child: pw.Text("DONATION RECEIPT", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold))),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    pw.Image(logoImage, width: 100, height: 100),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text("DONATION RECEIPT", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                        pw.SizedBox(height: 4),
+                        pw.Text("NamoHam Official", style: pw.TextStyle(fontSize: 14, color: PdfColors.grey600)),
+                      ]
+                    )
+                  ]
+                ),
+                pw.SizedBox(height: 12),
+                pw.Divider(thickness: 1, color: PdfColors.grey300),
                 pw.SizedBox(height: 24),
                 pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                   pw.Text('Invoice No: ${donation.invoiceNo}'),

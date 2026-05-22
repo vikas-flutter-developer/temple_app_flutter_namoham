@@ -28,13 +28,14 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   // Dropdown State
-  String _selectedLoginType = 'User Login';
-  List<String> get _loginTypes => [
-    'User Login',
-    'Temple Login',
-    'Creator Login',
-    if (kIsWeb) 'Admin Login'
-  ];
+  String _selectedLoginType = kIsWeb ? 'Admin Login' : 'User Login';
+  List<String> get _loginTypes => kIsWeb
+      ? ['Admin Login']
+      : [
+          'User Login',
+          'Temple Login',
+          'Creator Login',
+        ];
 
   final ApiService _apiService = ApiService.create();
 
@@ -45,19 +46,20 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _loadSavedCredentials() async {
+    final defaultLoginType = kIsWeb ? 'Admin Login' : 'User Login';
     final prefs = await SharedPreferences.getInstance();
     final rememberMe = prefs.getBool('remember_me') ?? false;
     if (rememberMe) {
       final savedEmail = prefs.getString('saved_email') ?? '';
       final savedPassword = prefs.getString('saved_password') ?? '';
-      final savedLoginType = prefs.getString('saved_login_type') ?? 'User Login';
+      final savedLoginType = prefs.getString('saved_login_type') ?? defaultLoginType;
 
       setState(() {
         _rememberMe = true;
         _emailController.text = savedEmail;
         _passwordController.text = savedPassword;
         // Ensure the saved login type is valid for the current platform
-        _selectedLoginType = _loginTypes.contains(savedLoginType) ? savedLoginType : 'User Login';
+        _selectedLoginType = _loginTypes.contains(savedLoginType) ? savedLoginType : defaultLoginType;
       });
     }
   }

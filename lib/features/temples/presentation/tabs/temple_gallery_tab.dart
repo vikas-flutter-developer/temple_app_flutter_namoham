@@ -43,43 +43,40 @@ class GalleryTabState extends State<GalleryTab> {
       
       print('GALLERY: Fetching data for templeId: ${widget.templeId}');
       
+      // Fetch reels
+      final Future<List<Map<String, dynamic>>> reelsFuture;
+      if (widget.templeName == 'Golden Temple') {
+        reelsFuture = Future.wait([
+          apiService.getReelsByUser(widget.templeId),
+          apiService.getReelsByUser('6973401b83c5b4a87ae2fd64'),
+        ]).then((lists) => [...lists[0], ...lists[1]]);
+      } else {
+        reelsFuture = apiService.getReelsByUser(widget.templeId);
+      }
+
       // Fetch posts and reels in parallel
       final results = await Future.wait([
         apiService.getPostsByUser(widget.templeId),
-        apiService.getReels(), // Get ALL reels, then filter
+        reelsFuture,
       ]);
 
       final postsData = results[0] as List;
-      final allReelsData = results[1] as List;
+      final userReelsData = results[1] as List;
 
-      // Filter reels by this temple's ID
-      // Also exclude dummy/test reels (those with /uploads/reels/example.mp4)
-      final reelsData = allReelsData.where((reel) {
-        final reelUserId = reel['userId'];
-        final reelTempleId = reel['templeId'];
+      // Filter out dummy/test reels (those with /uploads/reels/example.mp4)
+      final reelsData = userReelsData.where((reel) {
         final videoUrl = reel['videoUrl'] ?? '';
-        
-        // Match current temple ID
-        bool matchesCurrent = reelUserId == widget.templeId || reelTempleId == widget.templeId;
-        
-        // For Golden Temple specifically, also include old account ID
-        bool matchesOldGoldenTemple = false;
-        if (widget.templeName == 'Golden Temple') {
-          matchesOldGoldenTemple = reelUserId == '6973401b83c5b4a87ae2fd64';
-        }
-        
-        bool matchesId = matchesCurrent || matchesOldGoldenTemple;
         
         // Exclude dummy test videos
         bool isRealVideo = videoUrl.isNotEmpty && 
                           !videoUrl.contains('/uploads/reels/example.mp4');
         
-        return matchesId && isRealVideo;
+        return isRealVideo;
       }).toList();
 
       print('GALLERY: Temple ID: ${widget.templeId}');
       print('GALLERY: Received ${postsData.length} posts');
-      print('GALLERY: Received ${allReelsData.length} total reels, ${reelsData.length} real videos for this temple');
+      print('GALLERY: Received ${userReelsData.length} total reels, ${reelsData.length} real videos for this temple');
       
       if (reelsData.isNotEmpty) {
         print('GALLERY: First matching reel userId: ${reelsData[0]['userId']}');

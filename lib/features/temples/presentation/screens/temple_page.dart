@@ -19,8 +19,8 @@ import '../../../../widgets/custom_widgets/custom_network_image.dart';
 import 'package:flutter_user_app/features/temples/presentation/tabs/temple_about_tab.dart';
 import 'package:flutter_user_app/features/temples/presentation/tabs/temple_gallery_tab.dart';
 import 'package:flutter_user_app/features/temples/presentation/tabs/temple_calender_tab.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_user_app/core/util/share_helper.dart';
 
 class TemplePage extends StatefulWidget {
   final TempleModel templeModel;
@@ -183,7 +183,7 @@ class _TemplePageState extends State<TemplePage>
                         right: 16,
                         child: GestureDetector(
                           onTap: () {
-                            Share.share('Check out ${temple.name} on Temple App!\n\n${temple.website.isNotEmpty ? temple.website : ""}'); 
+                            ShareHelper.showTempleShareSheet(context, temple.id, temple.name);
                           },
                           child: Container(
                             padding: const EdgeInsets.all(10),

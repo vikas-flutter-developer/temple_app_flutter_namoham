@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/admin/dashboard/data/models/dashboard_models.dart';
@@ -29,6 +29,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<ClientModel> _clients = [];
   PaginationModel? _clientPagination;
   bool _isClientLoading = false; // Separate loading for search
+
+  // Date filter state
+  String _dateFilter = 'all';
+  String _dateFilterLabel = 'All Time';
+  DateTime? _startDate;
+  DateTime? _endDate;
   
   @override
   void initState() {
@@ -67,9 +73,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
     
     try {
+      // Format custom dates if active
+      String? startStr;
+      String? endStr;
+      if (_startDate != null && _endDate != null) {
+        startStr = _startDate!.toIso8601String().split('T')[0];
+        endStr = _endDate!.toIso8601String().split('T')[0];
+      }
+
       // Fetch all data in parallel
       final results = await Future.wait([
-        _apiService.getDashboardStats(),
+        _apiService.getDashboardStats(
+          filter: _dateFilter,
+          startDate: startStr,
+          endDate: endStr,
+        ),
         _apiService.getMonthlyEngagement(),
         _apiService.getTrafficByLocation(),
         _apiService.getClientList(type: _selectedFilter, search: _searchQuery),
@@ -234,6 +252,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           // Header
           AdminHeader(
             onBackPressed: () => AdminMainLayout.switchToTab(0),
+            selectedFilterLabel: _dateFilterLabel,
+            startDate: _startDate,
+            endDate: _endDate,
+            onFilterSelected: (filter) {
+              setState(() {
+                _dateFilter = filter;
+                _startDate = null; // Clear custom date range when choosing a quick filter
+                _endDate = null;
+                switch (filter) {
+                  case 'today':
+                    _dateFilterLabel = 'Today';
+                    break;
+                  case 'yesterday':
+                    _dateFilterLabel = 'Yesterday';
+                    break;
+                  case 'this_week':
+                    _dateFilterLabel = 'This Week';
+                    break;
+                  case 'this_month':
+                    _dateFilterLabel = 'This Month';
+                    break;
+                  default:
+                    _dateFilterLabel = 'All Time';
+                }
+              });
+              _loadData();
+            },
+            onStartDateSelected: (date) {
+              setState(() {
+                _startDate = date;
+                if (date != null && _endDate != null) {
+                  _dateFilter = 'custom';
+                  _dateFilterLabel = 'Custom Range';
+                }
+              });
+              if (_startDate != null && _endDate != null) {
+                _loadData();
+              }
+            },
+            onEndDateSelected: (date) {
+              setState(() {
+                _endDate = date;
+                if (_startDate != null && date != null) {
+                  _dateFilter = 'custom';
+                  _dateFilterLabel = 'Custom Range';
+                }
+              });
+              if (_startDate != null && _endDate != null) {
+                _loadData();
+              }
+            },
             filters: Row(
               children: [
                 _buildFilterBtn("All", 'all'),
@@ -494,80 +563,88 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const SizedBox(height: 16),
                 
                 AdminTable(
-                  columns: const ["USER ID", "USER NAME", "EMAIL", "PHONE", "DATE OF BIRTH", "LOCATION", "STATUS", "ACTIONS"],
-                  rows: _clients.map((client) => [
-                    Text("ID: ${client.id.substring(0, 8)}...", style: const TextStyle(fontWeight: FontWeight.w500)),
-                    Row(children: [
-                      CircleAvatar(
-                        radius: 14, 
-                        backgroundColor: _getTypeColor(client.type).withOpacity(0.2), 
-                        child: Text(
-                          client.name.isNotEmpty ? client.name[0].toUpperCase() : '?',
-                          style: TextStyle(color: _getTypeColor(client.type), fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(width: 8), 
-                      Flexible(
-                        child: Text(
-                          client.name, 
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ]),
-                    Text(client.email, style: const TextStyle(fontSize: 13)),
-                    Text(client.phone, style: const TextStyle(fontSize: 13)),
-                    Text(
-                      client.dateOfBirth != null 
-                        ? _formatDate(client.dateOfBirth!) 
-                        : 'N/A', 
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    Text(client.location, style: const TextStyle(fontSize: 13)),
-                    Row(children: [
-                      Container(
-                        width: 6, height: 6,
-                        decoration: BoxDecoration(
-                          color: client.status.toLowerCase() == 'online' ? Colors.green : Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(client.status, style: const TextStyle(fontSize: 12)),
-                    ]),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, size: 18),
-                      onSelected: (value) {
-                        if (value == 'deactivate') {
-                          _handleDeactivateClient(client);
-                        } else if (value == 'delete') {
-                          _handleHardDeleteClient(client);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'deactivate',
-                          child: Row(
-                            children: [
-                              Icon(Icons.block, size: 16, color: Colors.orange),
-                              SizedBox(width: 8),
-                              Text('Deactivate', style: TextStyle(fontSize: 13)),
-                            ],
+                  columns: const ["NO.", "USER NAME", "EMAIL", "PHONE", "GENDER", "DATE OF BIRTH", "LOCATION", "STATUS", "ACTIONS"],
+                  flexes: const [1, 3, 4, 3, 2, 3, 2, 2, 1],
+                  onRowTap: (index) => _showClientDetails(_clients[index]),
+                  rows: _clients.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final client = entry.value;
+                    final serialNumber = ((_clientPagination?.page ?? 1) - 1) * (_clientPagination?.limit ?? 20) + index + 1;
+                    return [
+                      Text("#$serialNumber", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                      Row(children: [
+                        CircleAvatar(
+                          radius: 14, 
+                          backgroundColor: _getTypeColor(client.type).withOpacity(0.2), 
+                          child: Text(
+                            client.name.isNotEmpty ? client.name[0].toUpperCase() : '?',
+                            style: TextStyle(color: _getTypeColor(client.type), fontWeight: FontWeight.bold),
                           ),
                         ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_forever, size: 16, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Hard Delete', style: TextStyle(fontSize: 13, color: Colors.red)),
-                            ],
+                        const SizedBox(width: 8), 
+                        Flexible(
+                          child: Text(
+                            client.name, 
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ],
-                    ),
-                  ]).toList(),
+                      ]),
+                      Text(client.email, style: const TextStyle(fontSize: 13)),
+                      Text(client.phone, style: const TextStyle(fontSize: 13)),
+                      Text(client.gender ?? 'N/A', style: const TextStyle(fontSize: 13)),
+                      Text(
+                        client.dateOfBirth != null 
+                          ? _formatDate(client.dateOfBirth!) 
+                          : 'N/A', 
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      Text(client.location, style: const TextStyle(fontSize: 13)),
+                      Row(children: [
+                        Container(
+                          width: 6, height: 6,
+                          decoration: BoxDecoration(
+                            color: client.status.toLowerCase() == 'online' ? Colors.green : Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(client.status, style: const TextStyle(fontSize: 12)),
+                      ]),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        onSelected: (value) {
+                          if (value == 'deactivate') {
+                            _handleDeactivateClient(client);
+                          } else if (value == 'delete') {
+                            _handleHardDeleteClient(client);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'deactivate',
+                            child: Row(
+                              children: [
+                                Icon(Icons.block, size: 16, color: Colors.orange),
+                                SizedBox(width: 8),
+                                Text('Deactivate', style: TextStyle(fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_forever, size: 16, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('Hard Delete', style: TextStyle(fontSize: 13, color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ];
+                  }).toList(),
                 ),
 
                 const SizedBox(height: 40),
@@ -742,5 +819,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (_) {
       return dateStr;
     }
+  }
+
+  void _showClientDetails(ClientModel client) {
+    showDialog(
+      context: context,
+      builder: (context) => ClientDetailsDialog(client: client),
+    );
   }
 }

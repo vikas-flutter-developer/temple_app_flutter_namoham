@@ -62,6 +62,10 @@ const reelSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// Indexes for performance scaling (critical for 99,999+ records)
+reelSchema.index({ isDeactivated: 1, timestamp: -1 });
+reelSchema.index({ userId: 1, isDeactivated: 1, timestamp: -1 });
+
 const Reel = mongoose.model('Reel', reelSchema);
 
 export default Reel;

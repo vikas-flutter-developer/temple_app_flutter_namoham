@@ -47,15 +47,10 @@ class _CreatorProfileStatsState extends State<CreatorProfileStats> {
         child: Row(
           children: [
             Expanded(
-              child: Consumer<PostsProvider>(
-                builder: (context, postsProvider, child) {
-                  final count = postsProvider.userPostCount;
-                  return _buildStat(
-                    '${postsProvider.isLoadingPostCount ? "..." : count}', 
-                    l10n.posts, 
-                    context
-                  );
-                },
+              child: _buildStat(
+                '${widget.profile.posts}', 
+                l10n.posts, 
+                context
               ),
             ),
             

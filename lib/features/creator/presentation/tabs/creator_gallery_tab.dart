@@ -43,27 +43,21 @@ class CreatorGalleryTabState extends State<CreatorGalleryTab> {
       // Fetch posts and reels in parallel
       final results = await Future.wait([
         apiService.getPostsByUser(widget.creatorId),
-        apiService.getReels(), // Get ALL reels, then filter
+        apiService.getReelsByUser(widget.creatorId),
       ]);
 
       final postsData = results[0] as List;
-      final allReelsData = results[1] as List;
+      final userReelsData = results[1] as List;
 
-      // Filter reels by this creator's ID
-      // Also exclude dummy/test reels (those with /uploads/reels/example.mp4)
-      final reelsData = allReelsData.where((reel) {
-        final reelUserId = reel['userId'];
-        final reelCreatorId = reel['creatorId'];
+      // Filter out dummy/test reels (those with /uploads/reels/example.mp4)
+      final reelsData = userReelsData.where((reel) {
         final videoUrl = reel['videoUrl'] ?? '';
-        
-        // Match by creator ID
-        bool matchesId = reelUserId == widget.creatorId || reelCreatorId == widget.creatorId;
         
         // Exclude dummy test videos
         bool isRealVideo = videoUrl.isNotEmpty && 
                           !videoUrl.contains('/uploads/reels/example.mp4');
         
-        return matchesId && isRealVideo;
+        return isRealVideo;
       }).toList();
 
       setState(() {

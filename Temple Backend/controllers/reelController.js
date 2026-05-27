@@ -39,7 +39,7 @@ const getUserDisplayInfo = async (userId, userType) => {
     }
 };
 
-// Get all reels with pagination
+// Get all reels with pagination (highly optimized for 99,999+ records)
 export const getAllReels = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -58,32 +58,70 @@ export const getAllReels = async (req, res) => {
             query.userId = { $nin: blockedIds };
         }
 
+        // Support both cursor-based (timestamp) and legacy offset pagination
+        if (req.query.lastTimestamp) {
+            query.timestamp = { $lt: new Date(req.query.lastTimestamp) };
+        }
+
+        // Optimization 1: Exclude heavy 'comments' arrays from the main feed load
         const reels = await Reel.find(query)
+            .select('-comments')
             .sort({ timestamp: -1 })
-            .skip(skip)
+            .skip(req.query.lastTimestamp ? 0 : skip) // skip is 0 when doing cursor queries
             .limit(limit);
 
-        // Transform reels to match frontend model
-        const formattedReels = await Promise.all(reels.map(async (reel) => {
-            const { userImage: latestUserImage } = await getUserDisplayInfo(reel.userId, reel.userType);
+        // Optimization 2: Batch query user/temple/creator details in exactly 3 (or fewer) concurrent requests (Solves N+1 problem)
+        const templeIds = [...new Set(reels.filter(r => r.userType === 'temple').map(r => r.userId.toString()))];
+        const creatorIds = [...new Set(reels.filter(r => r.userType === 'creator').map(r => r.userId.toString()))];
+        const userIds = [...new Set(reels.filter(r => r.userType !== 'temple' && r.userType !== 'creator').map(r => r.userId.toString()))];
+
+        const [temples, creators, users] = await Promise.all([
+            templeIds.length ? Temple.find({ _id: { $in: templeIds } }).select('templeName templePics').lean() : [],
+            creatorIds.length ? Creator.find({ _id: { $in: creatorIds } }).select('creatorName creatorPics profilePic').lean() : [],
+            userIds.length ? User.find({ _id: { $in: userIds } }).select('fullName profilePic').lean() : []
+        ]);
+
+        const templeMap = new Map(temples.map(t => [t._id.toString(), t]));
+        const creatorMap = new Map(creators.map(c => [c._id.toString(), c]));
+        const userMap = new Map(users.map(u => [u._id.toString(), u]));
+
+        // Transform reels using fast O(1) in-memory maps instead of doing inline DB queries
+        const formattedReels = reels.map((reel) => {
+            const idStr = reel.userId ? reel.userId.toString() : '';
+            let latestUserImage = '';
+            let latestUsername = reel.username;
+
+            if (reel.userType === 'temple') {
+                const temple = templeMap.get(idStr);
+                latestUsername = temple?.templeName || 'Temple';
+                latestUserImage = temple?.templePics?.[0] || '';
+            } else if (reel.userType === 'creator') {
+                const creator = creatorMap.get(idStr);
+                latestUsername = creator?.creatorName || 'Creator';
+                latestUserImage = creator?.creatorPics?.[0] || creator?.profilePic || '';
+            } else {
+                const user = userMap.get(idStr);
+                latestUsername = user?.fullName || 'User';
+                latestUserImage = user?.profilePic || '';
+            }
 
             return {
                 id: reel._id.toString(),
-                username: reel.username,
+                username: latestUsername,
                 userImage: latestUserImage || reel.userImage || '',
                 caption: reel.caption || '',
                 videoUrl: reel.videoUrl,
                 thumbnailUrl: reel.thumbnailUrl || '',
                 likes: reel.likes || 0,
                 likedBy: reel.likedBy || [],
-                comments: reel.comments || [],
+                comments: [], // Excluded from main feed list, loaded dynamically on-demand
                 views: reel.views || 0,
                 shareCount: reel.shareCount || 0,
                 timestamp: reel.timestamp.toISOString(),
                 userId: reel.userId,
                 userType: reel.userType
             };
-        }));
+        });
 
         console.log(`📤 Returning ${formattedReels.length} reels`);
         res.json(formattedReels);
@@ -93,7 +131,7 @@ export const getAllReels = async (req, res) => {
     }
 };
 
-// Get reels by user with pagination
+// Get reels by user with pagination (highly optimized)
 export const getReelsByUser = async (req, res) => {
     try {
         const { userId } = req.params;
@@ -111,12 +149,20 @@ export const getReelsByUser = async (req, res) => {
         }
 
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
+        // Default to a higher limit (200) for profile gallery view if not explicitly requested
+        const limit = parseInt(req.query.limit) || 200;
         const skip = (page - 1) * limit;
 
-        const reels = await Reel.find({ userId, isDeactivated: false })
+        const query = { userId, isDeactivated: false };
+        if (req.query.lastTimestamp) {
+            query.timestamp = { $lt: new Date(req.query.lastTimestamp) };
+        }
+
+        // Optimize: exclude heavy comments
+        const reels = await Reel.find(query)
+            .select('-comments')
             .sort({ timestamp: -1 })
-            .skip(skip)
+            .skip(req.query.lastTimestamp ? 0 : skip)
             .limit(limit);
 
         const firstReel = reels[0];
@@ -132,7 +178,7 @@ export const getReelsByUser = async (req, res) => {
             thumbnailUrl: reel.thumbnailUrl || '',
             likes: reel.likes || 0,
             likedBy: reel.likedBy || [],
-            comments: reel.comments || [],
+            comments: [], // Excluded for listing performance
             views: reel.views || 0,
             shareCount: reel.shareCount || 0,
             timestamp: reel.timestamp.toISOString(),
@@ -642,5 +688,45 @@ export const getSavedReels = async (req, res) => {
     } catch (error) {
         console.error('❌ Error fetching saved reels:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// Get single reel by ID
+export const getReelById = async (req, res) => {
+    try {
+        const { reelId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(reelId)) {
+            return res.status(400).json({ message: 'Invalid Reel ID' });
+        }
+
+        const reel = await Reel.findById(reelId);
+        if (!reel || reel.isDeactivated) {
+            return res.status(404).json({ message: 'Reel not found' });
+        }
+
+        const { userImage: latestUserImage } = await getUserDisplayInfo(reel.userId, reel.userType);
+
+        const formattedReel = {
+            id: reel._id.toString(),
+            username: reel.username,
+            userImage: latestUserImage || reel.userImage || '',
+            caption: reel.caption || '',
+            videoUrl: reel.videoUrl,
+            thumbnailUrl: reel.thumbnailUrl || '',
+            likes: reel.likes || 0,
+            likedBy: reel.likedBy || [],
+            comments: reel.comments || [],
+            views: reel.views || 0,
+            shareCount: reel.shareCount || 0,
+            timestamp: reel.timestamp.toISOString(),
+            userId: reel.userId,
+            userType: reel.userType
+        };
+
+        res.json({ success: true, data: formattedReel });
+    } catch (error) {
+        console.error('❌ Error fetching single reel:', error);
+        res.status(500).json({ message: 'Error fetching reel', error: error.message });
     }
 };

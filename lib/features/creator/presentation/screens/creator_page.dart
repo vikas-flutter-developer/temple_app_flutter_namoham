@@ -14,7 +14,7 @@ import 'package:flutter_user_app/features/creator/presentation/widgets/creator_p
 import 'package:flutter_user_app/features/creator/presentation/tabs/creator_about_tab.dart';
 import 'package:flutter_user_app/features/creator/presentation/tabs/creator_gallery_tab.dart';
 import 'package:flutter_user_app/features/creator/presentation/tabs/creator_calender_tab.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:flutter_user_app/core/util/share_helper.dart';
 import 'package:flutter_user_app/features/posts/presentation/provider/posts_provider.dart';
 import 'package:flutter_user_app/features/posts/domain/usecase/get_posts_usecase.dart';
 import 'package:flutter_user_app/features/posts/data/repository/post_repository_impl.dart';
@@ -189,7 +189,7 @@ class _CreatorPageState extends State<CreatorPage>
                         right: 16,
                         child: GestureDetector(
                           onTap: () {
-                            Share.share('Check out ${creator.creatorName} on Temple App!${creator.website.isNotEmpty ? '\n\n${creator.website}' : ''}'); 
+                            ShareHelper.showCreatorShareSheet(context, creator.id, creator.creatorName);
                           },
                           child: Container(
                             padding: const EdgeInsets.all(10),

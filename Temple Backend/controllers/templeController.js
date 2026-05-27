@@ -1,5 +1,7 @@
 import Temple from '../models/templeModel.js';
 import BlockedEntity from '../models/blockedEntityModel.js';
+import Post from '../models/postModel.js';
+import Reel from '../models/reelModel.js';
 
 // GET /api/temples - Get all temples with optional search and pagination
 export const getAllTemples = async (req, res) => {
@@ -138,7 +140,7 @@ export const getNearbyTemples = async (req, res) => {
     }
 };
 
-// GET /api/temples/:id - Get temple by ID
+// GET /api/temples/:id - Get temple by ID (highly optimized for dynamic combined posts + videos count)
 export const getTempleById = async (req, res) => {
     try {
         const temple = await Temple.findById(req.params.id)
@@ -166,11 +168,21 @@ export const getTempleById = async (req, res) => {
             }
         }
 
+        // Optimization: Dynamically count active posts and reels/videos to get the combined total
+        const [postCount, reelCount] = await Promise.all([
+            Post.countDocuments({ userId: temple._id, isDeactivated: false }),
+            Reel.countDocuments({ userId: temple._id, isDeactivated: false })
+        ]);
+
         console.log(`📿 Fetched temple: ${temple.templeName}`);
+
+        // Convert to plain object and overwrite posts count with combined total
+        const templeObj = temple.toObject();
+        templeObj.posts = postCount + reelCount; // Combined posts + reels/videos total
 
         res.json({
             success: true,
-            data: temple
+            data: templeObj
         });
     } catch (error) {
         console.error('Error fetching temple:', error);

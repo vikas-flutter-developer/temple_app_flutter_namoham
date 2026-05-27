@@ -1,5 +1,7 @@
 import Creator from '../models/creatorModel.js';
 import BlockedEntity from '../models/blockedEntityModel.js';
+import Post from '../models/postModel.js';
+import Reel from '../models/reelModel.js';
 
 // GET /api/creators - Get all creators with pagination
 export const getAllCreators = async (req, res) => {
@@ -62,7 +64,7 @@ export const getAllCreators = async (req, res) => {
     }
 };
 
-// GET /api/creators/:id - Get creator by ID
+// GET /api/creators/:id - Get creator by ID (highly optimized for dynamic combined posts + videos count)
 export const getCreatorById = async (req, res) => {
     try {
         const creator = await Creator.findById(req.params.id);
@@ -85,6 +87,12 @@ export const getCreatorById = async (req, res) => {
             }
         }
 
+        // Optimization: Dynamically count active posts and reels/videos to get the combined total
+        const [postCount, reelCount] = await Promise.all([
+            Post.countDocuments({ userId: creator._id, isDeactivated: false }),
+            Reel.countDocuments({ userId: creator._id, isDeactivated: false })
+        ]);
+
         res.json({
             success: true,
             creator: {
@@ -99,7 +107,7 @@ export const getCreatorById = async (req, res) => {
                 description: creator.description || '',
                 followers: creator.followers || 0,
                 following: creator.following || 0,
-                posts: creator.posts || 0,
+                posts: postCount + reelCount, // Dynamic combined total of posts + videos/reels
                 isVerified: creator.isVerified || false,
                 createdAt: creator.createdAt
             }

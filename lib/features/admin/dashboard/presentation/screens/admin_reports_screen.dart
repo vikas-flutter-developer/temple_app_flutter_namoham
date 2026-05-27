@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_user_app/core/api/api_service.dart';
 import 'package:flutter_user_app/features/admin/dashboard/data/models/dashboard_models.dart';
 import 'package:flutter_user_app/features/admin/dashboard/presentation/widgets/admin_widgets.dart';
@@ -22,6 +22,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   // Data from API
   List<ActivityModel> _activities = [];
   PaginationModel? _pagination;
+
+  // Date filter state
+  String _dateFilter = 'all';
+  String _dateFilterLabel = 'All Time';
+  DateTime? _startDate;
+  DateTime? _endDate;
   
   @override
   void initState() {
@@ -53,8 +59,43 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   }
   
   List<ActivityModel> get _filteredActivities {
-    if (_selectedFilter == 'all') return _activities;
-    return _activities.where((a) => a.type.toLowerCase() == _selectedFilter).toList();
+    List<ActivityModel> list = _activities;
+    if (_selectedFilter != 'all') {
+      list = list.where((a) => a.type.toLowerCase() == _selectedFilter).toList();
+    }
+    
+    // Filter by dates
+    if (_startDate != null && _endDate != null) {
+      list = list.where((a) {
+        if (a.time == null) return false;
+        final actDate = a.time!;
+        final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+        final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
+        return actDate.isAfter(start.subtract(const Duration(seconds: 1))) && 
+               actDate.isBefore(end.add(const Duration(seconds: 1)));
+      }).toList();
+    } else if (_dateFilter != 'all') {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      list = list.where((a) {
+        if (a.time == null) return false;
+        final actDate = a.time!;
+        if (_dateFilter == 'today') {
+          return actDate.year == today.year && actDate.month == today.month && actDate.day == today.day;
+        } else if (_dateFilter == 'yesterday') {
+          final yesterday = today.subtract(const Duration(days: 1));
+          return actDate.year == yesterday.year && actDate.month == yesterday.month && actDate.day == yesterday.day;
+        } else if (_dateFilter == 'this_week') {
+          final weekStart = today.subtract(Duration(days: today.weekday - 1));
+          final weekEnd = weekStart.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+          return actDate.isAfter(weekStart.subtract(const Duration(seconds: 1))) && actDate.isBefore(weekEnd);
+        } else if (_dateFilter == 'this_month') {
+          return actDate.year == today.year && actDate.month == today.month;
+        }
+        return true;
+      }).toList();
+    }
+    return list;
   }
 
   @override
@@ -84,6 +125,56 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         children: [
           AdminHeader(
             onBackPressed: () => AdminMainLayout.switchToTab(0),
+            selectedFilterLabel: _dateFilterLabel,
+            startDate: _startDate,
+            endDate: _endDate,
+            onFilterSelected: (filter) {
+              setState(() {
+                _dateFilter = filter;
+                _startDate = null; // Clear custom range
+                _endDate = null;
+                switch (filter) {
+                  case 'today':
+                    _dateFilterLabel = 'Today';
+                    break;
+                  case 'yesterday':
+                    _dateFilterLabel = 'Yesterday';
+                    break;
+                  case 'this_week':
+                    _dateFilterLabel = 'This Week';
+                    break;
+                  case 'this_month':
+                    _dateFilterLabel = 'This Month';
+                    break;
+                  default:
+                    _dateFilterLabel = 'All Time';
+                }
+              });
+            },
+            onStartDateSelected: (date) {
+              setState(() {
+                _startDate = date;
+                if (date != null && _endDate != null) {
+                  _dateFilter = 'custom';
+                  _dateFilterLabel = 'Custom Range';
+                } else if (date == null) {
+                  _dateFilter = 'all';
+                  _dateFilterLabel = 'All Time';
+                }
+              });
+            },
+            onEndDateSelected: (date) {
+              setState(() {
+                _endDate = date;
+                if (_startDate != null && date != null) {
+                  _dateFilter = 'custom';
+                  _dateFilterLabel = 'Custom Range';
+                } else if (date == null) {
+                  _dateFilter = 'all';
+                  _dateFilterLabel = 'All Time';
+                }
+              });
+            },
             filters: Row(
                children: [
                 _buildFilterBtn("All", _selectedFilter == 'all'),

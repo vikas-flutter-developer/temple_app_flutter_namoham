@@ -2327,10 +2327,19 @@ class ApiService {
   // ============== DASHBOARD ==============
 
   /// Get dashboard stats
-  /// [filter] can be 'month', 'week', 'year'
-  Future<Map<String, dynamic>> getDashboardStats({String filter = 'month'}) async {
+  /// [filter] can be 'month', 'week', 'year', 'today'
+  Future<Map<String, dynamic>> getDashboardStats({
+    String filter = 'month',
+    String? startDate,
+    String? endDate,
+  }) async {
+    String url = '$baseUrl/dashboard/stats?filter=$filter';
+    if (startDate != null && endDate != null) {
+      url = '$baseUrl/dashboard/stats?startDate=$startDate&endDate=$endDate';
+    }
+    
     final response = await client.get(
-      Uri.parse('$baseUrl/dashboard/stats?filter=$filter'),
+      Uri.parse(url),
       headers: await _getHeaders(),
     );
 
@@ -2550,9 +2559,18 @@ class ApiService {
   }
 
   /// Get donation stats
-  Future<Map<String, dynamic>> getDashboardDonationStats({String filter = 'all'}) async {
+  Future<Map<String, dynamic>> getDashboardDonationStats({
+    String filter = 'all',
+    String? startDate,
+    String? endDate,
+  }) async {
+    String url = '$baseUrl/dashboard/donations/stats?filter=$filter';
+    if (startDate != null && endDate != null) {
+      url = '$baseUrl/dashboard/donations/stats?startDate=$startDate&endDate=$endDate&filter=$filter';
+    }
+    
     final response = await client.get(
-      Uri.parse('$baseUrl/dashboard/donations/stats?filter=$filter'),
+      Uri.parse(url),
       headers: await _getHeaders(),
     );
 

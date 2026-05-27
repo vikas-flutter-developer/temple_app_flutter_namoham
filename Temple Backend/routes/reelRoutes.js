@@ -10,7 +10,8 @@ import {
     incrementViews,
     deleteReel,
     saveReel,
-    getSavedReels
+    getSavedReels,
+    getReelById
 } from '../controllers/reelController.js';
 import { protect } from '../middleware/auth.js';
 
@@ -26,6 +27,9 @@ reelRoutes.get('/user/:userId', getReelsByUser);
 
 // Get saved reels (before /:reelId)
 reelRoutes.get('/saved', getSavedReels);
+
+// Get single reel by ID
+reelRoutes.get('/:reelId', getReelById);
 
 // Create a new reel (accepts videoUrl and thumbnailUrl from client)
 reelRoutes.post('/create', createReel);

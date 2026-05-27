@@ -45,17 +45,12 @@ class _ProfileStatsState extends State<ProfileStats> {
       child: IntrinsicHeight(
         child: Row(
           children: [
-            // Live Post Count
+            // Live Post Count (renders combined total of photo posts and video reels from the backend)
             Expanded(
-              child: Consumer<PostsProvider>(
-                builder: (context, postsProvider, child) {
-                  final count = postsProvider.userPostCount;
-                  return _buildStat(
-                    '${postsProvider.isLoadingPostCount ? "..." : count}', 
-                    l10n.posts, 
-                    context
-                  );
-                },
+              child: _buildStat(
+                '${widget.profile.posts}', 
+                l10n.posts, 
+                context
               ),
             ),
             

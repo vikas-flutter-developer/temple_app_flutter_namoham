@@ -29,6 +29,12 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
   List<DonationTrafficModel> _trafficData = [];
   List<DonationHistoryModel> _donations = [];
   PaginationModel? _pagination;
+
+  // Date filter state
+  String _dateFilter = 'all';
+  String _dateFilterLabel = 'All Time';
+  DateTime? _startDate;
+  DateTime? _endDate;
   
   @override
   void initState() {
@@ -43,8 +49,20 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
     });
     
     try {
+      // Format custom dates if active
+      String? startStr;
+      String? endStr;
+      if (_startDate != null && _endDate != null) {
+        startStr = _startDate!.toIso8601String().split('T')[0];
+        endStr = _endDate!.toIso8601String().split('T')[0];
+      }
+
       final results = await Future.wait([
-        _apiService.getDashboardDonationStats(filter: _selectedFilter),
+        _apiService.getDashboardDonationStats(
+          filter: _selectedFilter,
+          startDate: startStr,
+          endDate: endStr,
+        ),
         _apiService.getDonationMonthly(filter: _selectedFilter),
         _apiService.getDonationTraffic(filter: _selectedFilter),
         _apiService.getDonationHistory(filter: _selectedFilter),
@@ -251,6 +269,63 @@ class _AdminDonationScreenState extends State<AdminDonationScreen> {
         children: [
           AdminHeader(
             onBackPressed: () => AdminMainLayout.switchToTab(0),
+            selectedFilterLabel: _dateFilterLabel,
+            startDate: _startDate,
+            endDate: _endDate,
+            onFilterSelected: (filter) {
+              setState(() {
+                _dateFilter = filter;
+                _startDate = null; // Clear custom range
+                _endDate = null;
+                switch (filter) {
+                  case 'today':
+                    _dateFilterLabel = 'Today';
+                    break;
+                  case 'yesterday':
+                    _dateFilterLabel = 'Yesterday';
+                    break;
+                  case 'this_week':
+                    _dateFilterLabel = 'This Week';
+                    break;
+                  case 'this_month':
+                    _dateFilterLabel = 'This Month';
+                    break;
+                  default:
+                    _dateFilterLabel = 'All Time';
+                }
+              });
+              _loadData();
+            },
+            onStartDateSelected: (date) {
+              setState(() {
+                _startDate = date;
+                if (date != null && _endDate != null) {
+                  _dateFilter = 'custom';
+                  _dateFilterLabel = 'Custom Range';
+                } else if (date == null) {
+                  _dateFilter = 'all';
+                  _dateFilterLabel = 'All Time';
+                }
+              });
+              if ((_startDate != null && _endDate != null) || date == null) {
+                _loadData();
+              }
+            },
+            onEndDateSelected: (date) {
+              setState(() {
+                _endDate = date;
+                if (_startDate != null && date != null) {
+                  _dateFilter = 'custom';
+                  _dateFilterLabel = 'Custom Range';
+                } else if (date == null) {
+                  _dateFilter = 'all';
+                  _dateFilterLabel = 'All Time';
+                }
+              });
+              if ((_startDate != null && _endDate != null) || date == null) {
+                _loadData();
+              }
+            },
             filters: Row(
                children: [
                 _buildFilterBtn("All", _selectedFilter == 'all'),

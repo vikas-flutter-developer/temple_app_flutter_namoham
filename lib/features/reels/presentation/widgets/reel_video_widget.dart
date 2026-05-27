@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_user_app/features/follow/presentation/providers/follow_provider.dart';
 
 import 'package:flutter_user_app/core/util/share_helper.dart';
 import 'package:flutter_user_app/features/reels/data/models/reel_model.dart';
@@ -9,6 +11,8 @@ import 'package:flutter_user_app/features/creator/presentation/screens/creator_p
 import 'package:flutter_user_app/features/temples/data/models/temple_model.dart';
 import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
 import '../../../../widgets/custom_widgets/custom_network_image.dart';
+import 'package:flutter_user_app/features/reels/presentation/widgets/reel_description_sheet.dart';
+import 'package:flutter_user_app/features/reels/presentation/providers/reels_provider.dart';
 
 
 class ReelVideoWidget extends StatefulWidget {
@@ -149,11 +153,87 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
     }
   }
 
+  void _navigateToProfile() {
+    final reel = widget.reel;
+    if (reel.userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot open profile: User ID missing')),
+      );
+      return;
+    }
+
+    final userType = reel.userType.toLowerCase();
+
+    if (userType == 'temple') {
+      final partialTemple = TempleModel(
+        id: reel.userId,
+        name: reel.username,
+        imageUrl: reel.userImage,
+        rating: 0,
+        totalReviews: 0,
+        posts: 0,
+        followers: 0,
+        following: 0,
+        recommendationPercentage: 0,
+        reviews: [],
+        donations: [],
+        totalDonations: 0,
+        location: '',
+        email: '',
+        phoneNumber: '',
+        isVerified: false,
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TemplePage(templeModel: partialTemple),
+        ),
+      );
+    } else if (userType == 'creator') {
+      final partialCreator = CreatorModel(
+        id: reel.userId,
+        creatorName: reel.username,
+        email: '',
+        phoneNumber: '',
+        profilePic: reel.userImage,
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CreatorPage(creator: partialCreator),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User Profile Coming Soon')),
+      );
+    }
+  }
+
+  void _showDescriptionSheet(BuildContext context) {
+    final provider = context.read<ReelsProvider>();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => ChangeNotifierProvider.value(
+        value: provider,
+        child: ReelDescriptionSheet(
+          reel: widget.reel,
+          onProfileTap: _navigateToProfile,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final controller = widget.controller;
     final reel = widget.reel;
+    final followProvider = Provider.of<FollowProvider>(context);
 
     return GestureDetector(
       onTap: _togglePlayPause,
@@ -255,29 +335,7 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Time display on left
-                      Padding(
-                        padding: const EdgeInsets.only(left: 12, bottom: 4),
-                        child: Row(
-                          children: [
-                            Text(
-                              _formatDuration(value.position),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              ' / ${_formatDuration(value.duration)}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+
                       // Thin progress bar (Instagram style)
                       GestureDetector(
                         onHorizontalDragUpdate: (details) {
@@ -339,9 +397,10 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
             ),
 
         // Right-side actions
+        // Right-side actions
         Positioned(
           right: 12,
-          bottom: 110,
+          bottom: 90,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -351,21 +410,21 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                 label: reel.likes.toString(),
                 onPressed: widget.onLikePressed,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               _ActionButton(
                 icon: Icons.chat_bubble_outline,
                 iconColor: Colors.white,
                 label: reel.comments.length.toString(),
                 onPressed: widget.onCommentPressed,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               _ActionButton(
                 icon: widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
                 iconColor: Colors.white,
                 label: 'Save',
                 onPressed: widget.onSavePressed,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               _ActionButton(
                 icon: Icons.send,
                 iconColor: Colors.white,
@@ -375,15 +434,8 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                   ShareHelper.showReelShareSheet(context, reel.id);
                 },
               ),
-              const SizedBox(height: 10),
-                _ActionButton(
-                icon: Icons.remove_red_eye_outlined,
-                iconColor: Colors.white,
-                label: reel.views.toString(),
-                onPressed: () {},
-              ),
-              const SizedBox(height: 10),
-              if (widget.canCreateReel)
+              if (widget.canCreateReel) ...[
+                const SizedBox(height: 6),
                 _ActionButton(
                   icon: Icons.add_circle_outline,
                   iconColor: Colors.white,
@@ -397,7 +449,8 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
                     );
                   },
                 ),
-              const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 6),
               PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == 'delete' && widget.onDeletePressed != null) {
@@ -453,161 +506,167 @@ class _ReelVideoWidgetState extends State<ReelVideoWidget> {
         Positioned(
           left: 12,
           right: 80,
-          bottom: 130,
-          child: GestureDetector(
-            onTap: () {
-              if (reel.userId.isEmpty) {
-                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Cannot open profile: User ID missing')),
-                );
-                return;
-              }
-
-              final userType = reel.userType.toLowerCase();
-
-              if (userType == 'temple') {
-                final partialTemple = TempleModel(
-                  id: reel.userId,
-                  name: reel.username,
-                  imageUrl: reel.userImage,
-                  rating: 0,
-                  totalReviews: 0,
-                  posts: 0,
-                  followers: 0,
-                  following: 0,
-                  recommendationPercentage: 0,
-                  reviews: [],
-                  donations: [],
-                  totalDonations: 0,
-                  location: '',
-                  email: '',
-                  phoneNumber: '',
-                  isVerified: false,
-                );
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TemplePage(templeModel: partialTemple),
-                  ),
-                );
-              } else if (userType == 'creator') {
-                final partialCreator = CreatorModel(
-                  id: reel.userId,
-                  creatorName: reel.username,
-                  email: '',
-                  phoneNumber: '',
-                  profilePic: reel.userImage,
-                );
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CreatorPage(creator: partialCreator),
-                  ),
-                );
-              } else {
-                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('User Profile Coming Soon')),
-                );
-              }
-            },
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile Picture
-                Container(
-                  width: 44,
-                  height: 44,
-                  padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.orange,
-                        Colors.pink,
-                        Colors.purple,
-                      ],
-                      begin: Alignment.bottomLeft,
-                      end: Alignment.topRight,
-                    ),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black, width: 2),
-                    ),
-                    child: ClipOval(
-                      child: reel.userImage.isNotEmpty
-                          ? CustomNetworkImage(
-                              imageUrl: reel.userImage,
-                              fit: BoxFit.cover,
-                              errorWidget: Container(
-                                color: const Color(0xFF29D0FF),
-                                child: Center(
-                                  child: Text(
-                                    reel.username.isNotEmpty
-                                        ? reel.username[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+          bottom: 90,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Row containing profile picture, username, verified badge, and follow button
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    onTap: _navigateToProfile,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.orange,
+                            Colors.pink,
+                            Colors.purple,
+                          ],
+                          begin: Alignment.bottomLeft,
+                          end: Alignment.topRight,
+                        ),
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.black, width: 2),
+                        ),
+                        child: ClipOval(
+                          child: reel.userImage.isNotEmpty
+                              ? CustomNetworkImage(
+                                  imageUrl: reel.userImage,
+                                  fit: BoxFit.cover,
+                                  errorWidget: Container(
+                                    color: const Color(0xFF29D0FF),
+                                    child: Center(
+                                      child: Text(
+                                        reel.username.isNotEmpty
+                                            ? reel.username[0].toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  color: const Color(0xFF29D0FF),
+                                  child: Center(
+                                    child: Text(
+                                      reel.username.isNotEmpty
+                                          ? reel.username[0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                     ),
                                   ),
                                 ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Username, Verified badge, Follow button in horizontal alignment
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: GestureDetector(
+                            onTap: _navigateToProfile,
+                            child: Text(
+                              reel.username,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
                               ),
-                            )
-                          : Container(
-                              color: const Color(0xFF29D0FF),
-                              child: Center(
-                                child: Text(
-                                  reel.username.isNotEmpty
-                                      ? reel.username[0].toUpperCase()
-                                      : '?',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
+                            ),
+                          ),
+                        ),
+                        if (reel.userType.toLowerCase() == 'temple' || reel.userType.toLowerCase() == 'creator') ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.verified,
+                            color: Colors.blue,
+                            size: 15,
+                          ),
+                        ],
+                        if (followProvider.userId != null &&
+                            followProvider.userId != reel.userId &&
+                            (reel.userType.toLowerCase() == 'temple' || reel.userType.toLowerCase() == 'creator')) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () async {
+                              final following = followProvider.isFollowing(reel.userId);
+                              if (following) {
+                                await followProvider.unfollow(
+                                  followingId: reel.userId,
+                                  followingType: reel.userType,
+                                );
+                              } else {
+                                await followProvider.follow(
+                                  followingId: reel.userId,
+                                  followingType: reel.userType,
+                                );
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.white.withOpacity(0.8), width: 1.0),
+                                borderRadius: BorderRadius.circular(6),
+                                color: followProvider.isFollowing(reel.userId)
+                                    ? Colors.white.withOpacity(0.2)
+                                    : Colors.transparent,
+                              ),
+                              child: Text(
+                                followProvider.isFollowing(reel.userId) ? 'Following' : 'Follow',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (reel.caption.trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => _showDescriptionSheet(context),
+                  child: Text(
+                    reel.caption,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withOpacity(0.95),
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                // Username and Caption
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        reel.username,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (reel.caption.trim().isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          reel.caption,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withOpacity(0.95),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
               ],
-            ),
+            ],
           ),
         ),
       ],

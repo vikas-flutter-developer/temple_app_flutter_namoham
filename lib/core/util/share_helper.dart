@@ -26,6 +26,24 @@ class ShareHelper {
     );
   }
 
+  /// Show share options bottom sheet for a temple profile
+  static void showTempleShareSheet(BuildContext context, String templeId, String templeName) {
+    _showShareSheet(
+      context: context,
+      title: 'Share Temple',
+      onShare: (platform) => _shareTemple(context, templeId, templeName, platform),
+    );
+  }
+
+  /// Show share options bottom sheet for a creator profile
+  static void showCreatorShareSheet(BuildContext context, String creatorId, String creatorName) {
+    _showShareSheet(
+      context: context,
+      title: 'Share Creator',
+      onShare: (platform) => _shareCreator(context, creatorId, creatorName, platform),
+    );
+  }
+
   static void _showShareSheet({
     required BuildContext context,
     required String title,
@@ -302,6 +320,146 @@ class ShareHelper {
         debugPrint('Analytics tracking failed: $e');
       });
       
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  static Future<void> _shareTemple(BuildContext context, String templeId, String templeName, String platform) async {
+    try {
+      final templeUrl = UrlGenerator.generateTempleUrl(templeId);
+      final playStoreUrl = 'https://play.google.com/store/apps/details?id=com.abhitreader.temple&pcampaignid=web_share';
+      final shareText = 'Check out $templeName on Temple App!\n$templeUrl\n\nDownload the app: $playStoreUrl';
+      
+      switch (platform) {
+        case 'copy':
+          await Clipboard.setData(ClipboardData(text: templeUrl));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Link copied to clipboard'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          break;
+          
+        case 'whatsapp':
+          final whatsappUrl = 'whatsapp://send?text=${Uri.encodeComponent(shareText)}';
+          if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
+            await launchUrl(Uri.parse(whatsappUrl));
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'telegram':
+          final telegramUrl = 'https://t.me/share/url?url=${Uri.encodeComponent(templeUrl)}&text=${Uri.encodeComponent("Check out $templeName")}';
+          if (await canLaunchUrl(Uri.parse(telegramUrl))) {
+            await launchUrl(Uri.parse(telegramUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'facebook':
+          final facebookUrl = 'https://www.facebook.com/sharer/sharer.php?u=${Uri.encodeComponent(templeUrl)}';
+          if (await canLaunchUrl(Uri.parse(facebookUrl))) {
+            await launchUrl(Uri.parse(facebookUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'twitter':
+          final twitterUrl = 'https://twitter.com/intent/tweet?text=${Uri.encodeComponent(shareText)}';
+          if (await canLaunchUrl(Uri.parse(twitterUrl))) {
+            await launchUrl(Uri.parse(twitterUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        default:
+          await Share.share(shareText);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  static Future<void> _shareCreator(BuildContext context, String creatorId, String creatorName, String platform) async {
+    try {
+      final creatorUrl = UrlGenerator.generateCreatorUrl(creatorId);
+      final playStoreUrl = 'https://play.google.com/store/apps/details?id=com.abhitreader.temple&pcampaignid=web_share';
+      final shareText = 'Check out $creatorName on Temple App!\n$creatorUrl\n\nDownload the app: $playStoreUrl';
+      
+      switch (platform) {
+        case 'copy':
+          await Clipboard.setData(ClipboardData(text: creatorUrl));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Link copied to clipboard'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          break;
+          
+        case 'whatsapp':
+          final whatsappUrl = 'whatsapp://send?text=${Uri.encodeComponent(shareText)}';
+          if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
+            await launchUrl(Uri.parse(whatsappUrl));
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'telegram':
+          final telegramUrl = 'https://t.me/share/url?url=${Uri.encodeComponent(creatorUrl)}&text=${Uri.encodeComponent("Check out $creatorName")}';
+          if (await canLaunchUrl(Uri.parse(telegramUrl))) {
+            await launchUrl(Uri.parse(telegramUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'facebook':
+          final facebookUrl = 'https://www.facebook.com/sharer/sharer.php?u=${Uri.encodeComponent(creatorUrl)}';
+          if (await canLaunchUrl(Uri.parse(facebookUrl))) {
+            await launchUrl(Uri.parse(facebookUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        case 'twitter':
+          final twitterUrl = 'https://twitter.com/intent/tweet?text=${Uri.encodeComponent(shareText)}';
+          if (await canLaunchUrl(Uri.parse(twitterUrl))) {
+            await launchUrl(Uri.parse(twitterUrl), mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(shareText);
+          }
+          break;
+          
+        default:
+          await Share.share(shareText);
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -166,6 +166,7 @@ class ClientModel {
   final String type;
   final DateTime? createdAt;
   final String? image; // Added image field
+  final String? gender; // Added gender field
 
   ClientModel({
     required this.id,
@@ -178,6 +179,7 @@ class ClientModel {
     required this.type,
     this.createdAt,
     this.image,
+    this.gender,
   });
 
   factory ClientModel.fromJson(Map<String, dynamic> json) {
@@ -192,6 +194,7 @@ class ClientModel {
       type: (json['type'] ?? 'User').toString(),
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
       image: json['profilePic'] ?? json['image'] ?? json['userImage'] ?? json['imageUrl'],
+      gender: json['gender']?.toString() ?? 'N/A',
     );
   }
 }

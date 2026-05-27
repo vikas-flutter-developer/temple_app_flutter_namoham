@@ -9,6 +9,11 @@ import 'package:flutter_user_app/features/reels/presentation/providers/reels_pro
 import 'package:flutter_user_app/features/posts/data/models/post_model.dart';
 import 'package:flutter_user_app/features/posts/presentation/screens/post_detail_screen.dart';
 import 'package:flutter_user_app/features/reels/presentation/screens/video_screen.dart';
+import 'package:flutter_user_app/features/reels/data/models/reel_model.dart';
+import 'package:flutter_user_app/features/temples/data/models/temple_model.dart';
+import 'package:flutter_user_app/features/temples/presentation/screens/temple_page.dart';
+import 'package:flutter_user_app/features/creator/data/model/creators_model.dart';
+import 'package:flutter_user_app/features/creator/presentation/screens/creator_page.dart';
 
 // The GlobalKey must be the same instance used in MaterialApp.
 // Import it from main.dart.
@@ -110,26 +115,51 @@ class DeepLinkHandler {
     final ctx = _navContext;
     if (ctx == null) return;
     try {
-      final reelsProvider = Provider.of<ReelsProvider>(ctx, listen: false);
-      
-      // Attempt to find the reel
-      int index = reelsProvider.reels.indexWhere((r) => r.id == reelId);
-      
-      if (index == -1) {
-        // If not found, try loading reels once
-        await reelsProvider.loadReels();
-        index = reelsProvider.reels.indexWhere((r) => r.id == reelId);
+      ReelModel? reelModel;
+
+      // Strategy 1: Try to find in cache
+      try {
+        final reelsProvider = Provider.of<ReelsProvider>(ctx, listen: false);
+        int index = reelsProvider.reels.indexWhere((r) => r.id == reelId);
+        if (index != -1) {
+          reelModel = reelsProvider.reels[index];
+        }
+      } catch (_) {
+        // Provider not ready/available yet
       }
 
-      if (index != -1 && navigatorKey.currentState != null) {
-        // We found the reel, navigate to the reels screen starting at this index
+      // Strategy 2: Fetch directly from API (most reliable)
+      if (reelModel == null) {
+        debugPrint('Reel not in cache, fetching from API: $reelId');
+        final apiService = ApiService.create();
+        final response = await apiService.getReelById(reelId);
+
+        Map<String, dynamic>? reelData;
+        if (response['data'] is Map<String, dynamic>) {
+          reelData = response['data'] as Map<String, dynamic>;
+        } else if (response['reel'] is Map<String, dynamic>) {
+          reelData = response['reel'] as Map<String, dynamic>;
+        } else if (response is Map<String, dynamic> && response.isNotEmpty) {
+          reelData = response;
+        }
+
+        if (reelData != null && reelData.isNotEmpty) {
+          reelModel = ReelModel.fromJson(reelData);
+        }
+      }
+
+      // Navigate using the global navigatorKey
+      if (reelModel != null && navigatorKey.currentState != null) {
         navigatorKey.currentState!.push(
           MaterialPageRoute(
-            builder: (context) => VideosScreen(initialIndex: index),
+            builder: (context) => VideosScreen(
+              initialReels: [reelModel!],
+              initialIndex: 0,
+            ),
           ),
         );
       } else {
-        _showDeepLinkError('Reel not found in current feed');
+        _showDeepLinkError('Reel not found');
       }
     } catch (e) {
       debugPrint('Error navigating to reel: $e');
@@ -210,15 +240,47 @@ class DeepLinkHandler {
   }
 
   /// Navigate to a temple profile
-  void _navigateToTemple(String templeId) {
-    // Requires a Temple profile screen that takes an ID
-    _showDeepLinkError('Temple profiles not fully implemented yet');
+  void _navigateToTemple(String templeId) async {
+    try {
+      debugPrint('DeepLink: Fetching temple details from API: $templeId');
+      final apiService = ApiService.create();
+      final TempleModel templeModel = await apiService.getTempleById(templeId);
+
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.push(
+          MaterialPageRoute(
+            builder: (context) => TemplePage(templeModel: templeModel),
+          ),
+        );
+      } else {
+        _showDeepLinkError('Unable to open temple page');
+      }
+    } catch (e) {
+      debugPrint('Error navigating to temple deep link: $e');
+      _showDeepLinkError('Temple not found');
+    }
   }
 
   /// Navigate to a creator profile
-  void _navigateToCreator(String creatorId) {
-    // Requires a Creator profile screen that takes an ID
-    _showDeepLinkError('Creator profiles not fully implemented yet');
+  void _navigateToCreator(String creatorId) async {
+    try {
+      debugPrint('DeepLink: Fetching creator details from API: $creatorId');
+      final apiService = ApiService.create();
+      final CreatorModel creatorModel = await apiService.getCreatorById(creatorId);
+
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.push(
+          MaterialPageRoute(
+            builder: (context) => CreatorPage(creator: creatorModel),
+          ),
+        );
+      } else {
+        _showDeepLinkError('Unable to open creator page');
+      }
+    } catch (e) {
+      debugPrint('Error navigating to creator deep link: $e');
+      _showDeepLinkError('Creator not found');
+    }
   }
 
   /// Show an error message when deep link navigation fails

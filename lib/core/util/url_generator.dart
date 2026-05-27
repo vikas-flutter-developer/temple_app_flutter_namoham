@@ -59,18 +59,33 @@ class UrlGenerator {
     }
 
     // Check if it's our app scheme or web URL
-    if (uri.scheme != appScheme && !url.startsWith(webBaseUrl)) {
+    final isWebUrl = (uri.scheme == 'http' || uri.scheme == 'https') && 
+                     (uri.host == 'namoham.com' || uri.host == 'www.namoham.com');
+
+    if (uri.scheme != appScheme && !isWebUrl) {
       return null;
     }
 
-    // Extract path segments
-    final pathSegments = uri.pathSegments;
-    if (pathSegments.length < 2) {
-      return null;
+    String? type;
+    String? id;
+
+    if (uri.scheme == appScheme) {
+      type = uri.host; // e.g. 'reel' or 'post'
+      if (uri.pathSegments.isNotEmpty) {
+        id = uri.pathSegments.first;
+      }
+    } else {
+      // Extract path segments for web Url
+      final pathSegments = uri.pathSegments;
+      if (pathSegments.length >= 2) {
+        type = pathSegments[0]; // 'reel', 'post', 'temple', 'creator'
+        id = pathSegments[1];
+      }
     }
 
-    final type = pathSegments[0]; // 'reel', 'post', 'temple', 'creator'
-    final id = pathSegments[1];
+    if (type == null || id == null || type.isEmpty || id.isEmpty) {
+      return null;
+    }
 
     return {
       'type': type,

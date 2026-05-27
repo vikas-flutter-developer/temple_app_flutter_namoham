@@ -7,23 +7,28 @@ import Post from '../models/postModel.js';
 import Follow from '../models/followModel.js';
 import mongoose from 'mongoose';
 
-// Helper function to get date range
+// Helper function to get date range (highly optimized to prevent Javascript Date mutation bugs)
 const getDateRange = (filter) => {
     const now = new Date();
-    let startDate, endDate = now;
+    const endDate = new Date(now); // Clone now to avoid mutating endDate
+    let startDate;
 
     switch (filter) {
         case 'today':
-            startDate = new Date(now.setHours(0, 0, 0, 0));
+            startDate = new Date(now);
+            startDate.setHours(0, 0, 0, 0);
             break;
         case 'week':
-            startDate = new Date(now.setDate(now.getDate() - 7));
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - 7);
             break;
         case 'month':
-            startDate = new Date(now.setMonth(now.getMonth() - 1));
+            startDate = new Date(now);
+            startDate.setMonth(now.getMonth() - 1);
             break;
         case 'year':
-            startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+            startDate = new Date(now);
+            startDate.setFullYear(now.getFullYear() - 1);
             break;
         default:
             startDate = new Date(0); // All time
@@ -274,6 +279,8 @@ export const getClientList = async (req, res) => {
         const skip = (page - 1) * limit;
         const sortOrder = order === 'desc' ? -1 : 1;
 
+        const connectedUsers = req.app.get('connectedUsers') || new Map();
+
         let clients = [];
         let total = 0;
 
@@ -288,7 +295,7 @@ export const getClientList = async (req, res) => {
 
         if (type === 'all' || type === 'user') {
             const users = await User.find(searchFilter)
-                .select('fullName email phoneNumber createdAt dob city state address')
+                .select('fullName email phoneNumber createdAt dob city state address gender')
                 .sort({ [sortBy]: sortOrder })
                 .skip(type === 'all' ? 0 : skip)
                 .limit(type === 'all' ? limit : parseInt(limit));
@@ -300,15 +307,16 @@ export const getClientList = async (req, res) => {
                 phone: u.phoneNumber || 'N/A',
                 dateOfBirth: u.dob,
                 location: `${u.city || ''}, ${u.state || ''}`.trim() || u.address || 'N/A',
-                status: 'Online',
+                status: connectedUsers.has(u._id.toString()) ? 'Online' : 'Offline',
                 type: 'User',
-                createdAt: u.createdAt
+                createdAt: u.createdAt,
+                gender: u.gender || 'N/A' // Return user gender
             })));
         }
 
         if (type === 'all' || type === 'temple') {
             const temples = await Temple.find(searchFilter)
-                .select('templeName email pocPhoneNumber createdAt address city state')
+                .select('templeName email pocPhoneNumber createdAt address city state establishmentDate')
                 .sort({ [sortBy]: sortOrder })
                 .skip(type === 'all' ? 0 : skip)
                 .limit(type === 'all' ? limit : parseInt(limit));
@@ -318,17 +326,18 @@ export const getClientList = async (req, res) => {
                 name: t.templeName,
                 email: t.email,
                 phone: t.pocPhoneNumber || 'N/A',
-                dateOfBirth: null,
+                dateOfBirth: t.establishmentDate,
                 location: `${t.city || ''}, ${t.state || ''}`.trim() || t.address || 'N/A',
-                status: 'Online',
+                status: connectedUsers.has(t._id.toString()) ? 'Online' : 'Offline',
                 type: 'Temple',
-                createdAt: t.createdAt
+                createdAt: t.createdAt,
+                gender: 'N/A' // Temples don't have gender
             })));
         }
 
         if (type === 'all' || type === 'creator') {
             const creators = await Creator.find(searchFilter)
-                .select('creatorName email phoneNumber createdAt address city state')
+                .select('creatorName email phoneNumber createdAt address city state gender dob')
                 .sort({ [sortBy]: sortOrder })
                 .skip(type === 'all' ? 0 : skip)
                 .limit(type === 'all' ? limit : parseInt(limit));
@@ -338,11 +347,12 @@ export const getClientList = async (req, res) => {
                 name: c.creatorName,
                 email: c.email,
                 phone: c.phoneNumber || 'N/A',
-                dateOfBirth: null,
+                dateOfBirth: c.dob,
                 location: `${c.city || ''}, ${c.state || ''}`.trim() || c.address || 'N/A',
-                status: 'Offline',
+                status: connectedUsers.has(c._id.toString()) ? 'Online' : 'Offline',
                 type: 'Creator',
-                createdAt: c.createdAt
+                createdAt: c.createdAt,
+                gender: c.gender || 'N/A' // Return creator gender
             })));
         }
 
@@ -403,34 +413,47 @@ const getPreviousPeriodRange = (filter, startDate, endDate) => {
         const end = new Date(endDate);
         const diff = end - start;
         return {
-            startDate: new Date(start - diff),
-            endDate: start
+            startDate: new Date(start.getTime() - diff),
+            endDate: new Date(start)
         };
     }
 
     const now = new Date();
+    let prevStartDate;
+    let prevEndDate;
+
     switch (filter) {
         case 'today':
-            return {
-                startDate: new Date(now.setDate(now.getDate() - 1)),
-                endDate: new Date(now.setHours(0, 0, 0, 0))
-            };
+            prevStartDate = new Date(now);
+            prevStartDate.setDate(now.getDate() - 1);
+            prevStartDate.setHours(0, 0, 0, 0);
+            
+            prevEndDate = new Date(now);
+            prevEndDate.setHours(0, 0, 0, 0);
+            break;
         case 'week':
-            return {
-                startDate: new Date(now.setDate(now.getDate() - 14)),
-                endDate: new Date(now.setDate(now.getDate() + 7))
-            };
+            prevStartDate = new Date(now);
+            prevStartDate.setDate(now.getDate() - 14);
+            
+            prevEndDate = new Date(now);
+            prevEndDate.setDate(now.getDate() - 7);
+            break;
         case 'month':
-            return {
-                startDate: new Date(now.setMonth(now.getMonth() - 2)),
-                endDate: new Date(now.setMonth(now.getMonth() + 1))
-            };
+            prevStartDate = new Date(now);
+            prevStartDate.setMonth(now.getMonth() - 2);
+            
+            prevEndDate = new Date(now);
+            prevEndDate.setMonth(now.getMonth() - 1);
+            break;
         default:
-            return {
-                startDate: new Date(0),
-                endDate: new Date()
-            };
+            prevStartDate = new Date(0);
+            prevEndDate = new Date();
     }
+
+    return {
+        startDate: prevStartDate,
+        endDate: prevEndDate
+    };
 };
 
 const calculateActiveVisitors = async (dateFilter) => {

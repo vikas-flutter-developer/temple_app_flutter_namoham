@@ -22,6 +22,12 @@ class _AdminAccountManagementScreenState extends State<AdminAccountManagementScr
   List<Map<String, dynamic>> _deactivatedTemples = [];
   List<Map<String, dynamic>> _deactivatedCreators = [];
 
+  // Date filter state
+  String _dateFilter = 'all';
+  String _dateFilterLabel = 'All Time';
+  DateTime? _startDate;
+  DateTime? _endDate;
+
   @override
   void initState() {
     super.initState();
@@ -211,6 +217,56 @@ class _AdminAccountManagementScreenState extends State<AdminAccountManagementScr
             onBackPressed: () => AdminMainLayout.switchToTab(0),
             title: "Account Management",
             showSearch: false,
+            selectedFilterLabel: _dateFilterLabel,
+            startDate: _startDate,
+            endDate: _endDate,
+            onFilterSelected: (filter) {
+              setState(() {
+                _dateFilter = filter;
+                _startDate = null; // Clear custom range
+                _endDate = null;
+                switch (filter) {
+                  case 'today':
+                    _dateFilterLabel = 'Today';
+                    break;
+                  case 'yesterday':
+                    _dateFilterLabel = 'Yesterday';
+                    break;
+                  case 'this_week':
+                    _dateFilterLabel = 'This Week';
+                    break;
+                  case 'this_month':
+                    _dateFilterLabel = 'This Month';
+                    break;
+                  default:
+                    _dateFilterLabel = 'All Time';
+                }
+              });
+            },
+            onStartDateSelected: (date) {
+              setState(() {
+                _startDate = date;
+                if (date != null && _endDate != null) {
+                  _dateFilter = 'custom';
+                  _dateFilterLabel = 'Custom Range';
+                } else if (date == null) {
+                  _dateFilter = 'all';
+                  _dateFilterLabel = 'All Time';
+                }
+              });
+            },
+            onEndDateSelected: (date) {
+              setState(() {
+                _endDate = date;
+                if (_startDate != null && date != null) {
+                  _dateFilter = 'custom';
+                  _dateFilterLabel = 'Custom Range';
+                } else if (date == null) {
+                  _dateFilter = 'all';
+                  _dateFilterLabel = 'All Time';
+                }
+              });
+            },
             filters: Row(
               children: [
                 _buildActionButton(
@@ -356,9 +412,52 @@ class _AdminAccountManagementScreenState extends State<AdminAccountManagementScr
   }
 
   Widget _buildAccountList(List<Map<String, dynamic>> accounts, String accountType) {
+    // Filter the accounts list client-side based on the selected date filter
+    List<Map<String, dynamic>> filteredList = accounts;
+    if (_startDate != null && _endDate != null) {
+      filteredList = filteredList.where((a) {
+        final dateStr = a['deactivatedAt'] ?? a['updatedAt'] ?? '';
+        if (dateStr.isEmpty) return false;
+        try {
+          final accountDate = DateTime.parse(dateStr);
+          final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+          final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
+          return accountDate.isAfter(start.subtract(const Duration(seconds: 1))) && 
+                 accountDate.isBefore(end.add(const Duration(seconds: 1)));
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+    } else if (_dateFilter != 'all') {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      filteredList = filteredList.where((a) {
+        final dateStr = a['deactivatedAt'] ?? a['updatedAt'] ?? '';
+        if (dateStr.isEmpty) return false;
+        try {
+          final accountDate = DateTime.parse(dateStr);
+          if (_dateFilter == 'today') {
+            return accountDate.year == today.year && accountDate.month == today.month && accountDate.day == today.day;
+          } else if (_dateFilter == 'yesterday') {
+            final yesterday = today.subtract(const Duration(days: 1));
+            return accountDate.year == yesterday.year && accountDate.month == yesterday.month && accountDate.day == yesterday.day;
+          } else if (_dateFilter == 'this_week') {
+            final weekStart = today.subtract(Duration(days: today.weekday - 1));
+            final weekEnd = weekStart.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+            return accountDate.isAfter(weekStart.subtract(const Duration(seconds: 1))) && accountDate.isBefore(weekEnd);
+          } else if (_dateFilter == 'this_month') {
+            return accountDate.year == today.year && accountDate.month == today.month;
+          }
+        } catch (_) {
+          return false;
+        }
+        return true;
+      }).toList();
+    }
+
     return RefreshIndicator(
       onRefresh: _loadDeactivatedAccounts,
-      child: accounts.isEmpty
+      child: filteredList.isEmpty
         ? ListView(
             children: [
               const SizedBox(height: 100),
@@ -386,10 +485,10 @@ class _AdminAccountManagementScreenState extends State<AdminAccountManagementScr
               ),
               padding: const EdgeInsets.all(24),
               child: ListView.separated(
-                itemCount: accounts.length,
+                itemCount: filteredList.length,
                 separatorBuilder: (_, __) => const Divider(height: 32),
                 itemBuilder: (context, index) {
-                  final account = accounts[index];
+                  final account = filteredList[index];
                   return _buildAccountItem(account, accountType);
                 },
               ),

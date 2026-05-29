@@ -185,7 +185,7 @@ class _AdminAppRatingsScreenState extends State<AdminAppRatingsScreen> {
             
             final match = clients.firstWhere(
                (c) => c.id == rating.userId, 
-               orElse: () => clients.firstWhere((c) => false, orElse: () => ClientModel(id: '', name: '', email: '', phone: '', location: '', status: '', type: '')), // Dummy
+               orElse: () => clients.firstWhere((c) => false, orElse: () => ClientModel(id: '', name: '', email: '', phone: '', location: '', status: '', type: '', isDeactivated: false)), // Dummy
             );
             
             if (match.id.isNotEmpty) {

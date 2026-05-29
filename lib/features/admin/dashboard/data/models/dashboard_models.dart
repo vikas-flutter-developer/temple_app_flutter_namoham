@@ -167,6 +167,7 @@ class ClientModel {
   final DateTime? createdAt;
   final String? image; // Added image field
   final String? gender; // Added gender field
+  final bool isDeactivated; // Added isDeactivated field
 
   ClientModel({
     required this.id,
@@ -180,6 +181,7 @@ class ClientModel {
     this.createdAt,
     this.image,
     this.gender,
+    required this.isDeactivated,
   });
 
   factory ClientModel.fromJson(Map<String, dynamic> json) {
@@ -195,6 +197,7 @@ class ClientModel {
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
       image: json['profilePic'] ?? json['image'] ?? json['userImage'] ?? json['imageUrl'],
       gender: json['gender']?.toString() ?? 'N/A',
+      isDeactivated: json['isDeactivated'] ?? false,
     );
   }
 }

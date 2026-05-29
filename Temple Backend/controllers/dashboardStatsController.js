@@ -295,7 +295,7 @@ export const getClientList = async (req, res) => {
 
         if (type === 'all' || type === 'user') {
             const users = await User.find(searchFilter)
-                .select('fullName email phoneNumber createdAt dob city state address gender')
+                .select('fullName email phoneNumber createdAt dob city state address gender isDeactivated')
                 .sort({ [sortBy]: sortOrder })
                 .skip(type === 'all' ? 0 : skip)
                 .limit(type === 'all' ? limit : parseInt(limit));
@@ -308,6 +308,7 @@ export const getClientList = async (req, res) => {
                 dateOfBirth: u.dob,
                 location: `${u.city || ''}, ${u.state || ''}`.trim() || u.address || 'N/A',
                 status: connectedUsers.has(u._id.toString()) ? 'Online' : 'Offline',
+                isDeactivated: u.isDeactivated || false,
                 type: 'User',
                 createdAt: u.createdAt,
                 gender: u.gender || 'N/A' // Return user gender
@@ -316,7 +317,7 @@ export const getClientList = async (req, res) => {
 
         if (type === 'all' || type === 'temple') {
             const temples = await Temple.find(searchFilter)
-                .select('templeName email pocPhoneNumber createdAt address city state establishmentDate')
+                .select('templeName email pocPhoneNumber createdAt address city state establishmentDate isDeactivated')
                 .sort({ [sortBy]: sortOrder })
                 .skip(type === 'all' ? 0 : skip)
                 .limit(type === 'all' ? limit : parseInt(limit));
@@ -329,6 +330,7 @@ export const getClientList = async (req, res) => {
                 dateOfBirth: t.establishmentDate,
                 location: `${t.city || ''}, ${t.state || ''}`.trim() || t.address || 'N/A',
                 status: connectedUsers.has(t._id.toString()) ? 'Online' : 'Offline',
+                isDeactivated: t.isDeactivated || false,
                 type: 'Temple',
                 createdAt: t.createdAt,
                 gender: 'N/A' // Temples don't have gender
@@ -337,7 +339,7 @@ export const getClientList = async (req, res) => {
 
         if (type === 'all' || type === 'creator') {
             const creators = await Creator.find(searchFilter)
-                .select('creatorName email phoneNumber createdAt address city state gender dob')
+                .select('creatorName email phoneNumber createdAt address city state gender dob isDeactivated')
                 .sort({ [sortBy]: sortOrder })
                 .skip(type === 'all' ? 0 : skip)
                 .limit(type === 'all' ? limit : parseInt(limit));
@@ -350,6 +352,7 @@ export const getClientList = async (req, res) => {
                 dateOfBirth: c.dob,
                 location: `${c.city || ''}, ${c.state || ''}`.trim() || c.address || 'N/A',
                 status: connectedUsers.has(c._id.toString()) ? 'Online' : 'Offline',
+                isDeactivated: c.isDeactivated || false,
                 type: 'Creator',
                 createdAt: c.createdAt,
                 gender: c.gender || 'N/A' // Return creator gender

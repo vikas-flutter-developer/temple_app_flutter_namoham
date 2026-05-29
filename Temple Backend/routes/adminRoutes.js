@@ -12,7 +12,8 @@ import {
     getDeactivatedAccounts,
     reactivateAccount,
     hardDeleteAccount,
-    permanentlyDeleteExpiredAccounts
+    permanentlyDeleteExpiredAccounts,
+    deactivateAccount
 } from '../controllers/adminController.js';
 import { protectAdmin } from '../middleware/adminAuth.js';
 
@@ -35,6 +36,7 @@ router.post('/verify/reject', protectAdmin, rejectAccount);                     
 
 // ===== Admin Account Management Routes =====
 router.get('/deactivated-accounts', protectAdmin, getDeactivatedAccounts);       // GET /api/admin/deactivated-accounts
+router.post('/deactivate-account', protectAdmin, deactivateAccount);             // POST /api/admin/deactivate-account
 router.post('/reactivate-account', protectAdmin, reactivateAccount);             // POST /api/admin/reactivate-account
 router.post('/hard-delete-account', protectAdmin, hardDeleteAccount);           // POST /api/admin/hard-delete-account
 router.post('/cleanup-expired-accounts', protectAdmin, permanentlyDeleteExpiredAccounts); // POST /api/admin/cleanup-expired-accounts

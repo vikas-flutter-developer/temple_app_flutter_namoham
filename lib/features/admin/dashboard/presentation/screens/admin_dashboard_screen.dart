@@ -178,6 +178,51 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Future<void> _handleReactivateClient(ClientModel client) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reactivate Account'),
+        content: Text(
+          'Are you sure you want to reactivate "${client.name}" (${client.type})?\n\n'
+          'The account and all associated content will be made visible again.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Reactivate', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final response = await _apiService.adminReactivateAccount(
+        accountType: client.type.toLowerCase(),
+        accountId: client.id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message'] ?? 'Account reactivated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadData(refreshClientsOnly: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to reactivate: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _handleHardDeleteClient(ClientModel client) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -604,33 +649,56 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Container(
                           width: 6, height: 6,
                           decoration: BoxDecoration(
-                            color: client.status.toLowerCase() == 'online' ? Colors.green : Colors.red,
+                            color: client.isDeactivated
+                                ? Colors.orange
+                                : (client.status.toLowerCase() == 'online' ? Colors.green : Colors.red),
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(client.status, style: const TextStyle(fontSize: 12)),
+                        Text(
+                          client.isDeactivated ? 'Deactivated' : client.status, 
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: client.isDeactivated ? Colors.orange : null,
+                            fontWeight: client.isDeactivated ? FontWeight.bold : null,
+                          ),
+                        ),
                       ]),
                       PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert, size: 18),
                         onSelected: (value) {
                           if (value == 'deactivate') {
                             _handleDeactivateClient(client);
+                          } else if (value == 'reactivate') {
+                            _handleReactivateClient(client);
                           } else if (value == 'delete') {
                             _handleHardDeleteClient(client);
                           }
                         },
                         itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'deactivate',
-                            child: Row(
-                              children: [
-                                Icon(Icons.block, size: 16, color: Colors.orange),
-                                SizedBox(width: 8),
-                                Text('Deactivate', style: TextStyle(fontSize: 13)),
-                              ],
+                          if (!client.isDeactivated)
+                            const PopupMenuItem(
+                              value: 'deactivate',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.block, size: 16, color: Colors.orange),
+                                  SizedBox(width: 8),
+                                  Text('Deactivate', style: TextStyle(fontSize: 13)),
+                                ],
+                              ),
+                            )
+                          else
+                            const PopupMenuItem(
+                              value: 'reactivate',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+                                  SizedBox(width: 8),
+                                  Text('Reactivate', style: TextStyle(fontSize: 13, color: Colors.green)),
+                                ],
+                              ),
                             ),
-                          ),
                           const PopupMenuItem(
                             value: 'delete',
                             child: Row(

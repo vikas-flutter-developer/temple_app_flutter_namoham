@@ -8,6 +8,7 @@ import Post from '../models/postModel.js';
 import Reel from '../models/reelModel.js';
 import Event from '../models/eventModel.js';
 import { cascadeDeleteAccount, runCleanup } from '../utils/accountCleanupCron.js';
+import RefreshToken from '../models/refreshTokenModel.js';
 
 // Generate JWT Token
 const generateToken = (adminId, role) => {
@@ -672,5 +673,56 @@ export const permanentlyDeleteExpiredAccounts = async (req, res) => {
     } catch (error) {
         console.error('❌ Admin cleanup error:', error);
         res.status(500).json({ success: false, message: 'Failed to run cleanup', error: error.message });
+    }
+};
+
+/**
+ * Admin: Soft deactivates a user, temple, or creator account with a 30-day grace period.
+ */
+export const deactivateAccount = async (req, res) => {
+    try {
+        const { accountType, accountId } = req.body;
+
+        if (!accountType || !accountId) {
+            return res.status(400).json({ success: false, message: 'accountType and accountId are required' });
+        }
+
+        let Model;
+        if (accountType === 'temple') Model = Temple;
+        else if (accountType === 'creator') Model = Creator;
+        else Model = User;
+
+        const account = await Model.findOne({ _id: accountId, isDeactivated: false });
+        if (!account) {
+            return res.status(404).json({ success: false, message: 'Active account not found' });
+        }
+
+        // Calculate scheduled deletion date (30 days from now)
+        const now = new Date();
+        const DELETION_GRACE_PERIOD_DAYS = 30;
+        const scheduledDeletionDate = new Date(now.getTime() + DELETION_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+
+        // Deactivate
+        account.isDeactivated = true;
+        account.deactivatedAt = now;
+        account.scheduledDeletionDate = scheduledDeletionDate;
+        await account.save();
+
+        // Hide content visibility
+        console.log(`🙈 ADMIN Hiding content visibility for ${accountType}: ${accountId}`);
+        await Post.updateMany({ userId: accountId }, { isDeactivated: true });
+        await Reel.updateMany({ userId: accountId }, { isDeactivated: true });
+        await Event.updateMany({ organizerId: accountId }, { isDeactivated: true });
+
+        // Revoke refresh tokens so user is logged out immediately
+        await RefreshToken.deleteMany({ userId: accountId });
+
+        res.json({
+            success: true,
+            message: `Account "${account.fullName || account.templeName || account.creatorName}" deactivated successfully.`
+        });
+    } catch (error) {
+        console.error('❌ Admin deactivate error:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };

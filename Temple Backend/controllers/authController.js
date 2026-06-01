@@ -14,39 +14,62 @@ import Reel from '../models/reelModel.js';
 import Event from '../models/eventModel.js';
 
 export const login = async (req, res) => {
-    const { email, password, userType } = req.body;
-    console.log('🔐 Login attempt:', { email, userType });
+    const { email, phoneNumber, password, userType } = req.body;
+    const identifier = email || phoneNumber || req.body.pocPhoneNumber;
+    console.log('🔐 Login attempt:', { identifier, userType });
 
     try {
         let user = null;
         let accountType = 'user';
 
+        const normalizedIdentifier = identifier?.trim();
+        
+        // Build dynamic query criteria to match email or phone (exact or suffix matching)
+        const getQueryCriteria = (phoneField) => {
+            const criteria = [];
+            if (normalizedIdentifier) {
+                criteria.push({ email: normalizedIdentifier });
+                criteria.push({ [phoneField]: normalizedIdentifier });
+                
+                const cleanPhone = normalizedIdentifier.replace(/\D/g, '');
+                if (cleanPhone.length >= 10) {
+                    const last10Digits = cleanPhone.slice(-10);
+                    criteria.push({ [phoneField]: new RegExp(`${last10Digits}$`) });
+                }
+            }
+            return criteria;
+        };
+
+        const userCriteria = getQueryCriteria('phoneNumber');
+        const creatorCriteria = getQueryCriteria('phoneNumber');
+        const templeCriteria = getQueryCriteria('pocPhoneNumber');
+
         // If userType is specified, search in that collection (case-insensitive)
         const normalizedUserType = userType?.toLowerCase();
 
         if (normalizedUserType === 'temple') {
-            user = await Temple.findOne({ email }).select('+password');
+            user = await Temple.findOne({ $or: templeCriteria }).select('+password');
             accountType = 'temple';
         } else if (normalizedUserType === 'creator') {
-            user = await Creator.findOne({ email }).select('+password');
+            user = await Creator.findOne({ $or: creatorCriteria }).select('+password');
             accountType = 'creator';
         } else if (normalizedUserType === 'user') {
-            user = await User.findOne({ email }).select('+password');
+            user = await User.findOne({ $or: userCriteria }).select('+password');
             accountType = 'user';
         } else {
             // Auto-detect: search all collections
             console.log('🔍 Auto-detecting account type...');
-            user = await User.findOne({ email }).select('+password');
+            user = await User.findOne({ $or: userCriteria }).select('+password');
             if (user) {
                 accountType = 'user';
                 console.log('  Found in users collection');
             } else {
-                user = await Temple.findOne({ email }).select('+password');
+                user = await Temple.findOne({ $or: templeCriteria }).select('+password');
                 if (user) {
                     accountType = 'temple';
                     console.log('  Found in temples collection');
                 } else {
-                    user = await Creator.findOne({ email }).select('+password');
+                    user = await Creator.findOne({ $or: creatorCriteria }).select('+password');
                     if (user) {
                         accountType = 'creator';
                         console.log('  Found in creators collection');
@@ -56,13 +79,13 @@ export const login = async (req, res) => {
         }
 
         if (!user) {
-            console.log('❌ User not found:', email, userType);
-            return res.status(401).json({ message: 'Invalid email or password' });
+            console.log('❌ User not found:', identifier, userType);
+            return res.status(401).json({ message: 'Invalid email/phone or password' });
         }
 
         // Check if account is deactivated (soft-deleted)
         if (user.isDeactivated) {
-            console.log(`⚠️ Login attempt for deactivated account: ${email}`);
+            console.log(`⚠️ Login attempt for deactivated account: ${user.email || identifier}`);
             const daysRemaining = user.scheduledDeletionDate
                 ? Math.max(0, Math.ceil((user.scheduledDeletionDate - new Date()) / (1000 * 60 * 60 * 24)))
                 : 0;
@@ -89,7 +112,7 @@ export const login = async (req, res) => {
                 const status = user.adminVerificationStatus || 'pending';
 
                 if (status === 'pending') {
-                    console.log(`⏳ Login blocked — ${accountType} account pending admin verification: ${email}`);
+                    console.log(`⏳ Login blocked — ${accountType} account pending admin verification: ${user.email || identifier}`);
                     return res.status(403).json({
                         message: 'Your account is under review. An admin will verify your account shortly. Please try again later or contact support.',
                         verificationStatus: 'pending',
@@ -98,7 +121,7 @@ export const login = async (req, res) => {
                 }
 
                 if (status === 'rejected') {
-                    console.log(`🚫 Login blocked — ${accountType} account rejected by admin: ${email}`);
+                    console.log(`🚫 Login blocked — ${accountType} account rejected by admin: ${user.email || identifier}`);
                     return res.status(403).json({
                         message: 'Your account registration has been rejected by the admin. Please contact support.',
                         verificationStatus: 'rejected',
@@ -114,8 +137,8 @@ export const login = async (req, res) => {
         console.log('🔑 Password match:', passwordMatch);
 
         if (!passwordMatch) {
-            console.log('❌ Password mismatch for:', email);
-            return res.status(401).json({ message: 'Invalid email or password' });
+            console.log('❌ Password mismatch for:', identifier);
+            return res.status(401).json({ message: 'Invalid email/phone or password' });
         }
 
         // Generate access + refresh tokens

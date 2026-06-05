@@ -708,6 +708,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                           if (_selectedRegisterType == 'Temple Register') {
                             registrationData['templeName'] = name;
+                            registrationData['establishmentDate'] = dob;
                             if (_websiteController.text.isNotEmpty) {
                               registrationData['website'] = _websiteController.text.trim();
                             }
@@ -716,6 +717,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             }
                           } else if (_selectedRegisterType == 'Creator Register') {
                             registrationData['creatorName'] = name;
+                            registrationData['dob'] = dob;
                             registrationData['gender'] = _selectedGender ?? '';
                           }
                         }

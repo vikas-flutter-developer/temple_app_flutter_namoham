@@ -498,7 +498,7 @@ class ClientDetailsDialog extends StatelessWidget {
             const SizedBox(height: 12),
             
             // Details List
-            _buildDetailItem(context, Icons.perm_identity, "ACCOUNT ID", client.id, canCopy: true),
+            _buildDetailItem(context, Icons.perm_identity, "ACCOUNT ID", client.userId, canCopy: true),
             _buildDetailItem(context, Icons.email_outlined, "EMAIL ADDRESS", client.email, canCopy: true),
             _buildDetailItem(context, Icons.phone_outlined, "PHONE NUMBER", client.phone, canCopy: true),
             _buildDetailItem(context, Icons.wc_outlined, "GENDER", client.gender ?? 'N/A'),
@@ -506,7 +506,7 @@ class ClientDetailsDialog extends StatelessWidget {
               context, 
               Icons.cake_outlined, 
               client.type.toLowerCase() == 'temple' ? "ESTABLISHMENT DATE" : "DATE OF BIRTH", 
-              client.dateOfBirth ?? 'N/A'
+              _formatDateString(client.dateOfBirth)
             ),
             _buildDetailItem(context, Icons.location_on_outlined, "LOCATION", client.location),
             if (client.createdAt != null)
@@ -592,5 +592,15 @@ class ClientDetailsDialog extends StatelessWidget {
 
   String _formatDateTime(DateTime dt) {
     return "${dt.month}/${dt.day}/${dt.year}";
+  }
+
+  String _formatDateString(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty || dateStr == 'N/A') return 'N/A';
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.month}/${date.day}/${date.year}';
+    } catch (_) {
+      return dateStr;
+    }
   }
 }

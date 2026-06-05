@@ -168,6 +168,7 @@ class ClientModel {
   final String? image; // Added image field
   final String? gender; // Added gender field
   final bool isDeactivated; // Added isDeactivated field
+  final String userId; // User-friendly account ID
 
   ClientModel({
     required this.id,
@@ -182,6 +183,7 @@ class ClientModel {
     this.image,
     this.gender,
     required this.isDeactivated,
+    required this.userId,
   });
 
   factory ClientModel.fromJson(Map<String, dynamic> json) {
@@ -198,6 +200,16 @@ class ClientModel {
       image: json['profilePic'] ?? json['image'] ?? json['userImage'] ?? json['imageUrl'],
       gender: json['gender']?.toString() ?? 'N/A',
       isDeactivated: json['isDeactivated'] ?? false,
+      userId: (json['userId'] ?? '').toString().isNotEmpty
+          ? json['userId'].toString()
+          : (() {
+              final prefix = (json['type']?.toString().toLowerCase() == 'temple') ? 'TMP'
+                  : (json['type']?.toString().toLowerCase() == 'creator') ? 'CRT'
+                  : 'USR';
+              final rawId = (json['id'] ?? json['_id'] ?? '').toString();
+              final suffix = rawId.length > 6 ? rawId.substring(rawId.length - 6).toUpperCase() : rawId.toUpperCase();
+              return '$prefix-$suffix';
+            })(),
     );
   }
 }

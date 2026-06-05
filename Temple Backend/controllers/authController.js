@@ -786,7 +786,9 @@ export const updateProfile = async (req, res) => {
             // Temple specific
             description, website, state, timings, bankDetails,
             // Creator specific 
-            title, bio, dob
+            title, bio, dob,
+            // Gender
+            gender
         } = req.body;
 
         // SECURITY: Don't log sensitive information
@@ -854,6 +856,7 @@ export const updateProfile = async (req, res) => {
             if (city) updateData.city = city;
             if (address) updateData.address = address;
             if (zipCode) updateData.zipCode = zipCode;
+            if (gender) updateData.gender = gender;
 
             user = await User.findByIdAndUpdate(userId, updateData, { new: true });
         } else if (accountType === 'temple') {
@@ -885,6 +888,7 @@ export const updateProfile = async (req, res) => {
             if (dob) updateData.dob = dob;
             if (bankDetails) updateData.bankDetails = bankDetails;
             if (profilePic) updateData.creatorPics = [profilePic];
+            if (gender) updateData.gender = gender;
 
             user = await Creator.findByIdAndUpdate(userId, updateData, { new: true });
         }
@@ -912,6 +916,7 @@ export const updateProfile = async (req, res) => {
             userData.city = user.city;
             userData.address = user.address;
             userData.zipCode = user.zipCode;
+            userData.gender = user.gender;
         } else if (accountType === 'temple') {
             userData.fullName = user.templeName;
             userData.templeName = user.templeName;
@@ -939,6 +944,8 @@ export const updateProfile = async (req, res) => {
             userData.title = user.title;
             userData.bio = user.bio;
             userData.bankDetails = user.bankDetails;
+            userData.gender = user.gender;
+            userData.dob = user.dob;
         }
 
         console.log('✅ Profile updated successfully:', userData.fullName);

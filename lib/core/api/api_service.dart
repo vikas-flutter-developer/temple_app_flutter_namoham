@@ -2013,6 +2013,7 @@ class ApiService {
     required String phoneNumber,
     required String otp,
     String profilePic = '',
+    String? gender,
   }) async {
     final response = await client.post(
       Uri.parse('$baseUrl/auth/registerUser'),
@@ -2025,6 +2026,7 @@ class ApiService {
         'phoneNumber': phoneNumber,
         'otp': otp,
         if (profilePic.isNotEmpty) 'profilePic': profilePic,
+        if (gender != null && gender.isNotEmpty) 'gender': gender,
       }),
     );
 
@@ -2045,6 +2047,8 @@ class ApiService {
     required String password,
     required String pocPhoneNumber,
     required String otp,
+    String? establishmentDate,
+    List<String>? templePics,
   }) async {
     final response = await client.post(
       Uri.parse('$baseUrl/auth/registerTemple'),
@@ -2058,6 +2062,8 @@ class ApiService {
         'password': password,
         'pocPhoneNumber': pocPhoneNumber,
         'otp': otp,
+        if (establishmentDate != null && establishmentDate.isNotEmpty) 'establishmentDate': establishmentDate,
+        if (templePics != null) 'templePics': templePics,
       }),
     );
 
@@ -2078,6 +2084,9 @@ class ApiService {
     required String phoneNumber,
     required String password,
     required String otp,
+    String? dob,
+    String? gender,
+    List<String>? creatorPics,
   }) async {
     final response = await client.post(
       Uri.parse('$baseUrl/auth/registerCreator'),
@@ -2091,6 +2100,9 @@ class ApiService {
         'phoneNumber': phoneNumber,
         'password': password,
         'otp': otp,
+        if (dob != null && dob.isNotEmpty) 'dob': dob,
+        if (gender != null && gender.isNotEmpty) 'gender': gender,
+        if (creatorPics != null) 'creatorPics': creatorPics,
       }),
     );
 

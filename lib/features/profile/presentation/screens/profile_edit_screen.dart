@@ -60,6 +60,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   
   
   String _countryCode = "+91";
+  String? _selectedGender;
 
   @override
   void initState() {
@@ -142,6 +143,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         }
         if (user['bio'] != null) _bioController.text = user['bio'];
         if (user['profilePic'] != null) _remotePhotoUrl = user['profilePic'];
+        if (user['gender'] != null) {
+          final val = user['gender'].toString().trim();
+          if (val.isNotEmpty && val != 'N/A') {
+            final capitalized = val[0].toUpperCase() + val.substring(1).toLowerCase();
+            if (['Male', 'Female', 'Other'].contains(capitalized)) {
+              _selectedGender = capitalized;
+            }
+          }
+        }
         
         // Populate bank details from wherever we found them
         if (bankDetails != null) {
@@ -360,6 +370,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         }
         
         if (data['profilePic'] != null) _remotePhotoUrl = data['profilePic'];
+        if (data['gender'] != null) {
+          final val = data['gender'].toString().trim();
+          if (val.isNotEmpty && val != 'N/A') {
+            final capitalized = val[0].toUpperCase() + val.substring(1).toLowerCase();
+            if (['Male', 'Female', 'Other'].contains(capitalized)) {
+              _selectedGender = capitalized;
+            }
+          }
+        }
         
         // Bank details for Creator
         if (data['bankDetails'] != null && data['bankDetails'] is Map) {
@@ -559,6 +578,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         if (_dobController.text.isNotEmpty) profileData['dob'] = _dobController.text.trim();
       }
 
+      if (_selectedGender != null && _selectedGender!.isNotEmpty) {
+        profileData['gender'] = _selectedGender;
+      }
+
       // Debug: Log the data being sent
       print('EDIT_PROFILE: Saving profile data: $profileData');
       if (profileData.containsKey('bankDetails')) {
@@ -736,8 +759,29 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                    labelText: 'Date of Birth (YYYY-MM-DD)', 
                    controller: _dobController,
                    isDateField: true,
-                 ),
-                 const SizedBox(height: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                      labelText: 'Gender',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    ),
+                    isExpanded: true,
+                    value: ['Male', 'Female', 'Other'].contains(_selectedGender) ? _selectedGender : null,
+                    items: ['Male', 'Female', 'Other'].map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      setState(() {
+                        _selectedGender = newValue;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
               ],
 
               // Creator Specific
@@ -753,6 +797,27 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                    labelText: 'Date of Birth (YYYY-MM-DD)', 
                    controller: _dobController,
                    isDateField: true,
+                 ),
+                 const SizedBox(height: 16),
+                 DropdownButtonFormField<String>(
+                   decoration: InputDecoration(
+                     labelText: 'Gender',
+                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                   ),
+                   isExpanded: true,
+                   value: ['Male', 'Female', 'Other'].contains(_selectedGender) ? _selectedGender : null,
+                   items: ['Male', 'Female', 'Other'].map((String value) {
+                     return DropdownMenuItem<String>(
+                       value: value,
+                       child: Text(value),
+                     );
+                   }).toList(),
+                   onChanged: (newValue) {
+                     setState(() {
+                       _selectedGender = newValue;
+                     });
+                   },
                  ),
                 const SizedBox(height: 24),
                 

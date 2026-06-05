@@ -117,6 +117,7 @@ class _OtpPageState extends State<OtpPage> {
           phoneNumber: widget.phoneNumber,
           otp: _otpCode,
           profilePic: widget.registrationData['profilePic'] ?? '',
+          gender: widget.registrationData['gender'] ?? '',
         );
       } else if (type == 'Temple Register') {
         await _apiService.registerTemple(
@@ -128,6 +129,10 @@ class _OtpPageState extends State<OtpPage> {
           password: widget.registrationData['password'] ?? '',
           pocPhoneNumber: widget.phoneNumber,
           otp: _otpCode,
+          establishmentDate: widget.registrationData['establishmentDate'] ?? '',
+          templePics: widget.registrationData['photos'] != null 
+              ? List<String>.from(widget.registrationData['photos']) 
+              : null,
         );
       } else if (type == 'Creator Register') {
         await _apiService.registerCreator(
@@ -139,6 +144,11 @@ class _OtpPageState extends State<OtpPage> {
           phoneNumber: widget.phoneNumber,
           password: widget.registrationData['password'] ?? '',
           otp: _otpCode,
+          dob: widget.registrationData['dob'] ?? '',
+          gender: widget.registrationData['gender'] ?? '',
+          creatorPics: widget.registrationData['photos'] != null 
+              ? List<String>.from(widget.registrationData['photos']) 
+              : null,
         );
       }
 

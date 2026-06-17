@@ -81,8 +81,18 @@ class NotificationService {
       showWhen: true,
     );
 
+    const DarwinNotificationDetails darwinPlatformChannelSpecifics =
+    DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
     const NotificationDetails platformChannelSpecifics =
-    NotificationDetails(android: androidPlatformChannelSpecifics);
+    NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: darwinPlatformChannelSpecifics,
+    );
 
     await flutterLocalNotificationsPlugin.show(
       id: id,
@@ -117,6 +127,11 @@ class NotificationService {
           channelDescription: 'Notifications for upcoming events',
           importance: Importance.max,
           priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
